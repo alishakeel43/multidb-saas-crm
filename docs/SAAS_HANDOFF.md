@@ -23,9 +23,9 @@
 
 ## Commands already run
 
-- `git status` — at task start the six PHASE 0 continuity documents were staged and the branch was `main`.
-- `git log -5 --oneline` — latest visible commits: `592703e`, `6898d62`, `d524924`.
-- Created and checked out `docs/git-branch-workflow` for this documentation work.
+- `git status` — clean at the start of the co-author rule update and clean after both commits.
+- `git log -5 --oneline` — this task's latest commits are `78512a6` and `dd5258a`.
+- Created and checked out `docs/git-branch-workflow` for the documentation changes.
 - No install, build, migration, or application commands were run.
 
 ## Files touched this session
@@ -41,7 +41,6 @@
 - `docs/agents/PLAN_CLAUDE.md`
 - `docs/agents/COORDINATOR_MESSAGE.md`
 - `~/.cursor/plans/krayin_multi-tenant_saas_3c0b1cff.plan.md`
-- `docs/CHANGELOG_SAAS.md`
 
 ## Blockers / environment notes
 
