@@ -1,7 +1,7 @@
 # PROGRESS — Krayin Multi-Tenant SaaS
 
-Last updated: 2026-10-09 09:27 +05:00
-Current phase: PHASE 6
+Last updated: 2026-10-09 09:36 +05:00
+Current phase: PHASE 7
 Status: READY
 
 ## Phases
@@ -12,7 +12,7 @@ Status: READY
 - [x] PHASE 3 — Landlord schema
 - [x] PHASE 4 — Provisioning service
 - [x] PHASE 5 — Filament /super-admin
-- [ ] PHASE 6 — Feature entitlements
+- [x] PHASE 6 — Feature entitlements
 - [ ] PHASE 7 — Storage + queues
 - [ ] PHASE 8 — Isolation tests
 
@@ -22,6 +22,9 @@ Status: READY
 - PHASE 4 is complete: strict MAMP tenant database manager, compensating provisioning service, safe CRM baseline seeder, local-only provision command, tenant migrate/seed wrappers, reserved slug/domain validation, isolated service tests, and live provision/rollback verification.
 - PHASE 5 is complete: Filament 3.3 is isolated at `/super-admin` with a landlord-only platform guard; the panel manages tenants, domains, plans, plan features, subscriptions, and tenant feature overrides. Tenant provisioning delegates to `TenantProvisioningService`, and its one-time administrator password is cleared from Livewire state. CRM users cannot authenticate to the panel. An interactive `platform-admin:create` command bootstraps the first platform administrator without password command-line arguments.
 - PHASE 5 verification passed: dedicated authentication/form tests (14 assertions), the full Pest suite (210 assertions, zero failures), Pint, route registration, and whitespace checks. No tenant DB or landlord migration was run in this phase. The suite reports 83 existing PHP 8.5.7 PDO SSL-CA deprecations from the upstream database configuration.
+- PHASE 6 is complete on `phase/06-feature-entitlements`: entitlement precedence is tenant override → plan default → configured feature default; unknown features and absent tenants are disabled. The `web` middleware group returns 403 for disabled mapped Krayin modules and filters the corresponding menu entries while retaining independently enabled Contacts/Organizations and Marketing/Automation links.
+- PHASE 6 cache invalidation covers tenant override create/update/delete, plan feature create/update/delete for tenants on affected plans, and tenant plan assignment changes. Super Admin can delete a tenant override to restore plan inheritance. New tenant provisioning no longer snapshots plan defaults into override rows; existing tenants’ previously copied rows remain overrides until deliberately removed in Super Admin.
+- PHASE 6 verification passed: focused entitlement/provisioning tests (84 assertions), full Pest suite (226 assertions, zero failures), Pint, route registration, and `git diff --check`. Existing PHP 8.5.7 PDO SSL-CA deprecations remain (89 cases in full suite). No DB migration or live tenant mutation was run.
 - Local MAMP Apache uses `krayinsaas.localhost:8888` and wildcard `*.krayinsaas.localhost` for this workspace `public/`; landlord maps the apex hostname to active demo tenant. Verified base CRM and Super Admin login routes and platform subdomain Super Admin route after graceful reload; `php artisan serve` is unnecessary.
 - Context7 and official Filament documentation were unavailable due to DNS; Filament 3.3.56 installed package source was used for implementation and verification.
 - Provisioned `demo` at `demo.krayin.localhost` into the previously absent `tenant_demo`; confirmed active landlord rows, eight plan-feature defaults, trial subscription, 60 tenant tables, 93 migrations, an active Administrator user with a valid password hash, and tenant DB switching. `tenants:migrate demo` and `tenants:seed demo` also completed successfully (`Nothing to migrate`; safe baseline seeding succeeded).
@@ -37,6 +40,6 @@ Status: READY
 
 ## Next action
 
-- Begin PHASE 6 — feature entitlements on `phase/06-feature-entitlements`.
+- Begin PHASE 7 — storage and queues on its phase branch.
 - Preserve the successful `tenant_demo` test tenant unless a later cleanup is explicitly scoped to that database and approved.
 - Never run `krayin-crm:install`, `migrate:fresh`, or destructive Krayin installer user/role seeders during SaaS provisioning.

@@ -37,6 +37,7 @@ PHASE 2 registered the domain finder and database switch task. PHASE 3 integrate
 
 - [x] Tenant database manager creates tenant databases and drops only databases it created itself.
 - [x] Provisioning service migrates, safely seeds, creates an explicit-credential Administrator, and compensates on failure.
+- [x] New tenant provisioning inherits plan feature defaults without creating tenant override rows.
 - [x] Tenant migrate/seed Artisan wrappers are available.
 - [x] CLI provisioned `demo` with a tenant Administrator whose stored password hash matches the configured local credential; the credential was not displayed.
 - [x] Reserved and malformed slug/domain validation is enforced; duplicate tenant/domain/database/storage artifacts are refused.
@@ -57,11 +58,11 @@ Live verification created only the previously absent `tenant_demo`, confirmed it
 
 ## PHASE 6 — Feature entitlements
 
-- [ ] Entitlement resolution applies tenant override before plan default.
-- [ ] Feature middleware returns 403 when a feature is disabled.
-- [ ] Disabled features are hidden from the relevant admin menu.
-- [ ] Entitlement cache is invalidated when a platform admin changes an override.
-- [ ] Tests or a manual verification checklist cover these behaviors.
+- [x] Entitlement resolution applies tenant override before plan default, then configured default; unknown features/no tenant are disabled.
+- [x] Feature middleware returns 403 when a mapped stock-module feature is disabled.
+- [x] Disabled features are hidden from the relevant admin menu without hiding independently entitled child modules.
+- [x] Entitlement cache is invalidated when overrides, plan feature defaults, or tenant plan assignments change.
+- [x] Pest coverage verifies precedence, defaults, disabled access, menu filtering, route specificity, and cache invalidation.
 
 ## PHASE 7 — Storage and queues
 

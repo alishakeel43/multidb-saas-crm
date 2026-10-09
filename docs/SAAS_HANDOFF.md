@@ -2,10 +2,10 @@
 
 ## Snapshot
 
-- Date: 2026-10-09 09:27 +05:00
-- Working branch: `fix/local-mamp-virtual-host`
-- Current phase: PHASE 6 — feature entitlements
-- PHASE 5 status: COMPLETE
+- Date: 2026-10-09 09:36 +05:00
+- Working branch: `phase/06-feature-entitlements`
+- Current phase: PHASE 7 — storage and queues
+- PHASE 6 status: COMPLETE
 
 ## Completed phases
 
@@ -30,14 +30,24 @@
 - No database migrations or tenant provisioning were run in PHASE 5.
 - Composer reported eight security advisories across five dependencies during Filament installation. They were not investigated in PHASE 5; audit and resolve them as a separate dependency-hardening task before production.
 
+## PHASE 6 implementation and verification
+
+- `FeatureEntitlementService` resolves tenant override, then the assigned plan feature, then the configured feature default. Unknown features and requests without a current tenant are disabled.
+- Feature middleware is appended to Laravel's `web` group. It gates the configured Krayin leads, quotes (including nested lead quotes), contact persons, organizations, products, Web Forms, Marketing, and selected Automation routes. The most-specific matching route prefix wins.
+- The admin menu removes disabled module entries and preserves Contacts and Settings/Automation parents when at least one independently entitled child remains. Parent links point to an enabled child.
+- Entitlements are cached by tenant. Model events invalidate the cache after tenant override create/update/delete, plan feature create/update/delete for tenants on the affected plan, and tenant plan assignment changes.
+- Tenant feature override editing now exposes delete so a platform administrator can remove an override and resume plan inheritance. New tenant provisioning no longer creates override rows from plan defaults. Rows created for existing tenants by earlier provisioning remain explicit overrides until removed; no live tenant DB cleanup was performed.
+- Isolated tests verify override precedence, plan/config fallback, unknown/no-tenant behavior, 403 middleware behavior, route specificity, independent menu filtering, cache invalidation, and provisioning without copied overrides.
+- Validation passed: focused entitlement/provisioning tests (84 assertions), full Pest suite (226 assertions, zero failures), Pint, route registration, and `git diff --check`. Existing PHP 8.5 PDO SSL-CA deprecations remain (89 deprecated cases in the full suite). No migration or live DB mutation was run in this phase.
+
 ## PHASE 4 implementation and verification
 
 - `TenantDatabaseManager` restricts database operations to MAMP MySQL at `127.0.0.1:8889`, derives only validated `tenant_{slug}` names, protects `zaristech_saas` and `tenant_bootstrap`, refuses reuse, and drops only a database created by the same manager instance. Connection/privilege failures include actionable context without exposing credentials.
-- `TenantProvisioningService` validates slug/domain/credentials and rejects duplicate landlord records, database names, and storage paths. It creates pending landlord records, a tenant database, migrations, guarded CRM baseline data, explicit-credential Bouncer Administrator, copied plan features, trial subscription, and storage before activation. Its compensation removes only artifacts created by that attempt.
+- `TenantProvisioningService` validates slug/domain/credentials and rejects duplicate landlord records, database names, and storage paths. It creates pending landlord records, a tenant database, migrations, guarded CRM baseline data, explicit-credential Bouncer Administrator, trial subscription, and storage before activation. Current provisioning inherits plan features rather than copying them into tenant overrides. Its compensation removes only artifacts created by that attempt.
 - `TenantCrmSeeder` only calls the selected Krayin baseline seeders when every table in that baseline is empty. It never invokes the installer root seeder or destructive `RoleSeeder` / `UserSeeder`.
 - CLI provisioning is local/testing-only. `TENANT_ADMIN_PASSWORD` remains in ignored local `.env`; do not print or document it.
 - Reconfirmed `tenant_demo`, `demo.krayin.localhost`, and `storage/tenants/demo` were unused; ran the requested `tenants:provision` command successfully.
-- Verified active tenant/domain records, eight copied feature defaults, trial subscription, 60 tenant tables, 93 migrations, an active Administrator user with a password hash matching the local configured credential, and tenant database switching to `tenant_demo`. The credential/hash were not printed or documented.
+- Historical verification confirmed active tenant/domain records, eight copied feature defaults from the original provisioning implementation, trial subscription, 60 tenant tables, 93 migrations, an active Administrator user with a password hash matching the local configured credential, and tenant database switching to `tenant_demo`. Those pre-existing feature rows now act as tenant overrides; remove them in Super Admin to restore plan inheritance. The credential/hash were not printed or documented.
 - Smoke-tested `tenants:migrate demo` (`Nothing to migrate`) and `tenants:seed demo` (safe baseline seeding succeeded).
 - Exercised rollback with an intentional migration failure for `demo-rollback`. Only the just-created `tenant_demo_rollback` database was dropped; its landlord tenant/domain rows and storage path were removed. The successful `demo` tenant stayed active.
 - `zaristech_saas` remained at nine tables and `tenant_bootstrap` at 60. Existing schema names were unchanged except for the intended new `tenant_demo`; the rollback database is absent.
@@ -57,7 +67,7 @@ Context7 was preferred but could not be resolved for Laravel lookups; the offici
 
 ## Next concrete step
 
-Begin PHASE 6 — feature entitlements on `phase/06-feature-entitlements`. Implement tenant override-before-plan resolution, feature middleware and menu hiding, and cache invalidation on platform changes. Retain `tenant_demo` as the local verification tenant; do not remove it without a separately scoped, explicit cleanup action. Keep all credentials out of source control.
+Begin PHASE 7 — storage and queues, following its acceptance criteria and working on a dedicated `phase/07-storage-queues` branch. Retain `tenant_demo` as the local verification tenant; do not remove it without a separately scoped, explicit cleanup action. Keep all credentials out of source control.
 
 ## Files changed for PHASE 4 completion
 

@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Domain;
 use App\Models\Plan;
 use App\Models\Tenant;
-use App\Models\TenantFeature;
 use App\Support\TenantIdentifier;
 use Database\Seeders\TenantCrmSeeder;
 use Illuminate\Support\Facades\Artisan;
@@ -105,14 +104,6 @@ class TenantProvisioningService
             ], 'safe CRM baseline seeding');
 
             $this->createTenantAdministrator($adminName, $adminEmail, $adminPassword);
-
-            foreach ($plan->features()->get() as $feature) {
-                TenantFeature::query()->create([
-                    'tenant_id' => $tenant->id,
-                    'feature_key' => $feature->feature_key,
-                    'is_enabled' => $feature->is_enabled,
-                ]);
-            }
 
             $storageCreated = true;
             File::ensureDirectoryExists($storagePath);

@@ -1,5 +1,14 @@
 # SaaS Change Log
 
+## 2026-10-09 — PHASE 6 feature entitlements completed
+
+- Added tenant-override → plan-default → configured-default resolution, tenant-keyed caching, and invalidation for override, plan-feature, and tenant-plan changes.
+- Added web middleware that returns 403 for disabled mapped Krayin modules and filters unavailable admin menu entries while preserving independently enabled nested modules.
+- Made tenant override deletion available in Super Admin so tenants can resume plan inheritance.
+- Changed new tenant provisioning to inherit plan defaults rather than copying them into tenant override rows. Existing copied rows are intentionally preserved as overrides until explicitly deleted.
+- Added isolated entitlement tests for precedence, fallback, unknown features, no tenant, route specificity, 403 responses, menu filtering, cache invalidation, and provisioning behavior.
+- Validation passed: full Pest suite (226 assertions, zero failures), Pint, route registration, and whitespace checks. No live DB mutation or migration was performed. PHASE 7 — storage and queues is next.
+
 ## 2026-10-09 — PHASE 0 handoff setup
 
 - Created the six project continuity documents: handoff, progress, decisions, checklist, change log, and environment notes.

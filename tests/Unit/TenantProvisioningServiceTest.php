@@ -99,7 +99,7 @@ function provisionTenantForTest(
     );
 }
 
-it('provisions an isolated tenant, migration/seed work, feature defaults, and explicit administrator', function () {
+it('provisions an isolated tenant, migration/seed work, inherited plan features, and explicit administrator', function () {
     $slug = 'demo';
     $this->databaseManager
         ->shouldReceive('databaseExists')->once()->with($slug)->andReturnFalse();
@@ -123,7 +123,8 @@ it('provisions an isolated tenant, migration/seed work, feature defaults, and ex
 
     expect($tenant->status)->toBe('active')
         ->and(Domain::query()->where('tenant_id', $tenant->id)->value('domain'))->toBe('demo.krayin.localhost')
-        ->and(TenantFeature::query()->where('tenant_id', $tenant->id)->orderBy('feature_key')->pluck('is_enabled', 'feature_key')->all())
+        ->and($tenant->features()->exists())->toBeFalse()
+        ->and($tenant->plan->features()->orderBy('feature_key')->pluck('is_enabled', 'feature_key')->all())
         ->toBe(['leads' => true, 'quotes' => false])
         ->and(DB::connection('landlord')->table('subscriptions')->where('tenant_id', $tenant->id)->value('status'))->toBe('trial')
         ->and(DB::connection('tenant')->table('users')->where('email', 'admin@demo.krayin.localhost')->exists())->toBeTrue()
