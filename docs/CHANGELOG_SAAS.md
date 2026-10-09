@@ -65,9 +65,30 @@
 - Validation: PHP syntax, Pint, route/config boot, migration status, and the full test suite pass. Tests report existing PHP 8.5 `PDO::MYSQL_ATTR_SSL_CA` deprecation notices.
 - Committed implementation as `749e600` (`feat(phase-03): add landlord schema and models`), without a co-author trailer. PHASE 4 is next.
 
-## 2026-10-09 — PHASE 4 startup blocked by Context7 DNS
+## 2026-10-09 — PHASE 4 startup and Context7 DNS fallback
 
 - Created `phase/04-tenant-provisioning` from `phase/03-landlord-schema`.
 - Read the required continuity docs and Copilot plan; inspected Krayin installer/seeder and Spatie tenant command/action sources without changing application code.
-- Required Context7 lookups for Laravel Artisan and Spatie tenant Artisan behavior failed because `mcp.context7.com` could not be resolved. PHASE 4 is marked blocked; no framework code was written.
+- The initial Context7 lookups for Laravel Artisan and Spatie tenant Artisan behavior failed because `mcp.context7.com` could not be resolved. The user clarified that this is not a blocker; implementation continued using installed source as documented in the next entry.
 - Safety note: Krayin's stock install command invokes `migrate:fresh`; its user seeder deletes existing users and inserts the published default admin credentials. Neither should be reused in tenant provisioning.
+
+## 2026-10-09 — PHASE 4 tenant provisioning implementation
+
+- Added strict tenant slug/domain validation, including all reserved names, and a MAMP-only database manager that derives database identifiers, refuses operations on `tenant_bootstrap` and `zaristech_saas`, and only drops databases created by that manager instance.
+- Added a compensating tenant provisioning service for landlord records, an isolated tenant database, safe pending migrations, guarded CRM baseline seeders, explicit Bouncer administrator credentials, plan feature overrides, trial subscription, tenant storage, and activation. Rollback targets only artifacts created in that attempt.
+- Added local/testing-only `tenants:provision` and `tenants:migrate` / `tenants:seed` commands for a specific tenant or `--all`; the password is supplied through local `.env` or an explicit option and is never logged.
+- Added reserved slug/domain and protected database identifier tests. Syntax checks and command registration passed; the focused Pest suite passed 24 cases.
+- Context7 and official Laravel documentation DNS lookups failed. Continued using installed Laravel 12, Spatie Multitenancy, and Krayin sources as directed; no dependencies or secrets were added.
+- Did not provision a live test tenant or drop any database. Live migration, login, and failure rollback verification remain pending until a unique test domain/database and explicit admin credentials are available.
+
+## 2026-10-09 — PHASE 4 completed and verified
+
+- Expanded isolated Pest coverage for success, migrations/seeding, explicit administrator/hash creation, reserved and malformed identifiers, duplicate tenants/domains/databases/storage, MAMP configuration restrictions, actionable connection failures, and rollback after both migration and post-storage activation failures.
+- Improved database-manager errors so schema inspection, creation, and cleanup failures identify the required MAMP connectivity/privileges without exposing credentials.
+- Reconfirmed `tenant_demo`, `demo.krayin.localhost`, and `storage/tenants/demo` were unused, then ran the requested `tenants:provision` command successfully.
+- Verified the active tenant/domain, eight copied feature defaults, trial subscription, 60 tenant tables, 93 migrations, active Administrator role/user, local configured password hash match, and tenant DB switching to `tenant_demo`.
+- Smoke-tested `tenants:migrate demo` (no pending migrations) and `tenants:seed demo` successfully.
+- Exercised compensating cleanup after a controlled migration failure for `demo-rollback`; the session-created `tenant_demo_rollback` database, tenant/domain rows, and storage were removed.
+- Confirmed `zaristech_saas` remains at nine tables and `tenant_bootstrap` at 60; the existing database inventory is unchanged except for the intended new `tenant_demo`. No pre-existing database was dropped or modified.
+- Context7 could not be reached for Laravel references and `laravel.com` documentation lookup failed DNS. Continued with installed Laravel 12, Spatie, and Krayin sources plus reachable Spatie docs; no dependency or secret was added.
+- Validation passed: focused tests (99 assertions), full suite (196 assertions, zero failures), Pint, PHP syntax, command registration, and whitespace checks. The 77 full-suite deprecations are the existing upstream PHP 8.5 PDO SSL-CA notice.

@@ -10,7 +10,7 @@
 - Verified local MAMP MySQL server: `8.0.44`.
 - PHASE 1 smoke-install database: `tenant_bootstrap` (created locally; contains the stock Krayin schema/seed data, not landlord data).
 - The local ignored `.env` uses `DB_CONNECTION=tenant`, `TENANT_DB_DATABASE=tenant_bootstrap`, and `LANDLORD_DB_DATABASE=zaristech_saas`. Connection credentials are read from the local environment only; do not copy them into docs.
-- `zaristech_saas` was confirmed absent before it was created for PHASE 2. It currently has zero tables; landlord migrations are deferred to PHASE 3.
+- `zaristech_saas` was confirmed absent before PHASE 2 and was provisioned as the landlord database. PHASE 3 added eight SaaS tables; with Laravel's migration repository it currently contains nine tables.
 - The default connection is `tenant`; Spatie changes its database name when a tenant becomes current. The named `landlord` connection is reserved for platform data.
 
 ## Application paths
@@ -67,3 +67,14 @@ The isolated `tenant_bootstrap` database was created on local MAMP MySQL and the
 - The full test suite passes: 1 pass and 41 existing PHP 8.5 deprecation notices from `PDO::MYSQL_ATTR_SSL_CA`. One initial logout test run returned 419 while other Artisan checks ran concurrently; it passed both alone and in the subsequent full-suite rerun.
 
 PHP 8.5.7 emits non-fatal deprecation warnings from stock `config/database.php` for `PDO::MYSQL_ATTR_SSL_CA`; the upstream file was not modified during bootstrap.
+
+## PHASE 4 live provisioning verification
+
+- Confirmed `tenant_demo` did not exist before provisioning; the existing database inventory contained no tenant schema with that name. Confirmed the requested domain and storage path were also unused.
+- Ran `php artisan tenants:provision demo demo.krayin.localhost --name="Demo" --admin-name="Demo Admin" --admin-email="admin@demo.krayin.localhost"` successfully using the local `.env` credential. No password or hash was printed or recorded here.
+- Verified the landlord tenant is active with database `tenant_demo`, primary domain `demo.krayin.localhost`, eight plan-feature defaults, and a trial subscription.
+- Switched the tenant DB connection to `tenant_demo`; verified its 60 Krayin tables, all 93 migrations, and the active `admin@demo.krayin.localhost` Administrator with `permission_type=all`. Confirmed only that its stored hash matches the local configured credential; the credential itself was not displayed.
+- Exercised the service's compensating rollback using a controlled migration failure for unused `demo-rollback` / `demo-rollback.krayin.localhost`. It created and then removed only `tenant_demo_rollback`; its landlord tenant/domain rows and storage were also absent after failure.
+- After both operations, `zaristech_saas` remained at nine tables and `tenant_bootstrap` at 60 tables. All pre-existing MySQL schema names were unchanged; only the intended successful `tenant_demo` was added.
+- `tenant_demo` is retained as the local verification tenant. `tenant_demo_rollback` does not exist.
+- Focused Phase 4 Pest tests passed (99 assertions); full suite completed with zero failures (196 assertions). Its 77 deprecated cases are the existing PHP 8.5 `PDO::MYSQL_ATTR_SSL_CA` deprecation from upstream configuration. Pint, PHP syntax checks, and command registration passed.

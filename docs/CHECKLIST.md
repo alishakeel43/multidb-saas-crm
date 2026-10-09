@@ -35,11 +35,15 @@ PHASE 2 registered the domain finder and database switch task. PHASE 3 integrate
 
 ## PHASE 4 — Tenant provisioning
 
-- [ ] Tenant database manager creates and drops tenant databases.
-- [ ] Provisioning service migrates, seeds, creates an admin, and compensates on failure.
-- [ ] Tenant migrate/seed Artisan wrappers are available.
-- [ ] CLI can provision a test tenant with a login-capable admin.
-- [ ] Reserved domain validation is enforced.
+- [x] Tenant database manager creates tenant databases and drops only databases it created itself.
+- [x] Provisioning service migrates, safely seeds, creates an explicit-credential Administrator, and compensates on failure.
+- [x] Tenant migrate/seed Artisan wrappers are available.
+- [x] CLI provisioned `demo` with a tenant Administrator whose stored password hash matches the configured local credential; the credential was not displayed.
+- [x] Reserved and malformed slug/domain validation is enforced; duplicate tenant/domain/database/storage artifacts are refused.
+- [x] Controlled failure after creating `tenant_demo_rollback` removed that database, its landlord records, and its storage path.
+- [x] Isolated provisioning tests cover success, migration/seeding invocation, admin creation, tenant DB configuration, connection errors, and cleanup.
+
+Live verification created only the previously absent `tenant_demo`, confirmed its 60-table schema, 93 migrations, landlord tenant/domain/subscription/feature rows, Administrator, and successful tenant DB switching. `zaristech_saas` remained at nine tables and `tenant_bootstrap` at 60; all other pre-existing schema names remained unchanged. No protected or pre-existing database was dropped.
 
 ## PHASE 5 — Filament Super Admin
 
