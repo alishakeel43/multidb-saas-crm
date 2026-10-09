@@ -54,3 +54,13 @@
 - `composer validate`, config caching, `route:list`, and all 42 project tests succeeded (1 passed, 41 marked deprecated due to the stock PHP 8.5 `PDO::MYSQL_ATTR_SSL_CA` deprecation).
 - Marked PHASE 2 complete. PHASE 3 is next; it must integrate the planned `Domain` model with tenant lookup before persisted domain routing is tested.
 - Committed the implementation as `f5c1a65` (`feat(phase-02): configure tenant database switching`) without a co-author trailer.
+
+## 2026-10-09 — PHASE 3 landlord schema and models completed
+
+- Added the landlord migration for plans, plan features, tenants, domains, tenant feature overrides, subscriptions, platform users, and platform settings; added the corresponding landlord-connected Eloquent models.
+- Replaced Spatie's default attribute-based finder with a finder that resolves the request hostname through `Domain` and refuses inactive domains or non-active tenants.
+- Added the default `starter` plan and eight enabled stock-module feature keys; verified seeding is idempotent.
+- Ran the landlord migration and verified eight SaaS tables plus the migrations repository exist only on `zaristech_saas`; tenant DB retains its 60 stock Krayin tables.
+- Smoke-tested active domain resolution, inactive-domain and suspended-tenant rejection, and database switching; removed temporary smoke-test rows.
+- Validation: PHP syntax, Pint, route/config boot, migration status, and the full test suite pass. Tests report existing PHP 8.5 `PDO::MYSQL_ATTR_SSL_CA` deprecation notices.
+- Committed implementation as `749e600` (`feat(phase-03): add landlord schema and models`), without a co-author trailer. PHASE 4 is next.

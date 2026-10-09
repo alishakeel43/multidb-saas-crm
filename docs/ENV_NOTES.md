@@ -25,7 +25,7 @@
 
 ## Tenant hostnames
 
-- Spatie's configured `DomainTenantFinder` matches the request hostname against a tenant's `domain` attribute. PHASE 3 must adapt it to the planned `Domain` model and document concrete local hostnames before persisted domain-routing verification.
+- `App\Multitenancy\TenantFinder\DomainTenantFinder` matches the request hostname against `domains.domain`, returning only active domains whose tenant status is `active`. It does not read tenant IDs from request data.
 
 ## Queue worker
 
@@ -52,9 +52,18 @@ The isolated `tenant_bootstrap` database was created on local MAMP MySQL and the
 ## PHASE 2 multitenancy foundation
 
 - Installed `spatie/laravel-multitenancy` v4.2.1 (`^4.0`).
-- Published `config/multitenancy.php` and configured the built-in domain finder, tenant database-switch task, and named `tenant` / `landlord` connections.
+- Published `config/multitenancy.php` and configured named `tenant` / `landlord` connections and the tenant database-switch task.
 - The manual current-tenant smoke test switched to `tenant_bootstrap` and queried `SELECT DATABASE()` successfully; the landlord query returned `zaristech_saas`.
 - `composer validate`, configuration caching, route registration, and the project test suite succeeded. The suite reported existing PHP 8.5 deprecation notices for `PDO::MYSQL_ATTR_SSL_CA`.
 - Context7's direct MCP endpoint now responds without the invalid Authorization header. The integrated VS Code MCP client may require a reload to discard cached settings.
+
+## PHASE 3 landlord schema and models
+
+- Ran `php artisan migrate --database=landlord --path=database/migrations/landlord --no-interaction`; the landlord migration repository records the migration on `zaristech_saas`.
+- The migration creates `plans`, `plan_features`, `tenants`, `domains`, `tenant_features`, `subscriptions`, `platform_users`, and `platform_settings`. Each SaaS model uses the landlord connection; the tenant model extends Spatie's tenant model.
+- Seeded the zero-cost `starter` plan and eight enabled stock-module feature keys using `php artisan db:seed --database=landlord --class='Database\Seeders\DefaultPlanSeeder' --no-interaction`. Re-running the seeder is idempotent.
+- Smoke-tested request-host lookup through the Domain relationship, tenant status and domain active guards, and tenant DB switching back to `tenant_bootstrap`. Temporary tenant/domain records were deleted afterward.
+- Verified `zaristech_saas` contains the eight SaaS tables plus Laravel's migration repository; tenant DB still contains 60 Krayin tables. No platform user or CRM data was seeded into the landlord DB.
+- The full test suite passes: 1 pass and 41 existing PHP 8.5 deprecation notices from `PDO::MYSQL_ATTR_SSL_CA`. One initial logout test run returned 419 while other Artisan checks ran concurrently; it passed both alone and in the subsequent full-suite rerun.
 
 PHP 8.5.7 emits non-fatal deprecation warnings from stock `config/database.php` for `PDO::MYSQL_ATTR_SSL_CA`; the upstream file was not modified during bootstrap.

@@ -21,17 +21,17 @@ Check a phase only after its acceptance criteria are verified and its status is 
 
 - [x] Landlord and tenant database connections are configured for MAMP MySQL.
 - [x] Domain-based tenant finder and tenant database-switch task are configured.
-- [x] Landlord database `zaristech_saas` exists and remains empty pending PHASE 3 migrations.
+- [x] Landlord database `zaristech_saas` exists; PHASE 3 added only SaaS metadata tables there.
 - [x] A manual current-tenant smoke test queries the tenant database (`tenant_bootstrap`).
 
-PHASE 2 configures Spatie's default `DomainTenantFinder`, which queries a `domain` attribute. PHASE 3 must integrate the planned `Domain` model before persisted domain routing is considered complete.
+PHASE 2 registered the domain finder and database switch task. PHASE 3 integrates the finder with the landlord `Domain` model and rejects inactive domains and non-active tenants.
 
 ## PHASE 3 — Landlord schema and models
 
-- [ ] Landlord migrations and models cover Tenant, Domain, Plan, PlanFeature, TenantFeature, Subscription, PlatformUser, and PlatformSetting.
-- [ ] Models use the landlord connection.
-- [ ] Landlord migrations run cleanly.
-- [ ] Default plan and feature keys are seeded.
+- [x] Landlord migrations and models cover Tenant, Domain, Plan, PlanFeature, TenantFeature, Subscription, PlatformUser, and PlatformSetting.
+- [x] Models use the landlord connection.
+- [x] Landlord migrations run cleanly.
+- [x] Default plan and feature keys are seeded.
 
 ## PHASE 4 — Tenant provisioning
 
