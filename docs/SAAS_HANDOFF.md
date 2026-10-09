@@ -2,9 +2,9 @@
 
 ## Snapshot
 
-- Date: 2026-10-09 07:32 +05:00
+- Date: 2026-10-09 07:43 +05:00
 - Agent/tool last used: GitHub Copilot in VS Code
-- Working branch: `phase/01-bootstrap-krayin`
+- Working branch: `phase/02-spatie-multitenancy`
 - Current phase: PHASE 2 — Spatie Multitenancy foundation
 - Phase status: BLOCKED
 
@@ -15,12 +15,13 @@
 - Added the requested rule prohibiting assistant co-author attribution in commit messages unless explicitly requested by the user.
 - Began PHASE 1 on `phase/01-bootstrap-krayin`; verified PHP 8.5.7, Composer 2.10.1, official Krayin v2.2.6 requirements (`php ^8.3`, `laravel/framework ^12.0`), and that TCP port 8889 is open.
 - Completed PHASE 1: installed official Krayin v2.2.6, ran the official installer into isolated `tenant_bootstrap` (60 tables), and verified Artisan version and route registration.
+- Started PHASE 2 on its dedicated branch. No Spatie package or Laravel config/code has been changed because Context7 rejected the configured API key.
 
 ## Next concrete step
 
-1. Retry Context7 MCP to look up current Laravel 12 and Spatie Multitenancy docs; it was unreachable at 07:32 +05:00.
-2. When Context7 is available, begin PHASE 2 on `phase/02-spatie-multitenancy`, preserving the PHASE 1/docs branch as its base until integration into `main` is explicitly authorized.
-3. Configure landlord/tenant connections and domain-based switching without placing CRM business tables on `zaristech_saas`.
+1. Restore a valid Context7 MCP API key, then resolve Laravel and Spatie Multitenancy docs before writing framework/API code.
+2. Continue PHASE 2 on this branch: `phase/02-spatie-multitenancy`.
+3. Configure landlord/tenant connections and domain-based switching without placing CRM business tables on `zaristech_saas`; implement the MySQL database only after confirming it does not already exist and the approach is non-destructive.
 
 ## Commands already run
 
@@ -38,6 +39,8 @@
 - `php artisan route:list` — succeeded.
 - Verified 60 tables in the isolated `tenant_bootstrap` database; no landlord migration was run.
 - Committed PHASE 1 as `ae7a28c` (`feat(phase-01): bootstrap Krayin CRM 2.2.6`), without a co-author trailer.
+- Read `SAAS_HANDOFF.md`, `PROGRESS.md`, `DECISIONS.md`, `CHECKLIST.md`, and `PLAN_OPENAI_CODEX.md` in mandatory startup order.
+- Retried Context7 resolution for Laravel and Spatie Multitenancy; both failed with “Invalid API key.” No framework or package changes were made.
 
 ## Files touched this session
 
@@ -64,6 +67,7 @@
 - Do not include assistant co-author attribution in commit messages unless the user requests it.
 - Context7 MCP request failed due to transport/network error; PHASE 2 framework/API work is blocked until docs can be queried.
 - PHP 8.5.7 prints non-fatal stock PDO SSL-CA deprecation warnings.
+- Context7 credentials need repair; PHASE 2 is otherwise ready to begin.
 
 ## Do NOT
 
