@@ -4,6 +4,7 @@ namespace Webkul\Task\Repositories;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Webkul\Core\Eloquent\Repository;
@@ -62,7 +63,18 @@ class TaskRepository extends Repository
 
         Event::dispatch('task.create.before', [$data]);
 
-        $task = parent::create($data);
+        $participants = $data['participants'] ?? null;
+        unset($data['participants']);
+
+        $task = DB::transaction(function () use ($data, $participants) {
+            $task = parent::create($data);
+
+            if ($participants !== null) {
+                $this->syncParticipants($task, $participants);
+            }
+
+            return $task;
+        });
 
         Event::dispatch('task.create.after', $task);
         event(new TaskCreated($task));
@@ -82,6 +94,8 @@ class TaskRepository extends Repository
         }
 
         $oldStatus = $task->status;
+        $participants = $data['participants'] ?? null;
+        unset($data['participants']);
 
         // Handle completion metadata when status changes
         if (isset($data['status'])) {
@@ -96,7 +110,15 @@ class TaskRepository extends Repository
 
         Event::dispatch('task.update.before', [$id, $data]);
 
-        $updated = parent::update($data, $id);
+        $updated = DB::transaction(function () use ($data, $id, $participants) {
+            $updated = parent::update($data, $id);
+
+            if ($participants !== null) {
+                $this->syncParticipants($updated, $participants);
+            }
+
+            return $updated;
+        });
 
         Event::dispatch('task.update.after', $updated);
         event(new TaskUpdated($updated));
@@ -110,6 +132,24 @@ class TaskRepository extends Repository
         }
 
         return $updated;
+    }
+
+    /**
+     * Replace the participant set for a task.
+     *
+     * @param  array{users?: array<int, int|string>, persons?: array<int, int|string>}  $participants
+     */
+    private function syncParticipants(Task $task, array $participants): void
+    {
+        $task->participants()->delete();
+
+        foreach (array_unique(array_filter($participants['users'] ?? [])) as $userId) {
+            $task->participants()->create(['user_id' => (int) $userId]);
+        }
+
+        foreach (array_unique(array_filter($participants['persons'] ?? [])) as $personId) {
+            $task->participants()->create(['person_id' => (int) $personId]);
+        }
     }
 
     /**

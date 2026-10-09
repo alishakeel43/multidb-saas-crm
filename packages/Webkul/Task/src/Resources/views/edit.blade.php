@@ -82,6 +82,90 @@
                         </x-admin::form.control-group>
                     </div>
 
+                    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <div class="mb-4 text-base font-semibold text-gray-800 dark:text-white">
+                            @lang('task::app.fields.schedule')
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <x-admin::form.control-group>
+                                <x-admin::form.control-group.label>
+                                    @lang('task::app.fields.schedule_from')
+                                </x-admin::form.control-group.label>
+                                <x-admin::form.control-group.control
+                                    type="datetime-local"
+                                    name="schedule_from"
+                                    :value="old('schedule_from', $task->schedule_from?->format('Y-m-d\TH:i'))"
+                                    :label="trans('task::app.fields.schedule_from')"
+                                />
+                                <x-admin::form.control-group.error control-name="schedule_from" />
+                            </x-admin::form.control-group>
+
+                            <x-admin::form.control-group>
+                                <x-admin::form.control-group.label>
+                                    @lang('task::app.fields.schedule_to')
+                                </x-admin::form.control-group.label>
+                                <x-admin::form.control-group.control
+                                    type="datetime-local"
+                                    name="schedule_to"
+                                    :value="old('schedule_to', $task->schedule_to?->format('Y-m-d\TH:i'))"
+                                    :label="trans('task::app.fields.schedule_to')"
+                                />
+                                <x-admin::form.control-group.error control-name="schedule_to" />
+                            </x-admin::form.control-group>
+                        </div>
+
+                        <x-admin::form.control-group>
+                            <x-admin::form.control-group.label>
+                                @lang('task::app.fields.location')
+                            </x-admin::form.control-group.label>
+                            <x-admin::form.control-group.control
+                                type="text"
+                                name="location"
+                                :value="old('location', $task->location)"
+                                :label="trans('task::app.fields.location')"
+                            />
+                            <x-admin::form.control-group.error control-name="location" />
+                        </x-admin::form.control-group>
+
+                        <x-admin::form.control-group class="!mb-0">
+                            <x-admin::form.control-group.label>
+                                @lang('task::app.fields.reminder')
+                            </x-admin::form.control-group.label>
+                            <x-admin::form.control-group.control
+                                type="select"
+                                name="reminder_minutes"
+                                :value="old('reminder_minutes', $task->reminder_minutes)"
+                                :label="trans('task::app.fields.reminder')"
+                            >
+                                <option value="">@lang('task::app.fields.no-reminder')</option>
+                                @foreach ([5, 15, 30, 60, 1440] as $minutes)
+                                    <option value="{{ $minutes }}" {{ (string) old('reminder_minutes', $task->reminder_minutes) === (string) $minutes ? 'selected' : '' }}>
+                                        @if ($minutes === 1440)
+                                            @lang('task::app.fields.reminder-day')
+                                        @else
+                                            @lang('task::app.fields.reminder-option', ['minutes' => $minutes])
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </x-admin::form.control-group.control>
+                            <x-admin::form.control-group.error control-name="reminder_minutes" />
+                        </x-admin::form.control-group>
+                    </div>
+
+                    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <div class="mb-3 text-base font-semibold text-gray-800 dark:text-white">
+                            @lang('task::app.fields.participants')
+                        </div>
+                        <x-task::participant-selector
+                            :users="$participantUsers"
+                            :persons="$participantPersons"
+                            :participants="$participants"
+                        />
+                        <x-admin::form.control-group.error control-name="participants.users" />
+                        <x-admin::form.control-group.error control-name="participants.persons" />
+                    </div>
+
                     <!-- Related CRM Record -->
                     <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <div class="mb-4 text-base font-semibold text-gray-800 dark:text-white">

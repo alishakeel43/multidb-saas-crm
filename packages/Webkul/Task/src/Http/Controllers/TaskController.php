@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Webkul\Activity\Repositories\ActivityRepository;
 use Webkul\Admin\Http\Controllers\Controller;
@@ -62,6 +63,7 @@ class TaskController extends Controller
         $stats = $this->taskRepository->getTaskStats($userId);
 
         $assignableUsers = $this->getAssignableUsers();
+        $participantPersons = $this->getParticipantPersons();
 
         $pipeline = (object) [
             'id' => 'default',
@@ -73,9 +75,117 @@ class TaskController extends Controller
             'stats' => $stats,
             'users' => $assignableUsers,
             'assignableUsers' => $assignableUsers,
+            'participantPersons' => $participantPersons,
             'pipeline' => $pipeline,
             'columns' => $this->getKanbanColumns(),
         ]);
+    }
+
+    /**
+     * Resolve selected participant IDs after validation errors so the form can be repopulated.
+     *
+     * @return array{users: array<int, array{id:int,name:string}>, persons: array<int, array{id:int,name:string}>}
+     */
+    private function oldParticipants(?Task $task = null): array
+    {
+        $old = old('participants');
+
+        if ($old === null && $task) {
+            return [
+                'users' => $task->participants
+                    ->filter(fn ($participant) => $participant->user)
+                    ->map(fn ($participant) => ['id' => (int) $participant->user->id, 'name' => $participant->user->name])
+                    ->values()
+                    ->all(),
+                'persons' => $task->participants
+                    ->filter(fn ($participant) => $participant->person)
+                    ->map(fn ($participant) => ['id' => (int) $participant->person->id, 'name' => $participant->person->name])
+                    ->values()
+                    ->all(),
+            ];
+        }
+
+        $users = collect($old['users'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id);
+        $persons = collect($old['persons'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id);
+
+        return [
+            'users' => $users->isEmpty()
+                ? []
+                : $this->userRepository->getModel()->newQuery()
+                    ->whereIn('id', $users)
+                    ->get(['id', 'name'])
+                    ->map(fn ($user) => ['id' => (int) $user->id, 'name' => $user->name])
+                    ->all(),
+            'persons' => $persons->isEmpty()
+                ? []
+                : Person::query()
+                    ->whereIn('id', $persons)
+                    ->get(['id', 'name'])
+                    ->map(fn ($person) => ['id' => (int) $person->id, 'name' => $person->name])
+                    ->all(),
+        ];
+    }
+
+    /**
+     * Normalize form submissions so clearing every participant also persists.
+     */
+    private function normalizeParticipantInput(array $data): array
+    {
+        if (isset($data['participants_present'])) {
+            $data['participants'] = [
+                'users' => $data['participants']['users'] ?? [],
+                'persons' => $data['participants']['persons'] ?? [],
+            ];
+            unset($data['participants_present']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Ensure participant persons are within the current user's data scope.
+     *
+     * @param  array<int, int|string>  $personIds
+     */
+    private function validateParticipantOwnership(array $personIds): void
+    {
+        $authorizedUserIds = bouncer()->getAuthorizedUserIds();
+
+        if ($authorizedUserIds === null || $personIds === []) {
+            return;
+        }
+
+        $authorizedPersonIds = Person::query()
+            ->whereIn('user_id', $authorizedUserIds)
+            ->whereIn('id', $personIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (count($authorizedPersonIds) !== count(array_unique(array_map('intval', $personIds)))) {
+            throw ValidationException::withMessages([
+                'participants.persons' => trans('task::app.validation.participant-invalid'),
+            ]);
+        }
+    }
+
+    /**
+     * Accept either participant objects from the drawer or IDs from API clients.
+     *
+     * @param  array<int, array{id?: int|string}|int|string>  $participants
+     * @return array<int, int|string>
+     */
+    private function participantIds(array $participants): array
+    {
+        return collect($participants)
+            ->map(fn ($participant) => is_array($participant) ? ($participant['id'] ?? null) : $participant)
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**
@@ -94,7 +204,7 @@ class TaskController extends Controller
 
         foreach ($stages as $stage) {
             $query = $this->taskRepository->getModel()->newQuery()
-                ->with(['assignedUser', 'creator', 'entity'])
+                ->with(['assignedUser', 'creator', 'entity', 'participants.user', 'participants.person'])
                 ->where('tasks.status', $stage['code']);
 
             if ($authorizedUserIds !== null) {
@@ -220,7 +330,19 @@ class TaskController extends Controller
 
         $this->authorizeTaskAccess($task);
 
-        $data = $this->validate(request(), [
+        $request = request();
+        $participants = $request->input('participants');
+
+        if (is_array($participants)) {
+            $request->merge([
+                'participants' => [
+                    'users' => $this->participantIds($participants['users'] ?? []),
+                    'persons' => $this->participantIds($participants['persons'] ?? []),
+                ],
+            ]);
+        }
+
+        $data = $this->validate($request, [
             'title' => 'sometimes|required|string|max:255',
             'assigned_to' => [
                 'sometimes',
@@ -233,7 +355,18 @@ class TaskController extends Controller
             'due_date' => 'sometimes|nullable|date',
             'due_time' => 'sometimes|nullable',
             'description' => 'sometimes|nullable|string',
+            'schedule_from' => 'sometimes|nullable|date',
+            'schedule_to' => 'sometimes|nullable|date|after_or_equal:schedule_from',
+            'location' => 'sometimes|nullable|string|max:255',
+            'reminder_minutes' => ['sometimes', 'nullable', 'integer', Rule::in([5, 15, 30, 60, 1440])],
+            'participants' => 'sometimes|array',
+            'participants.users' => 'sometimes|array',
+            'participants.users.*' => ['integer', 'distinct', Rule::in($this->getAssignableUserIds())],
+            'participants.persons' => 'sometimes|array',
+            'participants.persons.*' => ['integer', 'distinct', Rule::exists('persons', 'id')],
         ]);
+
+        $this->validateParticipantOwnership($data['participants']['persons'] ?? []);
 
         $updated = $this->taskRepository->update($data, $id);
 
@@ -274,6 +407,8 @@ class TaskController extends Controller
     public function create(): View
     {
         $users = $this->userRepository->scopeToWorkspace()->all();
+        $participantUsers = $this->getAssignableUsers();
+        $participantPersons = $this->getParticipantPersons();
 
         $entityType = old('entity_type', request()->get('entity_type'));
         $entityId = old('entity_id', request()->get('entity_id'));
@@ -288,8 +423,9 @@ class TaskController extends Controller
         }
 
         $stages = $this->getStagesList();
+        $participants = $this->oldParticipants();
 
-        return view('task::create', compact('users', 'entityType', 'entityId', 'entityTitle', 'stages'));
+        return view('task::create', compact('users', 'entityType', 'entityId', 'entityTitle', 'stages', 'participants', 'participantUsers', 'participantPersons'));
     }
 
     /**
@@ -298,6 +434,7 @@ class TaskController extends Controller
     public function store(TaskRequest $request): JsonResponse|RedirectResponse
     {
         $data = $request->validated();
+        $data = $this->normalizeParticipantInput($data);
 
         $task = $this->taskRepository->create($data);
 
@@ -364,6 +501,8 @@ class TaskController extends Controller
         $this->authorizeTaskAccess($task);
 
         $users = $this->userRepository->scopeToWorkspace()->all();
+        $participantUsers = $this->getAssignableUsers();
+        $participantPersons = $this->getParticipantPersons();
 
         $entityType = old('entity_type', $task->entity_type);
         $entityId = old('entity_id', $task->entity_id);
@@ -381,8 +520,9 @@ class TaskController extends Controller
         }
 
         $stages = $this->getStagesList();
+        $participants = $this->oldParticipants($task);
 
-        return view('task::edit', compact('task', 'users', 'entityType', 'entityId', 'entityTitle', 'stages'));
+        return view('task::edit', compact('task', 'users', 'entityType', 'entityId', 'entityTitle', 'stages', 'participants', 'participantUsers', 'participantPersons'));
     }
 
     /**
@@ -395,6 +535,7 @@ class TaskController extends Controller
         $this->authorizeTaskAccess($task);
 
         $data = $request->validated();
+        $data = $this->normalizeParticipantInput($data);
 
         $updated = $this->taskRepository->update($data, $id);
 
@@ -1080,7 +1221,7 @@ class TaskController extends Controller
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        if ($authorizedIds = bouncer()->getAuthorizedUserIds()) {
+        if (($authorizedIds = bouncer()->getAuthorizedUserIds()) !== null) {
             $workspaceUserIds = array_values(array_intersect($workspaceUserIds, array_map('intval', $authorizedIds)));
         }
 
@@ -1109,6 +1250,31 @@ class TaskController extends Controller
                 'id' => (int) $user->id,
                 'name' => $user->name,
             ])
+            ->values();
+    }
+
+    /**
+     * Contacts available to the current user as task participants.
+     *
+     * @return Collection<int, array{id:int,name:string}>
+     */
+    private function getParticipantPersons(): Collection
+    {
+        $authorizedUserIds = bouncer()->getAuthorizedUserIds();
+
+        if ($authorizedUserIds === []) {
+            return collect();
+        }
+
+        $query = Person::query();
+
+        if ($authorizedUserIds !== null) {
+            $query->whereIn('user_id', $authorizedUserIds);
+        }
+
+        return $query->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($person) => ['id' => (int) $person->id, 'name' => $person->name])
             ->values();
     }
 

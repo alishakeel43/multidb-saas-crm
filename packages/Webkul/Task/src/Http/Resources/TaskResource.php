@@ -45,6 +45,27 @@ class TaskResource extends JsonResource
             'priority_label' => trans('task::app.priority.'.$this->priority),
             'due_date' => $this->due_date ? Carbon::parse($this->due_date)->format('Y-m-d') : null,
             'due_time' => $this->due_time,
+            'schedule_from' => $this->schedule_from?->format('Y-m-d\TH:i'),
+            'schedule_to' => $this->schedule_to?->format('Y-m-d\TH:i'),
+            'formatted_schedule_from' => $this->schedule_from?->isoFormat('MMM D, YYYY h:mm A'),
+            'location' => $this->location,
+            'reminder_minutes' => $this->reminder_minutes,
+            'participants' => [
+                'users' => $this->participants
+                    ->filter(fn ($participant) => $participant->user)
+                    ->map(fn ($participant) => [
+                        'id' => (int) $participant->user->id,
+                        'name' => $participant->user->name,
+                    ])
+                    ->values(),
+                'persons' => $this->participants
+                    ->filter(fn ($participant) => $participant->person)
+                    ->map(fn ($participant) => [
+                        'id' => (int) $participant->person->id,
+                        'name' => $participant->person->name,
+                    ])
+                    ->values(),
+            ],
             'formatted_due_date' => $dueDateFormatted,
             'is_overdue' => $isOverdue,
             'overdue_days' => $overdueDays,

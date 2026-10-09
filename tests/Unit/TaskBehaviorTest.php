@@ -9,6 +9,7 @@ use Tests\TestCase;
 use Webkul\Task\Http\Requests\TaskRequest;
 use Webkul\Task\Http\Requests\UpdateStatusRequest;
 use Webkul\Task\Models\Task;
+use Webkul\Task\Repositories\TaskRepository;
 
 uses(TestCase::class);
 
@@ -38,8 +39,17 @@ beforeEach(function () {
         ['id' => 2, 'name' => 'Inactive user', 'email' => 'inactive@example.test', 'status' => false],
     ]);
 
+    Schema::create('persons', function (Blueprint $table) {
+        $table->increments('id');
+        $table->unsignedInteger('user_id')->nullable();
+        $table->string('name');
+    });
+    DB::table('persons')->insert(['id' => 1, 'user_id' => 1, 'name' => 'CRM contact']);
+
     $tasksMigration = require base_path('packages/Webkul/Task/src/Database/Migrations/2026_10_07_140000_create_tasks_table.php');
     $tasksMigration->up();
+    $fieldsMigration = require base_path('packages/Webkul/Task/src/Database/Migrations/2026_10_09_100000_add_schedule_and_participants_to_tasks.php');
+    $fieldsMigration->up();
     $stagesMigration = require base_path('packages/Webkul/Task/src/Database/Migrations/2026_10_07_150000_create_task_stages_table.php');
     $stagesMigration->up();
     DB::table('task_stages')->insert([
@@ -123,6 +133,40 @@ it('validates task assignments against active users and tenant task stages', fun
     ])->assertUnprocessable()->assertJsonValidationErrors('status');
 });
 
+it('validates scheduling fields and participant records', function () {
+    Route::post('/_tests/task-fields-request', fn (TaskRequest $request) => response()->json($request->validated()));
+
+    $this->postJson('/_tests/task-fields-request', [
+        'title' => 'Scheduled task',
+        'schedule_from' => '2026-10-11T09:30',
+        'schedule_to' => '2026-10-11T10:00',
+        'location' => 'Conference room',
+        'reminder_minutes' => 15,
+        'participants' => [
+            'users' => [1],
+            'persons' => [1],
+        ],
+    ])->assertOk()
+        ->assertJsonPath('location', 'Conference room')
+        ->assertJsonPath('reminder_minutes', 15)
+        ->assertJsonPath('participants.users.0', 1)
+        ->assertJsonPath('participants.persons.0', 1);
+
+    $this->postJson('/_tests/task-fields-request', [
+        'title' => 'Invalid schedule',
+        'schedule_from' => '2026-10-11T10:00',
+        'schedule_to' => '2026-10-11T09:00',
+        'reminder_minutes' => 7,
+        'participants' => ['users' => [2], 'persons' => [999]],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'schedule_to',
+            'reminder_minutes',
+            'participants.users.0',
+            'participants.persons.0',
+        ]);
+});
+
 it('accepts configured tenant stages for kanban status changes and rejects unknown stages', function () {
     Route::post('/_tests/task-status-request', fn (UpdateStatusRequest $request) => response()->json($request->validated()));
 
@@ -150,4 +194,32 @@ it('stores task relationships in the tenant task schema without a tenant_id colu
         ->and($task->entity_type)->toBe('leads')
         ->and($task->entity_id)->toBe(42)
         ->and($task->due_datetime->toDateTimeString())->toBe('2026-10-11 23:59:59');
+});
+
+it('persists task schedule data and user and contact participants', function () {
+    $task = app(TaskRepository::class)->create([
+        'title' => 'Scheduled task',
+        'status' => Task::STATUS_PENDING,
+        'priority' => Task::PRIORITY_MEDIUM,
+        'schedule_from' => '2026-10-11 09:30:00',
+        'schedule_to' => '2026-10-11 10:00:00',
+        'location' => 'Conference room',
+        'reminder_minutes' => 15,
+        'participants' => ['users' => [1], 'persons' => [1]],
+    ]);
+    $taskId = (int) $task->id;
+
+    expect(Schema::hasColumn('tasks', 'schedule_from'))->toBeTrue()
+        ->and(Task::query()->findOrFail($taskId)->schedule_from->toDateTimeString())->toBe('2026-10-11 09:30:00')
+        ->and(Task::query()->findOrFail($taskId)->schedule_to->toDateTimeString())->toBe('2026-10-11 10:00:00')
+        ->and(Task::query()->findOrFail($taskId)->location)->toBe('Conference room')
+        ->and(Task::query()->findOrFail($taskId)->reminder_minutes)->toBe(15)
+        ->and(DB::table('task_participants')->where('task_id', $taskId)->count())->toBe(2);
+
+    app(TaskRepository::class)->update([
+        'participants' => ['users' => [], 'persons' => [1]],
+    ], $taskId);
+
+    expect(DB::table('task_participants')->where('task_id', $taskId)->count())->toBe(1)
+        ->and(DB::table('task_participants')->where('task_id', $taskId)->whereNotNull('person_id')->exists())->toBeTrue();
 });

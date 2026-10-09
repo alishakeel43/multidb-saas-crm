@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Webkul\Contact\Models\OrganizationProxy;
 use Webkul\Contact\Models\PersonProxy;
@@ -67,6 +68,10 @@ class Task extends Model implements TaskContract
         'priority',
         'due_date',
         'due_time',
+        'schedule_from',
+        'schedule_to',
+        'location',
+        'reminder_minutes',
         'assigned_to',
         'created_by',
         'completed_by',
@@ -82,6 +87,9 @@ class Task extends Model implements TaskContract
      */
     protected $casts = [
         'due_date' => 'date:Y-m-d',
+        'schedule_from' => 'datetime',
+        'schedule_to' => 'datetime',
+        'reminder_minutes' => 'integer',
         'completed_at' => 'datetime',
     ];
 
@@ -120,6 +128,11 @@ class Task extends Model implements TaskContract
     public function entity(): MorphTo
     {
         return $this->morphTo(__FUNCTION__, 'entity_type', 'entity_id');
+    }
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(TaskParticipant::class)->with(['user', 'person']);
     }
 
     /**

@@ -243,6 +243,14 @@
                                             <span>@{{ element.formatted_due_date }}</span>
                                         </div>
 
+                                        <div
+                                            v-if="element.formatted_schedule_from"
+                                            class="flex items-center gap-1 rounded-xl bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200"
+                                        >
+                                            <span class="icon-calendar text-xs"></span>
+                                            <span>@{{ element.formatted_schedule_from }}</span>
+                                        </div>
+
                                         <!-- Related Entity Badge -->
                                         <div
                                             class="flex items-center gap-1 rounded-xl bg-sky-100 px-2 py-1 text-xs font-medium text-sky-800 dark:bg-sky-950 dark:text-sky-200"
@@ -420,6 +428,90 @@
                                     v-model="quickView.form.due_time"
                                 />
                             </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                    @lang('task::app.fields.schedule_from')
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    v-model="quickView.form.schedule_from"
+                                />
+                            </div>
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                    @lang('task::app.fields.schedule_to')
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    v-model="quickView.form.schedule_to"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('task::app.fields.location')
+                            </label>
+                            <input
+                                type="text"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                v-model="quickView.form.location"
+                            />
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('task::app.fields.reminder')
+                            </label>
+                            <select
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                v-model="quickView.form.reminder_minutes"
+                            >
+                                <option value="">@lang('task::app.fields.no-reminder')</option>
+                                <option value="5">@lang('task::app.fields.reminder-option', ['minutes' => 5])</option>
+                                <option value="15">@lang('task::app.fields.reminder-option', ['minutes' => 15])</option>
+                                <option value="30">@lang('task::app.fields.reminder-option', ['minutes' => 30])</option>
+                                <option value="60">@lang('task::app.fields.reminder-option', ['minutes' => 60])</option>
+                                <option value="1440">@lang('task::app.fields.reminder-day')</option>
+                            </select>
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('task::app.fields.participants')
+                            </label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <select
+                                    multiple
+                                    size="4"
+                                    v-model="quickView.form.participants.users"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    aria-label="@lang('task::app.fields.users')"
+                                >
+                                    <option v-for="user in assignableUsers" :key="'participant-user-' + user.id" :value="user.id">
+                                        @{{ user.name }}
+                                    </option>
+                                </select>
+                                <select
+                                    multiple
+                                    size="4"
+                                    v-model="quickView.form.participants.persons"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    aria-label="@lang('task::app.fields.persons')"
+                                >
+                                    <option v-for="person in participantPersons" :key="'participant-person-' + person.id" :value="person.id">
+                                        @{{ person.name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                @lang('task::app.fields.participant-selection-help')
+                            </p>
                         </div>
 
                         <!-- Description -->
@@ -707,6 +799,8 @@
 
                     assignableUsers: @json($assignableUsers ?? []),
 
+                    participantPersons: @json($participantPersons ?? []),
+
                     selectedUserFilter: null,
 
                     stageTasks: {},
@@ -725,6 +819,14 @@
                             priority: 'medium',
                             due_date: '',
                             due_time: '',
+                            schedule_from: '',
+                            schedule_to: '',
+                            location: '',
+                            reminder_minutes: '',
+                            participants: {
+                                users: [],
+                                persons: [],
+                            },
                             description: '',
                         },
                     },
@@ -950,6 +1052,14 @@
                         priority: task.priority ?? 'medium',
                         due_date: task.due_date ?? '',
                         due_time: task.due_time ?? '',
+                        schedule_from: task.schedule_from ?? '',
+                        schedule_to: task.schedule_to ?? '',
+                        location: task.location ?? '',
+                        reminder_minutes: task.reminder_minutes == null ? '' : String(task.reminder_minutes),
+                        participants: {
+                            users: (task.participants?.users || []).map(participant => participant.id),
+                            persons: (task.participants?.persons || []).map(participant => participant.id),
+                        },
                         description: task.description ?? '',
                     };
 

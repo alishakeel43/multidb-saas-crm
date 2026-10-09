@@ -151,6 +151,30 @@
                     @endif
                 </div>
 
+                <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <h2 class="mb-3 text-base font-semibold text-gray-800 dark:text-white">
+                        @lang('task::app.fields.participants')
+                    </h2>
+
+                    @if ($task->participants->isNotEmpty())
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($task->participants as $participant)
+                                @php($name = $participant->user?->name ?? $participant->person?->name)
+                                @if ($name)
+                                    <span class="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-800 dark:bg-gray-800 dark:text-blue-200">
+                                        {{ $name }}
+                                        <span class="text-xs text-blue-600 dark:text-blue-300">
+                                            ({{ $participant->user ? trans('task::app.fields.users') : trans('task::app.fields.persons') }})
+                                        </span>
+                                    </span>
+                                @endif
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="italic text-sm text-gray-400">@lang('task::app.fields.no-participants')</p>
+                    @endif
+                </div>
+
                 <!-- Related CRM Record Card -->
                 <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <h2 class="mb-3 text-base font-semibold text-gray-800 dark:text-white">
@@ -199,6 +223,38 @@
                     </h2>
 
                     <div class="flex flex-col gap-3.5 text-sm">
+                        <div class="flex items-center justify-between border-b pb-2.5 dark:border-gray-800">
+                            <span class="text-gray-500 dark:text-gray-400">@lang('task::app.fields.schedule_from')</span>
+                            <span class="font-medium text-gray-900 dark:text-white">
+                                {{ $task->schedule_from?->format('M j, Y g:i A') ?? '—' }}
+                            </span>
+                        </div>
+
+                        <div class="flex items-center justify-between border-b pb-2.5 dark:border-gray-800">
+                            <span class="text-gray-500 dark:text-gray-400">@lang('task::app.fields.schedule_to')</span>
+                            <span class="font-medium text-gray-900 dark:text-white">
+                                {{ $task->schedule_to?->format('M j, Y g:i A') ?? '—' }}
+                            </span>
+                        </div>
+
+                        <div class="flex items-center justify-between border-b pb-2.5 dark:border-gray-800">
+                            <span class="text-gray-500 dark:text-gray-400">@lang('task::app.fields.location')</span>
+                            <span class="font-medium text-gray-900 dark:text-white">{{ $task->location ?: '—' }}</span>
+                        </div>
+
+                        <div class="flex items-center justify-between border-b pb-2.5 dark:border-gray-800">
+                            <span class="text-gray-500 dark:text-gray-400">@lang('task::app.fields.reminder')</span>
+                            <span class="font-medium text-gray-900 dark:text-white">
+                                @if ($task->reminder_minutes === null)
+                                    @lang('task::app.fields.no-reminder')
+                                @elseif ($task->reminder_minutes === 1440)
+                                    @lang('task::app.fields.reminder-day')
+                                @else
+                                    @lang('task::app.fields.reminder-option', ['minutes' => $task->reminder_minutes])
+                                @endif
+                            </span>
+                        </div>
+
                         <!-- Due Date -->
                         <div class="flex items-center justify-between border-b pb-2.5 dark:border-gray-800">
                             <span class="text-gray-500 dark:text-gray-400">@lang('admin::app.tasks.fields.due_date')</span>

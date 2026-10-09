@@ -66,11 +66,29 @@ class TaskRequest extends FormRequest
             ],
             'due_date' => 'nullable|date',
             'due_time' => 'nullable|string|max:10',
+            'schedule_from' => 'nullable|date',
+            'schedule_to' => 'nullable|date|after_or_equal:schedule_from',
+            'location' => 'nullable|string|max:255',
+            'reminder_minutes' => ['nullable', 'integer', Rule::in([5, 15, 30, 60, 1440])],
             'assigned_to' => [
                 'nullable',
                 'integer',
                 Rule::exists('users', 'id')->where(fn ($query) => $query->where('status', 1)),
             ],
+            'participants' => 'sometimes|array',
+            'participants.users' => 'sometimes|array',
+            'participants.users.*' => [
+                'integer',
+                'distinct',
+                Rule::in($this->assignableUserIds()),
+            ],
+            'participants.persons' => 'sometimes|array',
+            'participants.persons.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('persons', 'id'),
+            ],
+            'participants_present' => 'sometimes|boolean',
             'entity_type' => [
                 'nullable',
                 'string',
@@ -101,6 +119,23 @@ class TaskRequest extends FormRequest
                 }
             }
 
+            $authorizedUserIds = $this->authorizedUserIds();
+
+            if ($authorizedUserIds !== null) {
+                $unauthorizedPersonIds = collect($this->input('participants.persons', []))
+                    ->filter(fn ($personId) => ! Person::query()
+                        ->whereKey($personId)
+                        ->whereIn('user_id', $authorizedUserIds)
+                        ->exists());
+
+                foreach ($unauthorizedPersonIds as $personId) {
+                    $validator->errors()->add(
+                        'participants.persons',
+                        trans('task::app.validation.participant-invalid')
+                    );
+                }
+            }
+
             $entityType = $this->input('entity_type');
             $entityId = $this->input('entity_id');
 
@@ -118,5 +153,36 @@ class TaskRequest extends FormRequest
                 }
             }
         });
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function assignableUserIds(): array
+    {
+        $userIds = DB::table('users')
+            ->where('status', 1)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        $authorizedUserIds = $this->authorizedUserIds();
+
+        if ($authorizedUserIds !== null) {
+            $userIds = $userIds->intersect(array_map('intval', $authorizedUserIds));
+        }
+
+        return $userIds->values()->all();
+    }
+
+    /**
+     * Unauthenticated request validation is used by unit tests and service callers.
+     */
+    private function authorizedUserIds(): ?array
+    {
+        if (! auth()->guard('user')->check()) {
+            return null;
+        }
+
+        return bouncer()->getAuthorizedUserIds();
     }
 }
