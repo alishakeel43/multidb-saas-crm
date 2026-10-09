@@ -6,6 +6,7 @@ use App\Models\PlanFeature;
 use App\Models\Tenant;
 use App\Models\TenantFeature;
 use Illuminate\Support\Facades\Cache;
+use LogicException;
 
 class FeatureEntitlementService
 {
@@ -16,12 +17,6 @@ class FeatureEntitlementService
      */
     public function isEnabled(string $featureKey, ?Tenant $tenant = null): bool
     {
-        $definition = config("features.{$featureKey}");
-
-        if (! is_array($definition)) {
-            return false;
-        }
-
         $tenant ??= Tenant::current();
 
         if (! $tenant) {
@@ -34,15 +29,46 @@ class FeatureEntitlementService
             fn (): array => $this->loadTenantFeatures($tenant),
         );
 
+        return $this->resolveFeature($featureKey, $features);
+    }
+
+    /**
+     * @param  array{overrides: array<string, bool>, plan: array<string, bool>}  $features
+     * @param  array<string, bool>  $resolving
+     */
+    private function resolveFeature(string $featureKey, array $features, array $resolving = []): bool
+    {
+        $definition = config("features.{$featureKey}");
+
+        if (! is_array($definition)) {
+            return false;
+        }
+
+        if (isset($resolving[$featureKey])) {
+            throw new LogicException("Circular feature dependency detected for [{$featureKey}].");
+        }
+
+        $resolving[$featureKey] = true;
+
         if (array_key_exists($featureKey, $features['overrides'])) {
-            return $features['overrides'][$featureKey];
+            $enabled = $features['overrides'][$featureKey];
+        } elseif (array_key_exists($featureKey, $features['plan'])) {
+            $enabled = $features['plan'][$featureKey];
+        } else {
+            $enabled = (bool) ($definition['default_enabled'] ?? false);
         }
 
-        if (array_key_exists($featureKey, $features['plan'])) {
-            return $features['plan'][$featureKey];
+        if (! $enabled) {
+            return false;
         }
 
-        return (bool) ($definition['default_enabled'] ?? false);
+        foreach ($definition['depends_on'] ?? [] as $dependency) {
+            if (! $this->resolveFeature($dependency, $features, $resolving)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function featureForRoute(?string $routeName): ?string
@@ -55,11 +81,18 @@ class FeatureEntitlementService
         $longestPrefixLength = -1;
 
         foreach (config('features', []) as $featureKey => $definition) {
+            if (in_array($routeName, $definition['route_names'] ?? [], true)) {
+                $matchedFeature = $featureKey;
+                $longestPrefixLength = PHP_INT_MAX;
+
+                continue;
+            }
+
             foreach ($definition['route_prefixes'] ?? [] as $prefix) {
                 $exactName = rtrim($prefix, '.');
                 $matches = $routeName === $exactName || str_starts_with($routeName, $prefix);
 
-                if ($matches && strlen($prefix) > $longestPrefixLength) {
+                if ($longestPrefixLength < PHP_INT_MAX && $matches && strlen($prefix) > $longestPrefixLength) {
                     $matchedFeature = $featureKey;
                     $longestPrefixLength = strlen($prefix);
                 }

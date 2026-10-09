@@ -1,11 +1,34 @@
 <?php
 
 return [
+    'dashboard' => [
+        'label' => 'Dashboard',
+        'default_enabled' => true,
+        'route_prefixes' => ['admin.dashboard.'],
+        'menu_keys' => ['dashboard'],
+    ],
+    'settings' => [
+        'label' => 'Settings',
+        'default_enabled' => true,
+        'route_names' => ['admin.settings.index', 'admin.settings.search'],
+        'menu_keys' => ['settings'],
+    ],
     'leads' => [
         'label' => 'Leads',
         'default_enabled' => true,
-        'route_prefixes' => ['admin.leads.'],
-        'menu_keys' => ['leads', 'settings.lead', 'settings.lead.pipelines', 'settings.lead.sources', 'settings.lead.types'],
+        'route_prefixes' => [
+            'admin.leads.',
+            'admin.settings.pipelines.',
+            'admin.settings.sources.',
+            'admin.settings.types.',
+        ],
+        'menu_keys' => [
+            'leads',
+            'settings.lead',
+            'settings.lead.pipelines',
+            'settings.lead.sources',
+            'settings.lead.types',
+        ],
     ],
     'contacts' => [
         'label' => 'Contacts',
@@ -18,6 +41,7 @@ return [
     'organizations' => [
         'label' => 'Organizations',
         'default_enabled' => true,
+        'depends_on' => ['contacts'],
         'route_prefixes' => ['admin.contacts.organizations.'],
         'menu_keys' => ['contacts.organizations'],
         'menu_any_keys' => ['contacts'],
@@ -32,39 +56,181 @@ return [
     'quotes' => [
         'label' => 'Quotes',
         'default_enabled' => true,
+        'depends_on' => ['leads', 'products'],
         'route_prefixes' => ['admin.quotes.', 'admin.leads.quotes.'],
         'menu_keys' => ['quotes'],
     ],
-    'webforms' => [
-        'label' => 'Web Forms',
+    'mail' => [
+        'label' => 'Mail',
         'default_enabled' => true,
-        'route_prefixes' => ['admin.settings.web_forms.'],
-        'menu_keys' => ['settings.other_settings.web_forms'],
+        'route_prefixes' => ['admin.mail.'],
+        'menu_keys' => [
+            'mail',
+            'mail.inbox',
+            'mail.draft',
+            'mail.outbox',
+            'mail.sent',
+            'mail.trash',
+        ],
     ],
-    'marketing' => [
-        'label' => 'Marketing',
+    'activities' => [
+        'label' => 'Activities',
         'default_enabled' => true,
-        'route_prefixes' => ['admin.settings.marketing.'],
-        'menu_keys' => ['settings.automation.events', 'settings.automation.campaigns'],
-        'menu_any_keys' => ['settings.automation'],
-        'menu_any_routes' => ['settings.automation' => 'admin.settings.marketing.events.index'],
+        'route_prefixes' => ['admin.activities.'],
+        'menu_keys' => ['activities'],
+    ],
+    'user_management' => [
+        'label' => 'User management',
+        'default_enabled' => true,
+        'route_prefixes' => [
+            'admin.settings.groups.',
+            'admin.settings.roles.',
+            'admin.settings.users.',
+        ],
+        'menu_keys' => [
+            'settings.user',
+            'settings.user.groups',
+            'settings.user.roles',
+            'settings.user.users',
+        ],
+    ],
+    'inventory' => [
+        'label' => 'Inventory',
+        'default_enabled' => true,
+        'route_prefixes' => [
+            'admin.settings.warehouses.',
+            'admin.settings.warehouse.activities.',
+            'admin.settings.locations.',
+        ],
+        'menu_keys' => ['settings.inventory', 'settings.inventory.warehouse'],
     ],
     'automation' => [
         'label' => 'Automation',
         'default_enabled' => true,
-        'route_prefixes' => [
-            'admin.settings.attributes.',
-            'admin.settings.email_templates.',
-            'admin.settings.workflows.',
-            'admin.settings.webhooks.',
-        ],
-        'menu_keys' => [
-            'settings.automation.attributes',
-            'settings.automation.email_templates',
-            'settings.automation.webhooks',
-            'settings.automation.workflows',
-        ],
+    ],
+    'attributes' => [
+        'label' => 'Custom attributes',
+        'default_enabled' => true,
+        'depends_on' => ['automation'],
+        'route_prefixes' => ['admin.settings.attributes.'],
+        'menu_keys' => ['settings.automation.attributes'],
         'menu_any_keys' => ['settings.automation'],
-        'menu_any_routes' => ['settings.automation' => 'admin.settings.attributes.index'],
+        'menu_any_routes' => [
+            'settings.automation' => 'admin.settings.attributes.index',
+        ],
+    ],
+    'email_templates' => [
+        'label' => 'Email templates',
+        'default_enabled' => true,
+        'depends_on' => ['automation'],
+        'route_prefixes' => ['admin.settings.email_templates.'],
+        'menu_keys' => ['settings.automation.email_templates'],
+        'menu_any_keys' => ['settings.automation'],
+        'menu_any_routes' => [
+            'settings.automation' => 'admin.settings.email_templates.index',
+        ],
+    ],
+    'marketing' => [
+        'label' => 'Marketing',
+        'default_enabled' => true,
+        'depends_on' => ['automation'],
+    ],
+    'marketing_events' => [
+        'label' => 'Marketing events',
+        'default_enabled' => true,
+        'depends_on' => ['marketing'],
+        'route_prefixes' => ['admin.settings.marketing.events.'],
+        'menu_keys' => ['settings.automation.events'],
+        'menu_any_keys' => ['settings.automation'],
+        'menu_any_routes' => [
+            'settings.automation' => 'admin.settings.marketing.events.index',
+        ],
+    ],
+    'marketing_campaigns' => [
+        'label' => 'Marketing campaigns',
+        'default_enabled' => true,
+        'depends_on' => ['marketing', 'marketing_events'],
+        'route_prefixes' => ['admin.settings.marketing.campaigns.'],
+        'menu_keys' => ['settings.automation.campaigns'],
+        'menu_any_keys' => ['settings.automation'],
+        'menu_any_routes' => [
+            'settings.automation' => 'admin.settings.marketing.campaigns.index',
+        ],
+    ],
+    'webhooks' => [
+        'label' => 'Webhooks',
+        'default_enabled' => true,
+        'depends_on' => ['automation'],
+        'route_prefixes' => ['admin.settings.webhooks.'],
+        'menu_keys' => ['settings.automation.webhooks'],
+        'menu_any_keys' => ['settings.automation'],
+        'menu_any_routes' => [
+            'settings.automation' => 'admin.settings.webhooks.index',
+        ],
+    ],
+    'workflows' => [
+        'label' => 'Workflows',
+        'default_enabled' => true,
+        'depends_on' => ['automation'],
+        'route_prefixes' => ['admin.settings.workflows.'],
+        'menu_keys' => ['settings.automation.workflows'],
+        'menu_any_keys' => ['settings.automation'],
+        'menu_any_routes' => [
+            'settings.automation' => 'admin.settings.workflows.index',
+        ],
+    ],
+    'data_transfer' => [
+        'label' => 'Data import/export',
+        'default_enabled' => true,
+        'depends_on' => ['automation'],
+        'route_prefixes' => ['admin.settings.data_transfer.'],
+        'menu_keys' => ['settings.automation.data_transfer'],
+        'menu_any_keys' => ['settings.automation'],
+        'menu_any_routes' => [
+            'settings.automation' => 'admin.settings.data_transfer.imports.index',
+        ],
+    ],
+    'webforms' => [
+        'label' => 'Web Forms',
+        'default_enabled' => true,
+        'depends_on' => ['leads'],
+        'route_prefixes' => ['admin.settings.web_forms.'],
+        'menu_keys' => ['settings.other_settings.web_forms'],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.settings.web_forms.index',
+        ],
+    ],
+    'tags' => [
+        'label' => 'Tags',
+        'default_enabled' => true,
+        'route_prefixes' => ['admin.settings.tags.'],
+        'menu_keys' => ['settings.other_settings.tags'],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.settings.tags.index',
+        ],
+    ],
+    'google_contacts' => [
+        'label' => 'Google Contacts integration',
+        'default_enabled' => true,
+        'route_prefixes' => ['admin.settings.google_contacts.'],
+        'menu_keys' => ['settings.other_settings.google_contacts'],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.settings.google_contacts.index',
+        ],
+    ],
+    'configuration' => [
+        'label' => 'Configuration',
+        'default_enabled' => true,
+        'route_prefixes' => ['admin.configuration.'],
+        'menu_keys' => ['configuration'],
+    ],
+    'help' => [
+        'label' => 'Help',
+        'default_enabled' => true,
+        'route_prefixes' => ['admin.help.'],
+        'menu_keys' => ['help'],
     ],
 ];

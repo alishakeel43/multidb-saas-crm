@@ -36,6 +36,7 @@ return [
 
         'database' => [
             'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION', 'landlord'),
             'table' => 'jobs',
             'queue' => 'default',
             'retry_after' => 90,
@@ -82,7 +83,7 @@ return [
 
     'failed' => [
         'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
-        'database' => env('DB_CONNECTION', 'mysql'),
+        'database' => env('QUEUE_FAILED_DATABASE', 'landlord'),
         'table' => 'failed_jobs',
     ],
 

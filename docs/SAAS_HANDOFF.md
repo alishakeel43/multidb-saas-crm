@@ -2,10 +2,22 @@
 
 ## Snapshot
 
-- Date: 2026-10-09 09:36 +05:00
-- Working branch: `phase/06-feature-entitlements`
-- Current phase: PHASE 7 — storage and queues
-- PHASE 6 status: COMPLETE
+- Date: 2026-10-09
+- Working branch: `phase/07-storage-queues`
+- Current phase: COMPLETE — `V1_COMPLETE`
+- PHASE 8 status: COMPLETE
+- PHASE 7 status: COMPLETE
+
+## Final V1 isolation verification
+
+- Separate active domain records for tenant A and tenant B resolve to their respective tenant records and separate SQLite databases; each tenant sees only its own isolated record.
+- Tenant storage switching invalidates already-cached Laravel filesystem disks. A file written under tenant A's local disk is not visible through tenant B's disk.
+- A queued `TenantAware` job was dispatched with tenant A current, processed by Laravel's database queue worker, and observed tenant A's context inside `handle()`; the worker returns to the prior no-tenant state afterward.
+- Database queue and failed-job tables are configured on the landlord connection so a worker can retrieve tenant jobs centrally; setup commands are recorded in `ENV_NOTES.md`.
+- Disabled feature routes return 403 and tenant CRM accounts are not accepted by the isolated `/super-admin` panel (existing focused tests).
+- Focused tests pass for tenant storage isolation, two-domain/two-database isolation, asynchronous queue context, feature gating, and Super Admin access.
+- Full Pest suite completed without failures (264 assertions); 95 existing upstream PHP deprecation notices remain.
+- Known production follow-up: investigate the Composer security advisories previously reported, deploy with production-grade database/domain settings, and supervise the queue worker. The local MAMP worker process itself has not been separately exercised.
 
 ## Completed phases
 
@@ -32,13 +44,13 @@
 
 ## PHASE 6 implementation and verification
 
-- `FeatureEntitlementService` resolves tenant override, then the assigned plan feature, then the configured feature default. Unknown features and requests without a current tenant are disabled.
-- Feature middleware is appended to Laravel's `web` group. It gates the configured Krayin leads, quotes (including nested lead quotes), contact persons, organizations, products, Web Forms, Marketing, and selected Automation routes. The most-specific matching route prefix wins.
-- The admin menu removes disabled module entries and preserves Contacts and Settings/Automation parents when at least one independently entitled child remains. Parent links point to an enabled child.
+- `FeatureEntitlementService` resolves tenant override, then the assigned plan feature, then the configured feature default. Unknown features and requests without a current tenant are disabled. It enforces each feature's `depends_on` prerequisites recursively; a child cannot be enabled while a prerequisite is disabled, regardless of the child's plan/tenant toggle.
+- Feature middleware is appended to Laravel's `web` group. It gates every stock Krayin admin menu module, including dashboard, leads and lead settings, contacts/organizations, products, quotes, mail, activities, user management, inventory, automation subsections, marketing events/campaigns, Web Forms, tags, Google Contacts, configuration, and help. The most-specific route prefix wins; exact shared settings routes use exact-name mapping.
+- The admin menu hides disabled module entries; Contacts, Automation, and Other Settings parents point to an enabled child and disappear when all child features are effectively disabled. Every stock admin menu key is covered by the catalog.
 - Entitlements are cached by tenant. Model events invalidate the cache after tenant override create/update/delete, plan feature create/update/delete for tenants on the affected plan, and tenant plan assignment changes.
 - Tenant feature override editing now exposes delete so a platform administrator can remove an override and resume plan inheritance. New tenant provisioning no longer creates override rows from plan defaults. Rows created for existing tenants by earlier provisioning remain explicit overrides until removed; no live tenant DB cleanup was performed.
-- Isolated tests verify override precedence, plan/config fallback, unknown/no-tenant behavior, 403 middleware behavior, route specificity, independent menu filtering, cache invalidation, and provisioning without copied overrides.
-- Validation passed: focused entitlement/provisioning tests (84 assertions), full Pest suite (226 assertions, zero failures), Pint, route registration, and `git diff --check`. Existing PHP 8.5 PDO SSL-CA deprecations remain (89 deprecated cases in the full suite). No migration or live DB mutation was run in this phase.
+- Isolated tests verify override precedence, plan/config fallback, unknown/no-tenant behavior, dependency cascades including enabled child overrides, 403 middleware behavior, full menu coverage, route specificity, cache invalidation, and provisioning without copied overrides.
+- Validation before the catalog follow-up passed: focused entitlement/provisioning tests (84 assertions), full Pest suite (226 assertions, zero failures), Pint, route registration, and `git diff --check`. The follow-up expands menu coverage and dependency tests on the same PHASE 6 branch; final follow-up/full-suite results are recorded in the changelog and progress before commit. Existing PHP 8.5 PDO SSL-CA deprecations are unrelated. No migration or live DB mutation has been run.
 
 ## PHASE 4 implementation and verification
 

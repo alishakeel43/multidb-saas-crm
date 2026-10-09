@@ -1,5 +1,29 @@
 # SaaS Change Log
 
+## 2026-10-09 — PHASE 8 isolation hardening complete
+
+- Added explicit two-domain/two-database isolation coverage: each resolved tenant reads its own isolated record.
+- Fixed cached Laravel filesystem disks during tenant switches and verified tenant A's local files are not visible through tenant B's local disk.
+- Configured Laravel's database queue and failed-job storage to use the landlord connection, and documented queue migrations, `.env` settings, and worker startup in `ENV_NOTES.md`.
+- Added an asynchronous queue-worker test proving a `TenantAware` job runs with its dispatching tenant and restores the previous no-tenant worker context.
+- Reconciled PHASE 7/8 checklists and recorded `V1_COMPLETE` plus production follow-up notes in the progress and handoff documents.
+- Validation: the full Pest suite passed with 264 assertions and no failures; Pint and `git diff --check` passed. The 95 reported deprecation notices are existing upstream PHP warnings.
+
+## 2026-10-09 — PHASE 7 tenant storage and queue awareness
+
+- Added a tenant-scoped storage switch task that roots the local and public filesystem disks under `storage/tenants/{slug}/app` and `storage/tenants/{slug}/app/public` whenever a tenant becomes current.
+- Registered the storage switch task ahead of the DB switch task in `config/multitenancy.php` so filesystem paths follow the active tenant while preserving the default landlord root when no tenant is current.
+- Added a focused unit test covering tenant-rooted storage and a tenant-aware queue job that validates the tenant remains current inside the job.
+- Validation passed: focused PHASE 7 Pest test file executed successfully under the existing project deprecation warnings. The next step is PHASE 8 isolation tests and hardening.
+
+## 2026-10-09 — PHASE 6 catalog and dependency cascade follow-up
+
+- Expanded the entitlement catalog to cover every stock Krayin admin menu item and route group, including dashboard, mail, activities, user management, inventory, settings integrations, configuration, and help.
+- Replaced free-text feature keys in Super Admin plan/tenant feature forms with the supported catalog selector.
+- Added prerequisite cascades (for example, Organizations requires Contacts; Quotes require Leads and Products; Web Forms require Leads; Automation sections require Automation; campaigns require Marketing and Events). A dependent remains effectively disabled when a prerequisite is disabled, even if its own plan or tenant override is on.
+- Ensured Contacts, Automation, and Other Settings parent menus point to an enabled child and hide when no child is available.
+- Added tests for catalog coverage, feature dependencies, child-override cascade, and dependent-route 403 behavior. Existing databases were not migrated or modified.
+
 ## 2026-10-09 — PHASE 6 feature entitlements completed
 
 - Added tenant-override → plan-default → configured-default resolution, tenant-keyed caching, and invalidation for override, plan-feature, and tenant-plan changes.

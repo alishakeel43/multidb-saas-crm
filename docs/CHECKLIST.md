@@ -59,25 +59,26 @@ Live verification created only the previously absent `tenant_demo`, confirmed it
 ## PHASE 6 — Feature entitlements
 
 - [x] Entitlement resolution applies tenant override before plan default, then configured default; unknown features/no tenant are disabled.
-- [x] Feature middleware returns 403 when a mapped stock-module feature is disabled.
-- [x] Disabled features are hidden from the relevant admin menu without hiding independently entitled child modules.
+- [x] Feature middleware returns 403 when a mapped stock-module feature is disabled, including dependent features whose parent is disabled.
+- [x] Every stock Krayin admin menu item maps to an entitlement; disabled features are hidden and parents point to available children.
+- [x] Declared feature dependencies cascade effective disablement transitively, even when a child has an enabled override.
 - [x] Entitlement cache is invalidated when overrides, plan feature defaults, or tenant plan assignments change.
-- [x] Pest coverage verifies precedence, defaults, disabled access, menu filtering, route specificity, and cache invalidation.
+- [x] Pest coverage verifies precedence, defaults, dependency cascades, all admin menu mappings, disabled access, route specificity, and cache invalidation.
 
 ## PHASE 7 — Storage and queues
 
-- [ ] Tenant files are rooted under `storage/tenants/{slug}`.
-- [ ] Tenant switching updates the filesystem root.
-- [ ] Queue jobs preserve the correct tenant context.
-- [ ] Tenant A files cannot be read through tenant B path helpers.
-- [ ] Worker command and setup are documented in `ENV_NOTES.md`.
+- [x] Tenant files are rooted under `storage/tenants/{slug}`.
+- [x] Tenant switching updates the filesystem root, including disks already resolved by Laravel.
+- [x] Queue jobs preserve the correct tenant context on an asynchronous database worker.
+- [x] Tenant A files cannot be read through tenant B path helpers.
+- [x] Worker command and setup are documented in `ENV_NOTES.md`.
 
 ## PHASE 8 — Isolation tests and hardening
 
-- [ ] Domain A resolves to tenant A's database and Domain B to tenant B's database.
-- [ ] Disabled feature requests return 403.
-- [ ] Tenant users cannot access `/super-admin`.
-- [ ] Queue jobs preserve tenant context.
-- [ ] Cross-tenant data reads fail.
-- [ ] Relevant Pest suite passes.
-- [ ] Handoff records `V1_COMPLETE` or clearly lists remaining known issues.
+- [x] Domain A resolves to tenant A's database and Domain B to tenant B's database.
+- [x] Disabled feature requests return 403.
+- [x] Tenant users cannot access `/super-admin`.
+- [x] Queue jobs preserve tenant context.
+- [x] Cross-tenant data reads fail.
+- [x] Relevant Pest suite passes.
+- [x] Handoff records `V1_COMPLETE` and clearly lists remaining known issues.

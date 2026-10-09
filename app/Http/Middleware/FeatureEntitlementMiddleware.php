@@ -24,18 +24,20 @@ class FeatureEntitlementMiddleware
 
         $tenant = Tenant::current();
 
-        if ($tenant) {
-            config([
-                'menu.admin' => $this->entitlements->filterMenuItems(
-                    config('menu.admin', []),
-                    $tenant,
-                ),
-            ]);
+        if (! $tenant) {
+            return $next($request);
         }
+
+        config([
+            'menu.admin' => $this->entitlements->filterMenuItems(
+                config('menu.admin', []),
+                $tenant,
+            ),
+        ]);
 
         $featureKey = $this->entitlements->featureForRoute($routeName);
 
-        if ($featureKey !== null && (! $tenant || ! $this->entitlements->isEnabled($featureKey, $tenant))) {
+        if ($featureKey !== null && ! $this->entitlements->isEnabled($featureKey, $tenant)) {
             abort(Response::HTTP_FORBIDDEN);
         }
 

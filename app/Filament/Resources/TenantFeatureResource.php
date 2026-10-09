@@ -5,7 +5,6 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\TenantFeatureResource\Pages;
 use App\Models\TenantFeature;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -29,7 +28,13 @@ class TenantFeatureResource extends Resource
         return $form
             ->schema([
                 Select::make('tenant_id')->relationship('tenant', 'name')->searchable()->preload()->required(),
-                TextInput::make('feature_key')->required()->maxLength(100),
+                Select::make('feature_key')
+                    ->options(collect(config('features', []))->mapWithKeys(fn (array $feature, string $key): array => [
+                        $key => $feature['label'] ?? $key,
+                    ]))
+                    ->searchable()
+                    ->required()
+                    ->helperText('This override cannot enable a feature while one of its requirements is disabled.'),
                 Toggle::make('is_enabled')->required(),
             ]);
     }

@@ -5,7 +5,6 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PlanFeatureResource\Pages;
 use App\Models\PlanFeature;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -29,7 +28,13 @@ class PlanFeatureResource extends Resource
         return $form
             ->schema([
                 Select::make('plan_id')->relationship('plan', 'name')->searchable()->preload()->required(),
-                TextInput::make('feature_key')->required()->maxLength(100),
+                Select::make('feature_key')
+                    ->options(collect(config('features', []))->mapWithKeys(fn (array $feature, string $key): array => [
+                        $key => $feature['label'] ?? $key,
+                    ]))
+                    ->searchable()
+                    ->required()
+                    ->helperText('Dependent features remain disabled whenever a required feature is disabled.'),
                 Toggle::make('is_enabled')->required(),
             ]);
     }

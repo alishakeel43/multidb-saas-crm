@@ -42,7 +42,30 @@ Full correct process: [`docs/DOMAIN_AND_URLS.md`](./DOMAIN_AND_URLS.md)
 
 ## Queue worker
 
-- Document the tenant-aware worker command and runtime setup in PHASE 7.
+- The local `.env.example` defaults to `QUEUE_CONNECTION=sync`; this executes queued jobs inline and does not require a worker.
+- For a persistent database-backed queue, set these values in the ignored local `.env` (do not commit `.env`):
+
+  ```dotenv
+  QUEUE_CONNECTION=database
+  DB_QUEUE_CONNECTION=landlord
+  QUEUE_FAILED_DATABASE=landlord
+  ```
+
+- Queue and failed-job infrastructure tables are created on the landlord connection, not in tenant CRM databases. Create them there:
+
+  ```bash
+  php artisan migrate --database=landlord --path=database/migrations/2024_09_09_094042_create_jobs_table.php --no-interaction
+  php artisan migrate --database=landlord --path=database/migrations/2019_08_19_000000_create_failed_jobs_table.php --no-interaction
+  ```
+
+- Start a worker from the project root:
+
+  ```bash
+  php artisan queue:work database --queue=default --tries=3 --timeout=90
+  ```
+
+- Keep the worker running under a process supervisor in production. After deployment or worker-affecting configuration changes, run `php artisan queue:restart` and let the supervisor restart it. Tenant-aware payloads restore the landlord tenant record before handling each job and return to the prior context afterward.
+- Verified automated coverage executes a queued tenant-aware job with Laravel's database worker against isolated SQLite landlord/tenant databases. Local MAMP MySQL worker startup was not separately exercised.
 
 ## PHASE 1 bootstrap record
 
