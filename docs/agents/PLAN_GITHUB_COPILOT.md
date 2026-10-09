@@ -33,6 +33,7 @@ Rules:
 9. If docs/ continuity files are missing, start at PHASE 0.
 10. MANDATORY: Use the Context7 MCP for Laravel (and related packages: Spatie Multitenancy, Filament, Livewire) before writing or changing framework/API code. Do not rely on memory or guesswork for Laravel 12 APIs — look up docs via Context7 MCP first.
 11. Follow the Git branching and commit workflow in §0.5; never do project work directly on `main`.
+12. IMPORTANT: Do not add a `Co-authored-by` trailer or assistant co-author attribution to commit messages unless the user explicitly requests it.
 ```
 
 ## Sync rule
@@ -136,6 +137,7 @@ Workflow:
 5. Commit each coherent, verified milestone on its task or phase branch using concise conventional messages, such as `feat(phase-02): add tenant database switch` or `docs: define git workflow`. Stage only the files belonging to that commit. Do not create empty commits or commit secrets.
 6. Before ending, verify the branch and commit history, run the relevant checks, and update the handoff docs. Do not push, open a PR, or merge into `main` unless the user asks.
 7. If existing staged or unstaged changes cannot safely be separated from the requested work, preserve them and ask before committing or switching branches.
+8. **IMPORTANT — Commit attribution:** Never append a `Co-authored-by` trailer or assistant co-author attribution to a commit message. Include it only when the user explicitly asks for it.
 
 ---
 

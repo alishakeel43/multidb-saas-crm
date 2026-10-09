@@ -12,3 +12,7 @@
 - Added the same mandatory branch hierarchy, phase/task branch naming, milestone-commit rules, and safeguards against staging unrelated changes to the three agent plan copies and the canonical Cursor plan.
 - Updated the coordinator message and progress/handoff docs with the branch requirement.
 - Created `docs/git-branch-workflow`; PHASE 1 remains the next implementation phase.
+
+## 2026-10-09 — Commit attribution rule
+
+- Added an explicit rule to all agent plan copies and the coordinator prompt: do not add a `Co-authored-by` trailer or assistant co-author attribution unless the user asks for it.

@@ -47,6 +47,7 @@ HARD RULES:
 - Do not put CRM business tables on the landlord DB.
 - Do not commit secrets (.env passwords, API keys).
 - Do not implement directly on `main`. Follow §0.5 of the selected plan: use the correct phase/task branch, commit each coherent, verified milestone, and do not push, open PRs, or merge into `main` without user authorization.
+- IMPORTANT: Do not add a `Co-authored-by` trailer or assistant co-author attribution to commit messages unless the user explicitly requests it.
 
 WHEN YOU STOP (end of session / limit / pause):
 1. Update docs/PROGRESS.md

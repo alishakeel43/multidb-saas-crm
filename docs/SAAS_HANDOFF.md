@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Date: 2026-10-09 07:26 +05:00
+- Date: 2026-10-09 07:30 +05:00
 - Agent/tool last used: GitHub Copilot in VS Code
 - Working branch: `docs/git-branch-workflow`
 - Current phase: PHASE 1 — Bootstrap official Krayin
@@ -12,6 +12,7 @@
 
 - PHASE 0 — Created the six continuity documents. No application code or dependencies were changed.
 - Added a mandatory Git branch hierarchy and milestone-commit workflow to the agent plans and coordinator prompt.
+- Added the requested rule prohibiting assistant co-author attribution in commit messages unless explicitly requested by the user.
 
 ## Next concrete step
 
@@ -40,6 +41,7 @@
 - `docs/agents/PLAN_CLAUDE.md`
 - `docs/agents/COORDINATOR_MESSAGE.md`
 - `~/.cursor/plans/krayin_multi-tenant_saas_3c0b1cff.plan.md`
+- `docs/CHANGELOG_SAAS.md`
 
 ## Blockers / environment notes
 
@@ -48,6 +50,7 @@
 - Do not store credentials in repository documentation; use a local untracked `.env`.
 - Context7 is mandatory before Laravel, Spatie Multitenancy, Filament, or Livewire framework/API work.
 - Do not push or merge `docs/git-branch-workflow` into `main` unless the user requests it.
+- Do not include assistant co-author attribution in commit messages unless the user requests it.
 
 ## Do NOT
 
