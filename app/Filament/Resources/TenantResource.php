@@ -185,6 +185,18 @@ class TenantResource extends Resource
                                             ->detailsFor($record)['database_message'])
                                         ->placeholder('Database connection is healthy'),
                                 ]),
+                            Section::make('Support accounts')
+                                ->description('Managed separately from regular tenant CRM users.')
+                                ->schema([
+                                    TextEntry::make('support_users')
+                                        ->label('Name and email')
+                                        ->state(fn (Tenant $record): string => collect(app(TenantOverviewService::class)
+                                            ->detailsFor($record)['support_users'])
+                                            ->map(fn (array $user): string => "{$user['name']} <{$user['email']}>")
+                                            ->join(', '))
+                                        ->placeholder('No support accounts configured')
+                                        ->columnSpanFull(),
+                                ]),
                             Section::make('CRM workspace usage')
                                 ->columns(3)
                                 ->schema([

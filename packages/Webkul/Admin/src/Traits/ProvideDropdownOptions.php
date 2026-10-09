@@ -2,6 +2,7 @@
 
 namespace Webkul\Admin\Traits;
 
+use Illuminate\Support\Facades\Schema;
 use Webkul\Contact\Repositories\OrganizationRepository;
 use Webkul\Lead\Repositories\SourceRepository;
 use Webkul\User\Repositories\UserRepository;
@@ -102,7 +103,13 @@ trait ProvideDropdownOptions
      */
     public function getUserDropdownOptions(): array
     {
-        $options = app(UserRepository::class)
+        $repository = app(UserRepository::class);
+
+        if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
+            $repository->scopeQuery(fn ($query) => $query->where('is_support_account', false));
+        }
+
+        $options = $repository
             ->get(['id as value', 'name as label'])
             ->map(function ($item, $key) {
                 $item->disabled = false;

@@ -111,6 +111,7 @@ class RoleController extends Controller
     public function edit(int $id): View|RedirectResponse
     {
         $role = $this->roleRepository->findOrFail($id);
+        abort_if($role->is_support_role, 404);
 
         /**
          * A user — including a full administrator — may never edit the role currently assigned to
@@ -139,6 +140,7 @@ class RoleController extends Controller
         ]);
 
         $role = $this->roleRepository->findOrFail($id);
+        abort_if($role->is_support_role, 404);
 
         /**
          * A user — including a full administrator — may never edit the role currently assigned to
@@ -192,6 +194,7 @@ class RoleController extends Controller
         ];
 
         $role = $this->roleRepository->findOrFail($id);
+        abort_if($role->is_support_role, 404);
 
         if ($role->users && $role->users->count() >= 1) {
             $response['message'] = trans('admin::app.settings.roles.index.being-used');

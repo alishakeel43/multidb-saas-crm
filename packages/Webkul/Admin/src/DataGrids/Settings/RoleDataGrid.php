@@ -4,6 +4,7 @@ namespace Webkul\Admin\DataGrids\Settings;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Webkul\DataGrid\DataGrid;
 
 class RoleDataGrid extends DataGrid
@@ -14,6 +15,10 @@ class RoleDataGrid extends DataGrid
     public function prepareQueryBuilder(): Builder
     {
         $queryBuilder = DB::table('roles')
+            ->when(
+                Schema::connection('tenant')->hasColumn('roles', 'is_support_role'),
+                fn ($query) => $query->where('roles.is_support_role', false),
+            )
             ->addSelect(
                 'roles.id',
                 'roles.name',

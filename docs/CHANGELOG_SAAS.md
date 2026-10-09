@@ -1,5 +1,11 @@
 # SaaS Change Log
 
+## 2026-10-09 — Tenant support-account management
+
+- Added a Super Admin support-user management resource to create, view, update, activate/deactivate, and delete multiple support identities per tenant. Each account uses an individual tenant CRM email and password; passwords are stored only as tenant-side hashes.
+- Removed shared `.env` support-user seeding. Support accounts retain a dedicated read-only CRM role and remain hidden from normal CRM user/role lists and assignment/search options, while remaining visible in Super Admin tenant details.
+- Support-account ownership/participant assignment is rejected, and support CRM write requests are denied server-side.
+
 ## 2026-10-09 — Super Admin recent-tenants table query fix
 
 - Configured the recent-tenants widget query directly on Filament's table, removing the runtime `must have a [query()]` error.

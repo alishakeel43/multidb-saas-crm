@@ -100,6 +100,16 @@ class Bouncer
     {
         $routeName = Route::currentRouteName();
 
+        $user = auth()->guard('user')->user();
+
+        if (
+            $user?->is_support_account
+            && ! in_array($routeName, ['admin.user.account.update', 'admin.session.destroy'], true)
+            && ! request()->isMethod('GET')
+        ) {
+            abort(401, 'Support accounts have read-only CRM access.');
+        }
+
         if (! $routeName) {
             return;
         }

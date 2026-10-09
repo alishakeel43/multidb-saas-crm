@@ -3,6 +3,8 @@
 namespace Webkul\Admin\Http\Controllers;
 
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Schema;
+use Webkul\User\Repositories\UserRepository;
 
 class DataGridController extends Controller
 {
@@ -34,7 +36,17 @@ class DataGridController extends Controller
         /**
          * Fetching on the basis of column options.
          */
-        return app($column['filterable_options']['repository'])
+        $repositoryClass = $column['filterable_options']['repository'];
+        $repository = app($repositoryClass);
+
+        if (
+            is_a($repositoryClass, UserRepository::class, true)
+            && Schema::connection('tenant')->hasColumn('users', 'is_support_account')
+        ) {
+            $repository = $repository->where('is_support_account', false);
+        }
+
+        return $repository
             ->select([$column['filterable_options']['column']['label'].' as label', $column['filterable_options']['column']['value'].' as value'])
             ->where($column['filterable_options']['column']['label'], 'LIKE', '%'.$params['search'].'%')
             ->get();

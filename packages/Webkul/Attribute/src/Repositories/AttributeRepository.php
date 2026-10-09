@@ -4,6 +4,7 @@ namespace Webkul\Attribute\Repositories;
 
 use Illuminate\Container\Container;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Webkul\Attribute\Contracts\Attribute;
 use Webkul\Core\Eloquent\Repository;
@@ -135,6 +136,10 @@ class AttributeRepository extends Repository
         if (Str::contains($lookup['repository'], 'UserRepository')) {
             $userRepository = app($lookup['repository'])->where('status', 1);
 
+            if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
+                $userRepository->where('is_support_account', false);
+            }
+
             $currentUser = auth()->guard('user')->user();
 
             if ($currentUser?->view_permission === 'group') {
@@ -176,15 +181,29 @@ class AttributeRepository extends Repository
             $columns = [($lookup['value_column'] ?? 'id').' as id', ($lookup['label_column'] ?? 'name').' as name'];
         }
 
+        if (Str::contains($lookup['repository'], 'UserRepository')) {
+            $query = app($lookup['repository']);
+
+            if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
+                $query = $query->where('is_support_account', false);
+            }
+
+            return is_array($entityId)
+                ? $query->whereIn('id', $entityId)->get($columns)
+                : $query->where('id', $entityId)->first($columns);
+        }
+
+        $repository = app($lookup['repository']);
+
         if (is_array($entityId)) {
-            return app($lookup['repository'])->findWhereIn(
+            return $repository->findWhereIn(
                 'id',
                 $entityId,
                 $columns
             );
-        } else {
-            return app($lookup['repository'])->find($entityId, $columns);
         }
+
+        return $repository->find($entityId, $columns);
     }
 
     /**

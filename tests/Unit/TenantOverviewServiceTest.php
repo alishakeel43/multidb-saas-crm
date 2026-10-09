@@ -76,6 +76,7 @@ it('loads administrator contact and CRM usage from that tenant database', functi
         $table->string('email');
         $table->boolean('status');
         $table->unsignedInteger('role_id');
+        $table->boolean('is_support_account')->default(false);
     });
 
     DB::connection('tenant')->table('roles')->insert([
@@ -83,8 +84,9 @@ it('loads administrator contact and CRM usage from that tenant database', functi
         ['id' => 2, 'permission_type' => 'custom'],
     ]);
     DB::connection('tenant')->table('users')->insert([
-        ['name' => 'Tenant Owner', 'email' => 'owner@example.test', 'status' => true, 'role_id' => 1],
-        ['name' => 'Sales User', 'email' => 'sales@example.test', 'status' => false, 'role_id' => 2],
+        ['name' => 'Tenant Owner', 'email' => 'owner@example.test', 'status' => true, 'role_id' => 1, 'is_support_account' => false],
+        ['name' => 'Sales User', 'email' => 'sales@example.test', 'status' => false, 'role_id' => 2, 'is_support_account' => false],
+        ['name' => 'Krayin Support', 'email' => 'support@example.test', 'status' => true, 'role_id' => 2, 'is_support_account' => true],
     ]);
 
     foreach (['leads', 'persons', 'organizations'] as $tableName) {
@@ -103,6 +105,9 @@ it('loads administrator contact and CRM usage from that tenant database', functi
     expect($details['database_status'])->toBe('Connected')
         ->and($details['owner_name'])->toBe('Tenant Owner')
         ->and($details['owner_email'])->toBe('owner@example.test')
+        ->and($details['support_users'])->toBe([
+            ['name' => 'Krayin Support', 'email' => 'support@example.test'],
+        ])
         ->and($details['total_users'])->toBe(2)
         ->and($details['active_users'])->toBe(1)
         ->and($details['leads'])->toBe(2)

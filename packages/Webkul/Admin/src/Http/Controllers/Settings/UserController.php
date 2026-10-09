@@ -7,6 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Prettus\Repository\Criteria\RequestCriteria;
 use Webkul\Admin\DataGrids\Settings\UserDataGrid;
@@ -60,6 +61,9 @@ class UserController extends Controller
     protected function assignableRoles()
     {
         $roles = $this->roleRepository->all();
+        if (Schema::connection('tenant')->hasColumn('roles', 'is_support_role')) {
+            $roles = $roles->reject(fn ($role) => (bool) $role->is_support_role);
+        }
 
         $authUser = auth()->guard('user')->user();
 
@@ -152,6 +156,7 @@ class UserController extends Controller
         $authUser = auth()->guard('user')->user();
 
         $admin = $this->userRepository->with(['role', 'groups'])->findOrFail($id);
+        $this->preventManagingSupportAccount($admin);
 
         /**
          * A non-administrator may view their own account or any user that is not above them, but
@@ -178,6 +183,7 @@ class UserController extends Controller
         $isSelf = $authUser->id == $id;
 
         $targetUser = $this->userRepository->findOrFail($id);
+        $this->preventManagingSupportAccount($targetUser);
 
         /**
          * The `settings.user.users.edit` permission is already enforced by the ACL middleware. A
@@ -281,9 +287,13 @@ class UserController extends Controller
      */
     public function search(): JsonResource
     {
-        $users = $this->userRepository
-            ->pushCriteria(app(RequestCriteria::class))
-            ->all();
+        $users = $this->userRepository;
+
+        if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
+            $users->scopeQuery(fn ($query) => $query->where('is_support_account', false));
+        }
+
+        $users = $users->pushCriteria(app(RequestCriteria::class))->all();
 
         return UserResource::collection($users);
     }
@@ -293,6 +303,8 @@ class UserController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
+        $this->preventManagingSupportAccount($this->userRepository->findOrFail($id));
+
         /**
          * Never delete the last remaining user or the primary administrator (id 1).
          */
@@ -344,6 +356,7 @@ class UserController extends Controller
             if (
                 auth()->guard('user')->user()->id == $users->id
                 || (int) $users->id === 1
+                || $users->is_support_account
                 || ! $this->canManageUser($users)
             ) {
                 continue;
@@ -388,6 +401,7 @@ class UserController extends Controller
             if (
                 auth()->guard('user')->user()->id == $user->id
                 || (int) $user->id === 1
+                || $user->is_support_account
                 || ! $this->canManageUser($user)
             ) {
                 continue;
@@ -424,6 +438,11 @@ class UserController extends Controller
     protected function preventUnauthorizedRoleAssignment(?int $roleId): void
     {
         $authUser = auth()->guard('user')->user();
+        $role = $this->roleRepository->find($roleId);
+
+        if (! $role || $role->is_support_role) {
+            abort(401, trans('admin::app.errors.role-exceeds-own'));
+        }
 
         /**
          * Full administrators are trusted to grant any role.
@@ -432,12 +451,10 @@ class UserController extends Controller
             return;
         }
 
-        $role = $this->roleRepository->find($roleId);
-
         /**
          * A non-administrator can never grant the administrator (`all`) role.
          */
-        if (! $role || $role->permission_type === 'all') {
+        if ($role->permission_type === 'all') {
             abort(401, trans('admin::app.errors.role-exceeds-own'));
         }
 
@@ -513,6 +530,13 @@ class UserController extends Controller
     {
         if (! $this->canManageUser($targetUser)) {
             abort(401, trans('admin::app.errors.user-exceeds-own'));
+        }
+    }
+
+    protected function preventManagingSupportAccount($targetUser): void
+    {
+        if ($targetUser->is_support_account) {
+            abort(404);
         }
     }
 }

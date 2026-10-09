@@ -4,6 +4,7 @@ namespace Webkul\Admin\DataGrids\Settings;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Webkul\DataGrid\DataGrid;
 use Webkul\User\Repositories\GroupRepository;
@@ -25,6 +26,10 @@ class UserDataGrid extends DataGrid
         $tablePrefix = DB::getTablePrefix();
 
         $queryBuilder = DB::table('users')
+            ->when(
+                Schema::connection('tenant')->hasColumn('users', 'is_support_account'),
+                fn ($query) => $query->where('users.is_support_account', false),
+            )
             ->addSelect(
                 'users.id',
                 'users.name',

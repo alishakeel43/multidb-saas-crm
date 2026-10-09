@@ -43,4 +43,9 @@ class Tenant extends SpatieTenant
     {
         return $this->hasMany(Subscription::class);
     }
+
+    public function supportUsers(): HasMany
+    {
+        return $this->hasMany(TenantSupportUser::class);
+    }
 }
