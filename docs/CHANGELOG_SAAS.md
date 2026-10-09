@@ -64,3 +64,10 @@
 - Smoke-tested active domain resolution, inactive-domain and suspended-tenant rejection, and database switching; removed temporary smoke-test rows.
 - Validation: PHP syntax, Pint, route/config boot, migration status, and the full test suite pass. Tests report existing PHP 8.5 `PDO::MYSQL_ATTR_SSL_CA` deprecation notices.
 - Committed implementation as `749e600` (`feat(phase-03): add landlord schema and models`), without a co-author trailer. PHASE 4 is next.
+
+## 2026-10-09 — PHASE 4 startup blocked by Context7 DNS
+
+- Created `phase/04-tenant-provisioning` from `phase/03-landlord-schema`.
+- Read the required continuity docs and Copilot plan; inspected Krayin installer/seeder and Spatie tenant command/action sources without changing application code.
+- Required Context7 lookups for Laravel Artisan and Spatie tenant Artisan behavior failed because `mcp.context7.com` could not be resolved. PHASE 4 is marked blocked; no framework code was written.
+- Safety note: Krayin's stock install command invokes `migrate:fresh`; its user seeder deletes existing users and inserts the published default admin credentials. Neither should be reused in tenant provisioning.
