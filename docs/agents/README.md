@@ -19,5 +19,7 @@ Ye folder **ek hi plan** ki teen copies rakhta hai taake Cursor limit ke baad bh
 
 ## Important
 
+- **Context7 MCP (Laravel) lazmi hai** — har agent ko Laravel/Spatie/Filament kaam se pehle Context7 use karna hoga.
+- Details: har `PLAN_*.md` aur [COORDINATOR_MESSAGE.md](./COORDINATOR_MESSAGE.md).
 - Teenon files ka **architecture content same** hona chahiye.
 - Runtime status sirf `docs/SAAS_HANDOFF.md` + `docs/PROGRESS.md` mein update hota hai (teen plan copies mein phase checkboxes duplicate mat rakho as source of truth).

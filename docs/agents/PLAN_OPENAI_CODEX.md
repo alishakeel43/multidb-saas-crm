@@ -1,3 +1,13 @@
+# CONTEXT7 MCP — MANDATORY
+
+## Context7 MCP (MANDATORY for all agents)
+
+**Lazmi / required:** Har agent (Copilot, Codex, Claude, Cursor) ko Laravel kaam se pehle **Context7 MCP** use karna hai.
+
+- Laravel 12, Spatie Multitenancy, Filament, Livewire, queues, migrations, middleware — pehle Context7 se docs verify karo.
+- Memory / guesswork se Laravel APIs mat likho.
+- Agar Context7 MCP available na ho, handoff mein blocker likho; galat API assume mat karo.
+
 # Krayin Multi-Tenant SaaS — Plan copy for OpenAI Codex
 
 > **Identical playbook** shared with Copilot / Codex / Claude / Cursor.
@@ -21,6 +31,7 @@ Rules:
 7. Keep Krayin Bouncer/ACL for tenant permissions. No Spatie Permission in v1.
 8. Stock Krayin modules only in v1 (no UnifiedInbox port yet).
 9. If docs/ continuity files are missing, start at PHASE 0.
+10. MANDATORY: Use the Context7 MCP for Laravel (and related packages: Spatie Multitenancy, Filament, Livewire) before writing or changing framework/API code. Do not rely on memory or guesswork for Laravel 12 APIs — look up docs via Context7 MCP first.
 ```
 
 ## Sync rule
@@ -52,6 +63,7 @@ Before writing any code, the agent MUST:
 3. Run: `git status` and `git log -5 --oneline` (if git exists)
 4. Start **exactly** at the first phase in `docs/PROGRESS.md` that is not `DONE`
 5. After finishing a phase (or stopping mid-phase): **update the three docs** before ending the turn
+6. Before Laravel/framework API work: **query Context7 MCP** (Laravel 12 + related packages)
 
 If `docs/` does not exist yet → you are at **PHASE 0**. Create the handoff docs first, then continue.
 
@@ -118,6 +130,7 @@ Rules:
 | D13 | Tenant override beats plan default |
 | D14 | Never trust `tenant_id` from request; resolve tenant from domain only |
 | D15 | Do not destroy unrelated projects; do not commit secrets |
+| D16 | **Context7 MCP mandatory** for Laravel / Spatie / Filament docs before coding |
 
 ---
 
