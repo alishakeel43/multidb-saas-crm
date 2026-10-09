@@ -47,11 +47,13 @@ Live verification created only the previously absent `tenant_demo`, confirmed it
 
 ## PHASE 5 — Filament Super Admin
 
-- [ ] Filament panel is isolated at `/super-admin` and authenticates landlord platform users.
-- [ ] Tenant, Domain, Plan, Subscription, and feature override resources are available.
-- [ ] Tenant creation uses `TenantProvisioningService`.
-- [ ] Tenant CRM users cannot access the platform panel.
-- [ ] Tenant database passwords are not shown in the UI.
+- [x] Filament panel is isolated at `/super-admin` and authenticates landlord platform users through its dedicated `platform` guard.
+- [x] Tenant, Domain, Plan, Subscription, plan feature, and tenant feature override resources are available.
+- [x] Tenant creation uses `TenantProvisioningService` and does not retain the one-time administrator password in component state.
+- [x] Tenant CRM users cannot access the platform panel; inactive platform users receive 403.
+- [x] Tenant database names and credentials are omitted from the Super Admin UI.
+- [x] A secure interactive `platform-admin:create` command bootstraps the first platform administrator without accepting a password argument.
+- [x] Authentication and tenant form tests, route registration, Pint, and the full test suite pass.
 
 ## PHASE 6 — Feature entitlements
 

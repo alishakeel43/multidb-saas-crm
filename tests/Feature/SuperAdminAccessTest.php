@@ -1,0 +1,107 @@
+<?php
+
+use App\Filament\Resources\TenantResource\Pages\CreateTenant;
+use App\Models\PlatformUser;
+use App\Models\Tenant;
+use App\Services\TenantProvisioningService;
+use Filament\Facades\Filament;
+use Webkul\User\Models\User as CrmUser;
+
+it('uses a dedicated active landlord platform account for panel access', function () {
+    $panel = Filament::getPanel('super-admin');
+
+    $activeUser = new PlatformUser([
+        'name' => 'Platform Admin',
+        'email' => 'platform@example.test',
+        'is_active' => true,
+    ]);
+    $inactiveUser = new PlatformUser([
+        'name' => 'Disabled Admin',
+        'email' => 'disabled@example.test',
+        'is_active' => false,
+    ]);
+
+    expect(config('auth.guards.platform.provider'))->toBe('platform_users')
+        ->and(config('auth.providers.platform_users.model'))->toBe(PlatformUser::class)
+        ->and($activeUser->canAccessPanel($panel))->toBeTrue()
+        ->and($inactiveUser->canAccessPanel($panel))->toBeFalse();
+});
+
+it('does not accept a Krayin CRM user as Super Admin authentication', function () {
+    $this->actingAs(new CrmUser, 'user')
+        ->get('/super-admin')
+        ->assertRedirect('/super-admin/login');
+});
+
+it('allows an active platform user to reach the Super Admin panel', function () {
+    $activeUser = new PlatformUser([
+        'name' => 'Platform Admin',
+        'email' => 'platform@example.test',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($activeUser, 'platform')
+        ->get('/super-admin')
+        ->assertOk();
+});
+
+it('renders tenant provisioning credentials without database connection fields', function () {
+    $activeUser = new PlatformUser([
+        'name' => 'Platform Admin',
+        'email' => 'platform@example.test',
+        'is_active' => true,
+    ]);
+
+    $response = $this->actingAs($activeUser, 'platform')
+        ->get('/super-admin/tenants/create')
+        ->assertOk();
+
+    $response->assertSee('Initial tenant administrator password');
+    $this->assertStringNotContainsString('database', strtolower($response->getContent()));
+});
+
+it('blocks inactive platform users from the Super Admin panel', function () {
+    $inactiveUser = new PlatformUser([
+        'name' => 'Disabled Admin',
+        'email' => 'disabled@example.test',
+        'is_active' => false,
+    ]);
+
+    $this->actingAs($inactiveUser, 'platform')
+        ->get('/super-admin')
+        ->assertForbidden();
+});
+
+it('provisions tenants through the provisioning service and clears the one-time password', function () {
+    $tenant = new Tenant;
+    $data = [
+        'name' => 'Example Tenant',
+        'slug' => 'example',
+        'domain' => 'example.krayin.localhost',
+        'admin_name' => 'Example Admin',
+        'admin_email' => 'admin@example.test',
+        'admin_password' => 'a-secure-one-time-password',
+    ];
+
+    $provisioning = Mockery::mock(TenantProvisioningService::class);
+    $provisioning->shouldReceive('provision')
+        ->once()
+        ->with(
+            'Example Tenant',
+            'example',
+            'example.krayin.localhost',
+            'Example Admin',
+            'admin@example.test',
+            'a-secure-one-time-password',
+        )
+        ->andReturn($tenant);
+
+    app()->instance(TenantProvisioningService::class, $provisioning);
+
+    $page = new CreateTenant;
+    $page->data = $data;
+    $handler = new ReflectionMethod(CreateTenant::class, 'handleRecordCreation');
+
+    expect($handler->invoke($page, $data))->toBe($tenant)
+        ->and($page->data)->toBe([]);
+});

@@ -1,6 +1,7 @@
 <?php
 
 use App\Providers\AppServiceProvider;
+use App\Providers\Filament\SuperAdminPanelProvider;
 use Barryvdh\DomPDF\ServiceProvider;
 use Konekt\Concord\ConcordServiceProvider;
 use Prettus\Repository\Providers\RepositoryServiceProvider;
@@ -37,6 +38,7 @@ return [
      * Application Service Providers...
      */
     AppServiceProvider::class,
+    SuperAdminPanelProvider::class,
 
     /*
      * Webkul Service Providers...

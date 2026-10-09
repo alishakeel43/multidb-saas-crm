@@ -97,3 +97,13 @@
 
 - Clarified across DECISIONS (D16), agent plans, coordinator message, and handoff: Context7 is not a hard dependency.
 - If Context7 fails, agents must implement via official docs and/or vendor source without marking the phase BLOCKED.
+
+## 2026-10-09 — PHASE 5 Filament Super Admin completed
+
+- Installed Filament 3.3 and configured its landlord-backed panel at `/super-admin` with a dedicated `platform` guard; Krayin remains at `/admin`.
+- Added resource screens for tenants, domains, plans, plan features, subscriptions, and tenant feature overrides. Tenant provisioning uses `TenantProvisioningService`, and its one-time administrator password is cleared from Livewire state before the response.
+- Added active-platform-user authorization, a panel-specific authentication middleware to avoid Krayin's CRM login redirect, and the interactive `platform-admin:create` bootstrap command.
+- Added tests for landlord guard assignment, CRM-user isolation, active and inactive platform admins, tenant form secrecy, and the provisioning-service delegation/password cleanup.
+- Context7 and official Filament docs failed DNS; the installed Filament 3.3.56 package source was used. No tenant DB or landlord migration was run.
+- Validation: focused tests (14 assertions), full Pest suite (210 assertions, zero failures), Pint, route registration, and whitespace checks passed. Existing PHP 8.5 PDO SSL-CA deprecation notices remain.
+- Marked PHASE 5 complete. PHASE 6 — feature entitlements is next on `phase/06-feature-entitlements`.

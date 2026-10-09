@@ -2,10 +2,10 @@
 
 ## Snapshot
 
-- Date: 2026-10-09 08:32 +05:00
-- Working branch: `phase/04-tenant-provisioning`
-- Current phase: PHASE 5 — Filament `/super-admin`
-- PHASE 4 status: COMPLETE
+- Date: 2026-10-09 08:56 +05:00
+- Working branch: `phase/05-super-admin`
+- Current phase: PHASE 6 — feature entitlements
+- PHASE 5 status: COMPLETE
 
 ## Completed phases
 
@@ -14,6 +14,18 @@
 - PHASE 2 configured Spatie Multitenancy with separate `tenant` and `landlord` connections and domain-based tenant selection. Implementation commit: `f5c1a65`.
 - PHASE 3 added landlord models and migrations for plans, features, tenants, domains, subscriptions, platform users, and settings. `zaristech_saas` has eight SaaS tables plus Laravel's migrations table. Implementation commit: `749e600`.
 - PHASE 4 implements guarded tenant DB management, safe Krayin baseline seeding, tenant provision/migrate/seed commands, explicit tenant administrator creation, and compensating rollback.
+- PHASE 5 installs and configures Filament 3.3 at `/super-admin`, isolated from Krayin `/admin` using a dedicated `platform` guard and landlord `PlatformUser`. Tenant/domain/plan/plan-feature/subscription/tenant-feature resources and safe provisioning integration are in place.
+
+## PHASE 5 implementation and verification
+
+- `SuperAdminPanelProvider` registers the default Filament panel at `/super-admin`, uses the dedicated landlord-backed `platform` guard, and leaves Krayin's `/admin` panel untouched.
+- `PlatformUser` can access only the `super-admin` panel while active. Panel middleware redirects guests directly to Filament's login route rather than Krayin's custom CRM login route; tenant CRM users are not accepted by the platform guard.
+- Super Admin resources manage tenants, domains, plans, plan feature defaults, subscriptions, and tenant feature overrides. Tenant UI omits the tenant database field and all database credentials; deletions are not exposed for core tenant/billing records.
+- Tenant creation asks for the tenant and initial CRM administrator details, then calls `TenantProvisioningService`. The password is removed from Livewire state before the response, is not persisted on landlord records, and appears only as a masked, non-revealable form field.
+- `php artisan platform-admin:create` securely bootstraps the first active platform admin through interactive prompts, requires password confirmation and a 12-character minimum, and accepts no credentials as command-line arguments. The command was not run, so no platform credentials were created.
+- Context7 and official Filament docs were unavailable because of DNS. Used the installed Filament 3.3.56 source and verified routes and runtime behavior; no framework API was guessed from memory.
+- No database migrations or tenant provisioning were run in PHASE 5.
+- Composer reported eight security advisories across five dependencies during Filament installation. They were not investigated in PHASE 5; audit and resolve them as a separate dependency-hardening task before production.
 
 ## PHASE 4 implementation and verification
 
@@ -35,13 +47,14 @@ Context7 was preferred but could not be resolved for Laravel lookups; the offici
 ## Validation notes
 
 - Focused Pest suite: 36 cases marked deprecated, 99 assertions, zero failures. Full `php artisan test --compact`: 1 pass, 77 cases marked deprecated, 196 assertions, zero failures.
+- PHASE 5 focused Super Admin suite: 6 cases marked deprecated, 14 assertions, zero failures. Full `php artisan test --compact`: 1 pass, 83 cases marked deprecated, 210 assertions, zero failures. Pint, Super Admin route registration, and `git diff --check` passed.
 - `./vendor/bin/pint` and `php -l` passed for changed PHP files; command registration and final database inventory checks passed; `git diff --check` passed.
 - The deprecation cases are the existing PHP 8.5.7 `PDO::MYSQL_ATTR_SSL_CA` notice from upstream `config/database.php`, not new Phase 4 failures.
 - Tenant migrate/seed wrappers are `php artisan tenants:migrate {slug|id}` / `php artisan tenants:seed {slug|id}`; use `--all` only when intentionally operating on every tenant.
 
 ## Next concrete step
 
-Begin PHASE 5 on a new phase branch. Retain `tenant_demo` as the local verification tenant; do not remove it without a separately scoped, explicit cleanup action. Keep all credentials in ignored local `.env`.
+Begin PHASE 6 — feature entitlements on `phase/06-feature-entitlements`. Implement tenant override-before-plan resolution, feature middleware and menu hiding, and cache invalidation on platform changes. Retain `tenant_demo` as the local verification tenant; do not remove it without a separately scoped, explicit cleanup action. Keep all credentials out of source control.
 
 ## Files changed for PHASE 4 completion
 
@@ -54,6 +67,21 @@ Begin PHASE 5 on a new phase branch. Retain `tenant_demo` as the local verificat
 - `docs/ENV_NOTES.md`
 
 The existing staged `.gitignore` changes and `.vscode/mcp.json` were not modified; exclude them from the PHASE 4 commit.
+
+## Files changed for PHASE 5 completion
+
+- `composer.json` / `composer.lock`
+- `app/Console/Commands/CreatePlatformAdminCommand.php`
+- `app/Filament/Resources/`
+- `app/Http/Middleware/AuthenticateSuperAdmin.php`
+- `app/Models/PlatformUser.php`
+- `app/Providers/Filament/SuperAdminPanelProvider.php`
+- `bootstrap/providers.php`
+- `config/auth.php`
+- `tests/Feature/SuperAdminAccessTest.php`
+- `docs/PROGRESS.md`, `docs/SAAS_HANDOFF.md`, `docs/CHECKLIST.md`, `docs/CHANGELOG_SAAS.md`
+
+Do not stage or commit the pre-existing `.gitignore` changes, `.vscode/` content, or generated `.phpunit.cache/`.
 
 ## Documentation sources
 

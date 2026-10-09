@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Multitenancy\Models\Concerns\UsesLandlordConnection;
 
-class PlatformUser extends Authenticatable
+class PlatformUser extends Authenticatable implements FilamentUser
 {
     use Notifiable;
     use UsesLandlordConnection;
@@ -32,5 +34,10 @@ class PlatformUser extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $panel->getId() === 'super-admin' && $this->is_active;
     }
 }
