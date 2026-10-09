@@ -2,6 +2,10 @@
 
 use Illuminate\Support\Str;
 
+$mysqlOptions = extension_loaded('pdo_mysql') ? array_filter([
+    PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+]) : [];
+
 return [
 
     /*
@@ -15,7 +19,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'mysql'),
+    'default' => env('DB_CONNECTION', 'tenant'),
 
     /*
     |--------------------------------------------------------------------------
@@ -58,9 +62,43 @@ return [
             'prefix_indexes' => true,
             'strict' => false,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            'options' => $mysqlOptions,
+        ],
+
+        'tenant' => [
+            'driver' => 'mysql',
+            'url' => env('TENANT_DATABASE_URL'),
+            'host' => env('TENANT_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('TENANT_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('TENANT_DB_DATABASE') ?: null,
+            'username' => env('TENANT_DB_USERNAME', env('DB_USERNAME', 'forge')),
+            'password' => env('TENANT_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('TENANT_DB_SOCKET', env('DB_SOCKET', '')),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => env('TENANT_DB_PREFIX', env('DB_PREFIX', '')),
+            'prefix_indexes' => true,
+            'strict' => false,
+            'engine' => null,
+            'options' => $mysqlOptions,
+        ],
+
+        'landlord' => [
+            'driver' => 'mysql',
+            'url' => env('LANDLORD_DATABASE_URL'),
+            'host' => env('LANDLORD_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('LANDLORD_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('LANDLORD_DB_DATABASE', 'zaristech_saas'),
+            'username' => env('LANDLORD_DB_USERNAME', env('DB_USERNAME', 'forge')),
+            'password' => env('LANDLORD_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('LANDLORD_DB_SOCKET', env('DB_SOCKET', '')),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => env('LANDLORD_DB_PREFIX', env('DB_PREFIX', '')),
+            'prefix_indexes' => true,
+            'strict' => false,
+            'engine' => null,
+            'options' => $mysqlOptions,
         ],
 
         'mariadb' => [
@@ -78,9 +116,7 @@ return [
             'prefix_indexes' => true,
             'strict' => false,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            'options' => $mysqlOptions,
         ],
 
         'pgsql' => [
