@@ -6,6 +6,7 @@ use App\Models\PlanFeature;
 use App\Models\Tenant;
 use App\Models\TenantFeature;
 use App\Services\FeatureEntitlementService;
+use App\Services\TenantOverviewService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,7 +16,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->scoped(TenantOverviewService::class);
     }
 
     /**

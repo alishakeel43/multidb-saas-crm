@@ -2,15 +2,17 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\SuperAdminDashboard;
+use App\Filament\Widgets\PlatformStatsOverview;
+use App\Filament\Widgets\RecentTenantsTable;
+use App\Filament\Widgets\TenantGrowthChart;
 use App\Http\Middleware\AuthenticateSuperAdmin;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -28,17 +30,18 @@ class SuperAdminPanelProvider extends PanelProvider
             ->path('super-admin')
             ->authGuard('platform')
             ->login()
+            ->brandName('Krayin SaaS Platform')
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Blue,
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                SuperAdminDashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\FilamentInfoWidget::class,
+                PlatformStatsOverview::class,
+                TenantGrowthChart::class,
+                RecentTenantsTable::class,
             ])
             ->middleware([
                 EncryptCookies::class,

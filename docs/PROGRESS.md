@@ -25,6 +25,13 @@ Status: V1_COMPLETE
 - [x] The relevant tests pass; existing upstream PHP deprecation notices remain non-fatal.
 - [x] Handoff records V1_COMPLETE and remaining production hardening notes.
 
+## Post-V1 UX improvements
+
+- [x] Super Admin dashboard overview widgets are implemented on `feat/super-admin-overview`.
+- [x] Tenant list and detail view display domain, primary administrator contact, user counts, plan/subscription, database health, and CRM usage counts.
+- [x] Focused and full Pest tests, Pint, syntax, route registration, and whitespace checks pass.
+- [x] Browser confirms branded Super Admin login; authenticated visual review is pending a platform account and no credentials were read/created for this task.
+
 ## Notes
 
 - User policy 2026-10-09: Context7 is optional only; never hard-block. Any working implementation path (official docs, vendor source) is allowed.

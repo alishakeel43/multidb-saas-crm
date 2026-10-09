@@ -1,5 +1,13 @@
 # SaaS Change Log
 
+## 2026-10-09 — Super Admin dashboard and tenant overview
+
+- Replaced the default Filament information card with platform KPI cards, a six-month tenant-growth chart, and a recent-tenants table.
+- Added per-tenant administrator/owner contact, CRM user counts, database health, leads, contacts, and organization counts, read from the tenant database without moving CRM data to the landlord.
+- Expanded tenant rows and the tenant-details action with primary domains, plan/subscription status, trial dates, CRM health, and usage details.
+- Added focused tests for Super Admin dashboard registration and tenant overview queries.
+- Validation passed: full Pest suite (279 assertions, zero failures), focused dashboard/tenant overview tests, Pint, PHP syntax, route registration, and `git diff --check`. Browser verified the branded Super Admin login route; authenticated dashboard rendering still requires a platform account.
+
 ## 2026-10-09 — PHASE 8 isolation hardening complete
 
 - Added explicit two-domain/two-database isolation coverage: each resolved tenant reads its own isolated record.
