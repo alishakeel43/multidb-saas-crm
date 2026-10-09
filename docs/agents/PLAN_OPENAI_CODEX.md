@@ -32,6 +32,7 @@ Rules:
 8. Stock Krayin modules only in v1 (no UnifiedInbox port yet).
 9. If docs/ continuity files are missing, start at PHASE 0.
 10. MANDATORY: Use the Context7 MCP for Laravel (and related packages: Spatie Multitenancy, Filament, Livewire) before writing or changing framework/API code. Do not rely on memory or guesswork for Laravel 12 APIs — look up docs via Context7 MCP first.
+11. Follow the Git branching and commit workflow in §0.5; never do project work directly on `main`.
 ```
 
 ## Sync rule
@@ -107,7 +108,34 @@ Rules:
 5. Use MAMP MySQL 127.0.0.1:8889. Filament at /super-admin. Krayin at /admin.
 6. Keep Krayin Bouncer/ACL for tenant permissions. No Spatie Permission in v1.
 7. Stock Krayin modules only in v1 (no UnifiedInbox port yet).
+8. Use a phase/task branch and commit each coherent, verified milestone; follow the mandatory §0.5 Git workflow.
 ```
+
+---
+
+### 0.5 Git branching and commit workflow (mandatory)
+
+Keep `main` as the stable integration branch; do not implement project work directly on it.
+
+Use this branch hierarchy:
+
+```text
+main
+├── phase/<NN>-<short-name>       # One long-lived branch per active phase
+│   ├── feat/<NN>-<short-name>    # Optional, independently shippable feature work
+│   └── fix/<NN>-<short-name>     # Optional, focused bug fixes
+└── docs/<short-name>             # Documentation-only tasks not tied to a phase
+```
+
+Workflow:
+
+1. Before editing, inspect `git status`, the current branch, and recent commits. Preserve existing work; never reset, discard, or stage unrelated changes.
+2. For a phase, create `phase/<NN>-<short-name>` from `main` if it does not exist; otherwise resume that branch. Use two-digit phase numbers (for example, `phase/01-bootstrap-krayin`).
+3. Do phase work on its phase branch. Create a `feat/` or `fix/` child branch only for independent work that benefits from isolation; base it on the phase branch and merge it back there after validation. Do not create unnecessary branches for every small change or session.
+4. For standalone documentation work, use `docs/<short-name>` from `main`.
+5. Commit each coherent, verified milestone on its task or phase branch using concise conventional messages, such as `feat(phase-02): add tenant database switch` or `docs: define git workflow`. Stage only the files belonging to that commit. Do not create empty commits or commit secrets.
+6. Before ending, verify the branch and commit history, run the relevant checks, and update the handoff docs. Do not push, open a PR, or merge into `main` unless the user asks.
+7. If existing staged or unstaged changes cannot safely be separated from the requested work, preserve them and ask before committing or switching branches.
 
 ---
 

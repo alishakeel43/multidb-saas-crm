@@ -46,6 +46,7 @@ HARD RULES:
 - Never trust tenant_id from the request; tenant comes from domain.
 - Do not put CRM business tables on the landlord DB.
 - Do not commit secrets (.env passwords, API keys).
+- Do not implement directly on `main`. Follow §0.5 of the selected plan: use the correct phase/task branch, commit each coherent, verified milestone, and do not push, open PRs, or merge into `main` without user authorization.
 
 WHEN YOU STOP (end of session / limit / pause):
 1. Update docs/PROGRESS.md
@@ -82,3 +83,4 @@ Neeche wala English block agent ko paste kar do.
 4. Agent se confirm lo: usne `SAAS_HANDOFF` + `PROGRESS` padha, aur kaunsa PHASE start kiya
 5. Session khatam hone se pehle handoff docs update hue ya nahi — check karo
 6. Agent Context7 MCP (Laravel) use kar raha ho — lazmi
+7. Agent ne sahi phase/task branch use ki aur har coherent, verified milestone ke liye commit banaya — verify karo
