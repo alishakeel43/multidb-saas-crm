@@ -22,6 +22,7 @@ use Webkul\Marketing\Providers\MarketingServiceProvider;
 use Webkul\Product\Providers\ProductServiceProvider;
 use Webkul\Quote\Providers\QuoteServiceProvider;
 use Webkul\Tag\Providers\TagServiceProvider;
+use Webkul\Task\Providers\TaskServiceProvider;
 use Webkul\User\Providers\UserServiceProvider;
 use Webkul\Warehouse\Providers\WarehouseServiceProvider;
 use Webkul\WebForm\Providers\WebFormServiceProvider;
@@ -60,6 +61,7 @@ return [
     ProductServiceProvider::class,
     QuoteServiceProvider::class,
     TagServiceProvider::class,
+    TaskServiceProvider::class,
     UserServiceProvider::class,
     WarehouseServiceProvider::class,
     WebFormServiceProvider::class,

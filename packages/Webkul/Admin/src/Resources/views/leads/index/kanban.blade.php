@@ -56,7 +56,7 @@
                             <!-- Stage Total Leads and Amount -->
                             <div class="flex items-center justify-between gap-2">
                                 <span class="text-xs font-medium dark:text-white">
-                                    @{{ $admin.formatPrice(stage.lead_value) }}
+                                    @{{ $admin.formatPrice(stage.lead_value, 2) }}
                                 </span>
 
                                 <!-- Progress Bar -->
@@ -123,9 +123,12 @@
                             <template #item="{ element, index }">
                                 {!! view_render_event('admin.leads.index.kanban.content.stage.body.card.before') !!}
 
-                                <a
-                                    class="lead-item flex cursor-pointer flex-col gap-5 rounded-lg border border-gray-300 shadow-xl shadow-slate-200 bg-gray-100 p-2 dark:border-gray-400 dark:bg-gray-400"
-                                    :href="'{{ route('admin.leads.view', 'replaceId') }}'.replace('replaceId', element.id)"
+                                <div
+                                    class="lead-item flex cursor-pointer flex-col gap-3 rounded-lg border border-gray-300 bg-gray-100 p-2 shadow-xl shadow-slate-200 dark:border-gray-400 dark:bg-gray-400"
+                                    role="button"
+                                    tabindex="0"
+                                    @click.prevent="openQuickView(element)"
+                                    @keydown.enter.prevent="openQuickView(element)"
                                 >
                                     {!! view_render_event('admin.leads.index.kanban.content.stage.body.card.header.before') !!}
 
@@ -177,12 +180,15 @@
 
                                     <div class="flex flex-wrap gap-1">
                                         <div
-                                            class="flex items-center gap-1 rounded-xl bg-gray-200 px-2 py-1 text-xs font-medium dark:bg-gray-800 dark:text-white"
-                                            v-if="cardFields.assignedUser && element.user"
+                                            class="flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-medium"
+                                            :class="element.user
+                                                ? 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-100'
+                                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100'"
+                                            v-if="cardFields.assignedUser"
                                         >
                                             <span class="icon-settings-user text-sm"></span>
 
-                                            @{{ element.user.name }}
+                                            @{{ element.user ? element.user.name : "@lang('admin::app.leads.index.kanban.unassigned')" }}
                                         </div>
 
                                         <div
@@ -225,7 +231,27 @@
                                             </template>
                                         </template>
                                     </div>
-                                </a>
+
+                                    <div
+                                        class="flex items-start gap-1 rounded-md border border-dashed border-gray-300 bg-white/70 px-2 py-1.5 text-[11px] text-gray-700 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200"
+                                        v-if="cardFields.nextActivity && element.next_activity"
+                                    >
+                                        <span class="icon-calendar text-sm text-brandColor"></span>
+
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate font-medium">
+                                                @{{ element.next_activity.title || element.next_activity.type }}
+                                            </p>
+
+                                            <p
+                                                class="truncate text-gray-500 dark:text-gray-400"
+                                                v-if="element.next_activity.schedule_from"
+                                            >
+                                                @{{ formatActivitySchedule(element.next_activity.schedule_from) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 {!! view_render_event('admin.leads.index.kanban.content.stage.body.card.after') !!}
                             </template>
@@ -273,7 +299,7 @@
                                     </x-admin::form.control-group.label>
 
                                     <x-admin::form.control-group.control
-                                        type="price"
+                                        type="text"
                                         name="lead_value"
                                         ::value="finalized.lead.lead_value"
                                     />
@@ -322,6 +348,234 @@
                     </x-admin::modal>
                 </form>
             </x-admin::form>
+
+            <!-- Lead Quick View Drawer -->
+            <x-admin::drawer
+                ref="leadQuickViewDrawer"
+                width="420px"
+            >
+                <x-slot:header>
+                    <p class="text-base font-semibold dark:text-white">
+                        @lang('admin::app.leads.index.kanban.quick-view.title')
+                    </p>
+                </x-slot>
+
+                <x-slot:content>
+                    <div
+                        class="flex flex-col gap-4"
+                        v-if="quickView.lead"
+                    >
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                @lang('admin::app.leads.index.kanban.quick-view.contact')
+                            </p>
+
+                            <p class="mt-1 font-medium dark:text-white">
+                                @{{ quickView.lead.person ? quickView.lead.person.name : '—' }}
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('admin::app.leads.index.kanban.columns.title')
+                            </label>
+
+                            <input
+                                type="text"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                v-model="quickView.form.title"
+                            />
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('admin::app.leads.index.kanban.quick-view.assigned-to')
+                            </label>
+
+                            <select
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                v-model="quickView.form.user_id"
+                            >
+                                <option :value="null">
+                                    @lang('admin::app.leads.index.kanban.quick-view.unassigned')
+                                </option>
+
+                                <option
+                                    v-for="user in assignableUsers"
+                                    :key="user.id"
+                                    :value="user.id"
+                                >
+                                    @{{ user.name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('admin::app.leads.index.kanban.quick-view.lead-value')
+                            </label>
+
+                            <input
+                                type="text"
+                                maxlength="255"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                v-model="quickView.form.lead_value"
+                            />
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('admin::app.leads.index.kanban.quick-view.stage')
+                            </label>
+
+                            <select
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                v-model="quickView.form.lead_pipeline_stage_id"
+                            >
+                                <option
+                                    v-for="stage in stages"
+                                    :key="stage.id"
+                                    :value="stage.id"
+                                >
+                                    @{{ stage.name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('admin::app.leads.index.kanban.quick-view.expected-close-date')
+                            </label>
+
+                            <input
+                                type="date"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                v-model="quickView.form.expected_close_date"
+                            />
+                        </div>
+
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-gray-800 dark:text-white">
+                                @lang('admin::app.leads.index.kanban.quick-view.description')
+                            </label>
+
+                            <textarea
+                                rows="3"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                v-model="quickView.form.description"
+                            ></textarea>
+                        </div>
+
+                        <div class="flex h-[200px] max-h-[200px] w-full min-w-0 flex-col overflow-hidden rounded-md border border-gray-200 p-3 dark:border-gray-800">
+                            <div class="mb-2 flex shrink-0 items-center justify-between">
+                                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                    @lang('admin::app.leads.index.kanban.quick-view.notes')
+                                </p>
+
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        @{{ quickView.notes.length }}
+                                    </span>
+
+                                    <a
+                                        class="text-xs font-medium text-brandColor hover:underline"
+                                        :href="'{{ route('admin.leads.view', 'replaceId') }}?tab=note'.replace('replaceId', quickView.lead.id)"
+                                    >
+                                        @lang('admin::app.leads.index.kanban.quick-view.view-all-notes')
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pr-1">
+                                <p
+                                    v-if="quickView.notesLoading"
+                                    class="py-2 text-sm text-gray-500 dark:text-gray-400"
+                                >
+                                    @lang('admin::app.leads.index.kanban.quick-view.loading-notes')
+                                </p>
+
+                                <p
+                                    v-else-if="quickView.notesError"
+                                    class="py-2 text-sm text-red-600 dark:text-red-400"
+                                >
+                                    @lang('admin::app.leads.index.kanban.quick-view.notes-load-failed')
+                                </p>
+
+                                <p
+                                    v-else-if="! quickView.notes.length"
+                                    class="py-2 text-sm text-gray-500 dark:text-gray-400"
+                                >
+                                    @lang('admin::app.leads.index.kanban.quick-view.no-notes')
+                                </p>
+
+                                <div
+                                    v-else
+                                    class="divide-y divide-gray-200 dark:divide-gray-800"
+                                >
+                                    <article
+                                        v-for="note in quickView.notes"
+                                        :key="note.id"
+                                        class="py-2 first:pt-0 last:pb-0"
+                                    >
+                                        <div
+                                            class="activity-rich-content break-words text-sm text-gray-800 dark:text-gray-200"
+                                            v-safe-html="note.comment || note.title || '—'"
+                                        ></div>
+
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            @{{ note.user?.name || '—' }} · @{{ formatActivitySchedule(note.created_at) }}
+                                        </p>
+                                    </article>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-dashed border-gray-300 p-3 dark:border-gray-700">
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                @lang('admin::app.leads.index.kanban.quick-view.next-activity')
+                            </p>
+
+                            <template v-if="quickView.lead.next_activity">
+                                <p class="mt-1 text-sm font-medium dark:text-white">
+                                    @{{ quickView.lead.next_activity.title || quickView.lead.next_activity.type }}
+                                </p>
+
+                                <p
+                                    class="text-xs text-gray-500 dark:text-gray-400"
+                                    v-if="quickView.lead.next_activity.schedule_from"
+                                >
+                                    @{{ formatActivitySchedule(quickView.lead.next_activity.schedule_from) }}
+                                </p>
+                            </template>
+
+                            <p
+                                class="mt-1 text-sm text-gray-500 dark:text-gray-400"
+                                v-else
+                            >
+                                @lang('admin::app.leads.index.kanban.quick-view.no-next-activity')
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                                type="button"
+                                class="primary-button"
+                                :disabled="quickView.saving"
+                                @click="saveQuickView"
+                            >
+                                @lang('admin::app.leads.index.kanban.quick-view.save-btn')
+                            </button>
+
+                            <a
+                                class="secondary-button"
+                                :href="'{{ route('admin.leads.view', 'replaceId') }}'.replace('replaceId', quickView.lead.id)"
+                            >
+                                @lang('admin::app.leads.index.kanban.quick-view.open-full')
+                            </a>
+                        </div>
+                    </div>
+                </x-slot>
+            </x-admin::drawer>
         </template>
     </script>
 
@@ -349,11 +603,33 @@
 
                     stages: @json($pipeline->stages->toArray()),
 
+                    assignableUsers: @json($assignableUsers ?? []),
+
+                    workspaceTimezone: @json(config('app.timezone')),
+
+                    selectedUserFilter: null,
+
                     stageLeads: {},
 
                     isLoading: true,
 
                     isLoadingMore: false,
+
+                    quickView: {
+                        lead: null,
+                        saving: false,
+                        notes: [],
+                        notesLoading: false,
+                        notesError: false,
+                        form: {
+                            title: '',
+                            user_id: null,
+                            lead_value: null,
+                            lead_pipeline_stage_id: null,
+                            expected_close_date: '',
+                            description: '',
+                        },
+                    },
 
                     cardFields: {
                         contactPerson: true,
@@ -363,6 +639,7 @@
                         source: true,
                         type: true,
                         tags: true,
+                        nextActivity: true,
                     },
 
                     tagTextColor: {
@@ -469,6 +746,14 @@
                         }
 
                         /**
+                         * Assignee tabs use a dedicated query param so unassigned (null user_id)
+                         * can be filtered without relying on RequestCriteria equality.
+                         */
+                        if (column.index === 'user_id') {
+                            return;
+                        }
+
+                        /**
                          * Date range filters are sent as a dedicated parameter, not through the search
                          * string, so the server can resolve them the same way the datagrid does. A quick
                          * filter, such as `last_month`, is applied as a plain string, whereas a custom
@@ -492,6 +777,10 @@
 
                         params['searchFields'] += `${column.index}:${column.search_field};`;
                     });
+
+                    if (this.selectedUserFilter !== null) {
+                        params.assigned_user_id = this.selectedUserFilter;
+                    }
 
                     return this.$axios
                         .get("{{ route('admin.leads.get') }}", {
@@ -525,6 +814,14 @@
                         ...filters.columns,
                     ];
 
+                    const userFilter = filters.columns.find((column) => column.index === 'user_id');
+
+                    if (userFilter) {
+                        const value = Array.isArray(userFilter.value) ? userFilter.value[0] : userFilter.value;
+
+                        this.selectedUserFilter = value?.value ?? value ?? null;
+                    }
+
                     this.get()
                         .then(response => {
                             for (let [sortOrder, data] of Object.entries(response.data)) {
@@ -551,6 +848,161 @@
                                 this.stageLeads[sortOrder] = data;
                             }
                         });
+                },
+
+                /**
+                 * Filter kanban leads by assignee user tab.
+                 *
+                 * @param {number|null} userId
+                 * @returns {void}
+                 */
+                filterByUser(userId) {
+                    this.selectedUserFilter = userId;
+
+                    this.applied.filters.columns = this.applied.filters.columns.filter(
+                        (column) => column.index !== 'user_id'
+                    );
+
+                    this.isLoading = true;
+
+                    this.get()
+                        .then(response => {
+                            for (let [sortOrder, data] of Object.entries(response.data)) {
+                                this.stageLeads[sortOrder] = data;
+                            }
+                        });
+                },
+
+                /**
+                 * Open the lead quick-view drawer.
+                 *
+                 * @param {object} lead
+                 * @returns {void}
+                 */
+                openQuickView(lead) {
+                    this.quickView.lead = lead;
+
+                    let expectedCloseDate = '';
+
+                    if (lead.expected_close_date) {
+                        const parsed = new Date(lead.expected_close_date);
+
+                        if (! Number.isNaN(parsed.getTime())) {
+                            expectedCloseDate = parsed.toISOString().slice(0, 10);
+                        }
+                    }
+
+                    this.quickView.form = {
+                        title: lead.title ?? '',
+                        user_id: lead.user_id ?? null,
+                        lead_value: lead.lead_value ?? null,
+                        lead_pipeline_stage_id: lead.lead_pipeline_stage_id ?? lead.stage?.id ?? null,
+                        expected_close_date: expectedCloseDate,
+                        description: lead.description ?? '',
+                    };
+
+                    this.$refs.leadQuickViewDrawer.open();
+
+                    this.loadQuickViewNotes(lead.id);
+                },
+
+                /**
+                 * Load the latest notes for the lead shown in the drawer.
+                 *
+                 * @param {number} leadId
+                 * @returns {void}
+                 */
+                loadQuickViewNotes(leadId) {
+                    this.quickView.notes = [];
+                    this.quickView.notesLoading = true;
+                    this.quickView.notesError = false;
+
+                    this.$axios.get(
+                        "{{ route('admin.leads.activities.index', 'replaceId') }}".replace('replaceId', leadId),
+                        {
+                            params: {
+                                type: 'note',
+                                per_page: 50,
+                            },
+                        }
+                    )
+                        .then(response => {
+                            if (this.quickView.lead?.id === leadId) {
+                                this.quickView.notes = response.data.data ?? [];
+                            }
+                        })
+                        .catch(() => {
+                            if (this.quickView.lead?.id === leadId) {
+                                this.quickView.notesError = true;
+                            }
+                        })
+                        .finally(() => {
+                            if (this.quickView.lead?.id === leadId) {
+                                this.quickView.notesLoading = false;
+                            }
+                        });
+                },
+
+                /**
+                 * Persist quick-view edits and refresh the board.
+                 *
+                 * @returns {void}
+                 */
+                saveQuickView() {
+                    if (! this.quickView.lead) {
+                        return;
+                    }
+
+                    this.quickView.saving = true;
+
+                    this.$axios.put(
+                        "{{ route('admin.leads.quick_update', ':id') }}".replace(':id', this.quickView.lead.id),
+                        {
+                            ...this.quickView.form,
+                            user_id: this.quickView.form.user_id || null,
+                        }
+                    )
+                        .then(response => {
+                            this.$emitter.emit('add-flash', { type: 'success', message: response.data.message });
+
+                            this.$refs.leadQuickViewDrawer.close();
+
+                            this.get()
+                                .then(boardResponse => {
+                                    for (let [sortOrder, data] of Object.entries(boardResponse.data)) {
+                                        this.stageLeads[sortOrder] = data;
+                                    }
+                                });
+                        })
+                        .catch(error => {
+                            this.$emitter.emit('add-flash', {
+                                type: 'error',
+                                message: error.response?.data?.message || error.message,
+                            });
+                        })
+                        .finally(() => {
+                            this.quickView.saving = false;
+                        });
+                },
+
+                /**
+                 * Format next-activity schedule for card/drawer display.
+                 *
+                 * @param {string} value
+                 * @returns {string}
+                 */
+                formatActivitySchedule(value) {
+                    if (! value) {
+                        return '';
+                    }
+
+                    const date = new Date(value);
+
+                    if (Number.isNaN(date.getTime())) {
+                        return value;
+                    }
+
+                    return this.$admin.formatDate(value, 'MMM d, h:mm A', this.workspaceTimezone);
                 },
 
                 /**

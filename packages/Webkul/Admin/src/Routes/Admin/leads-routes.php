@@ -22,6 +22,8 @@ Route::controller(LeadController::class)->prefix('leads')->group(function () {
 
     Route::put('edit/{id}', 'update')->name('admin.leads.update');
 
+    Route::put('quick-edit/{id}', 'quickUpdate')->name('admin.leads.quick_update');
+
     Route::put('attributes/edit/{id}', 'updateAttributes')->name('admin.leads.attributes.update');
 
     Route::put('stage/edit/{id}', 'updateStage')->name('admin.leads.stage.update');

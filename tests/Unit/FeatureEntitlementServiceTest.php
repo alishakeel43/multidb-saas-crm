@@ -210,6 +210,7 @@ it('maps all stock admin menu modules to feature entitlements', function () {
         ->and($entitlements->featureForRoute('admin.dashboard.index'))->toBe('dashboard')
         ->and($entitlements->featureForRoute('admin.mail.index'))->toBe('mail')
         ->and($entitlements->featureForRoute('admin.activities.index'))->toBe('activities')
+        ->and($entitlements->featureForRoute('admin.tasks.index'))->toBe('tasks')
         ->and($entitlements->featureForRoute('admin.settings.roles.index'))->toBe('user_management')
         ->and($entitlements->featureForRoute('admin.settings.warehouses.index'))->toBe('inventory')
         ->and($entitlements->featureForRoute('admin.settings.tags.index'))->toBe('tags')

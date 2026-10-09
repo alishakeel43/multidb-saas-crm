@@ -151,16 +151,30 @@ class AttributeController extends Controller
      */
     public function checkUniqueValidation()
     {
-        $attribute = $this->attributeRepository->findOneWhere([
-            'code' => request('attribute_code'),
+        $data = request()->validate([
+            'entity_id' => ['nullable', 'integer'],
+            'entity_type' => ['required', 'string'],
+            'attribute_code' => ['required', 'string'],
+            'attribute_value' => ['required', 'string'],
         ]);
+
+        $attribute = $this->attributeRepository->findOneWhere([
+            'code' => $data['attribute_code'],
+            'entity_type' => $data['entity_type'],
+        ]);
+
+        if (! $attribute) {
+            return response()->json([
+                'message' => 'The requested attribute does not exist.',
+            ], 422);
+        }
 
         return response()->json([
             'validated' => $this->attributeValueRepository->isValueUnique(
-                request('entity_id'),
-                request('entity_type'),
+                $data['entity_id'] ?? null,
+                $data['entity_type'],
                 $attribute,
-                request('attribute_value'),
+                $data['attribute_value'],
             ),
         ]);
     }

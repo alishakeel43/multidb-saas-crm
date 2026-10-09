@@ -1,4 +1,9 @@
-<v-product-list :data="products"></v-product-list>
+@php($canCreateProduct = bouncer()->hasPermission('products.create.quick-create'))
+
+<v-product-list
+    :data="products"
+    :can-create-product="@json($canCreateProduct)"
+></v-product-list>
 
 @pushOnce('scripts')
     <script
@@ -52,6 +57,7 @@
                             :product="product"
                             :key="index"
                             :index="index"
+                            :can-create-product="canCreateProduct"
                             @onRemoveProduct="removeProduct($event)"
                         ></v-product-item>
 
@@ -74,6 +80,7 @@
 
                 @lang('admin::app.leads.common.products.add-more')
             </button>
+
         </div>
     </script>
 
@@ -86,24 +93,145 @@
             <x-admin::table.td>
                 <x-admin::form.control-group class="!mb-0">
                     <x-admin::lookup
+                        ::key="product.product_id || 'new-product'"
                         ::src="src"
-                        ::name="`${inputName}[name]`"
+                        ::name="`${inputName}[lookup_id]`"
                         :preload="true"
+                        :can-add-new="$canCreateProduct"
+                        :defer-add-new="true"
+                        ::value="{ id: product.product_id, name: product.name }"
                         :placeholder="trans('admin::app.leads.common.products.product-name')"
-                        @on-selected="(product) => addProduct(product)"
+                        @on-selected="(result) => addProduct(result)"
+                        @add-new="openProductModal"
                     />
 
-                    <x-admin::form.control-group.control
+                    <input
                         type="hidden"
-                        ::name="`${inputName}[product_id]`"
-                        v-model="product.product_id"
-                        rules="required"
-                        :label="trans('admin::app.leads.common.products.product-name')"
-                        :placeholder="trans('admin::app.leads.common.products.product-name')"
+                        :name="`${inputName}[name]`"
+                        :value="product.name"
+                    />
+
+                    <input
+                        v-if="product.product_id"
+                        type="hidden"
+                        :name="`${inputName}[product_id]`"
+                        :value="product.product_id"
                     />
 
                     <x-admin::form.control-group.error ::name="`${inputName}[product_id]`" />
                 </x-admin::form.control-group>
+
+                <x-admin::modal
+                    ref="productModal"
+                    size="medium"
+                    @toggle="syncProductModal"
+                >
+                    <x-slot:header>
+                        <p class="text-lg font-bold text-gray-800 dark:text-white">
+                            @lang('admin::app.products.create.title')
+                        </p>
+                    </x-slot:header>
+
+                    <x-slot:content>
+                        <div
+                            v-if="productModalOpen"
+                            class="grid max-h-[70vh] grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2"
+                            @keydown.enter.prevent
+                        >
+                            <p
+                                v-if="productError"
+                                class="text-sm text-red-600 sm:col-span-2"
+                            >
+                                @{{ productError }}
+                            </p>
+
+                            <div class="sm:col-span-2">
+                                <label class="required mb-1 block text-sm font-medium text-gray-800 dark:text-white">
+                                    @lang('admin::app.leads.common.products.product-name')
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                                    v-model="productDraft.name"
+                                    autocomplete="off"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="required mb-1 block text-sm font-medium text-gray-800 dark:text-white">
+                                    @lang('admin::app.products.view.sku')
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                                    v-model="productDraft.sku"
+                                    autocomplete="off"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="required mb-1 block text-sm font-medium text-gray-800 dark:text-white">
+                                    @lang('admin::app.leads.common.products.quantity')
+                                </label>
+
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                                    v-model="productDraft.quantity"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="required mb-1 block text-sm font-medium text-gray-800 dark:text-white">
+                                    @lang('admin::app.leads.common.products.price')
+                                </label>
+
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                                    v-model="productDraft.price"
+                                />
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="mb-1 block text-sm font-medium text-gray-800 dark:text-white">
+                                    @lang('installer::app.seeders.attributes.products.description')
+                                </label>
+
+                                <textarea
+                                    class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                                    rows="3"
+                                    v-model="productDraft.description"
+                                ></textarea>
+                            </div>
+                        </div>
+                    </x-slot:content>
+
+                    <x-slot:footer>
+                        <button
+                            type="button"
+                            class="transparent-button"
+                            @click="closeProductModal"
+                        >
+                            @lang('admin::app.leads.view.persons.cancel-btn')
+                        </button>
+
+                        <button
+                            type="button"
+                            class="primary-button"
+                            :disabled="productSaving"
+                            @click="saveProduct"
+                        >
+                            @lang('admin::app.products.create.save-btn')
+                        </button>
+                    </x-slot:footer>
+                </x-admin::modal>
             </x-admin::table.td>
 
             <!-- Product Quantity -->
@@ -172,7 +300,16 @@
         app.component('v-product-list', {
             template: '#v-product-list-template',
 
-            props: ['data'],
+            props: {
+                data: {
+                    type: Array,
+                    default: null,
+                },
+                canCreateProduct: {
+                    type: Boolean,
+                    default: false,
+                },
+            },
 
             data: function () {
                 return {
@@ -209,11 +346,25 @@
         app.component('v-product-item', {
             template: '#v-product-item-template',
 
-            props: ['index', 'product'],
+            props: ['index', 'product', 'canCreateProduct'],
 
             data() {
                 return {
                     products: [],
+
+                    productModalOpen: false,
+
+                    productSaving: false,
+
+                    productError: '',
+
+                    productDraft: {
+                        name: '',
+                        sku: '',
+                        description: '',
+                        quantity: 1,
+                        price: '',
+                    },
                 }
             },
 
@@ -248,13 +399,100 @@
                  * @return {void}
                  */
                 addProduct(result) {
-                    this.product.product_id = result.id;
+                    this.product.product_id = result.id || null;
 
-                    this.product.name = result.name;
+                    this.product.name = result.name || '';
 
-                    this.product.price = result.price;
+                    this.product.price = result.price ?? this.product.price ?? 0;
 
-                    this.product.quantity = result.quantity ?? 1;
+                    this.product.quantity = result.quantity ?? (this.product.quantity || 1);
+                },
+
+                openProductModal(name) {
+                    this.productError = '';
+                    this.productDraft = {
+                        name: name || '',
+                        sku: this.suggestSku(name),
+                        description: '',
+                        quantity: 1,
+                        price: '',
+                    };
+
+                    this.productModalOpen = true;
+                    this.$nextTick(() => this.$refs.productModal.open());
+                },
+
+                closeProductModal() {
+                    this.productModalOpen = false;
+                    this.$refs.productModal.close();
+                },
+
+                syncProductModal(state) {
+                    this.productModalOpen = !! state?.isActive;
+                },
+
+                suggestSku(name) {
+                    const base = String(name || 'product')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, '')
+                        .slice(0, 20) || 'product';
+
+                    return base + '-' + Math.random().toString(36).slice(2, 8);
+                },
+
+                saveProduct() {
+                    const name = String(this.productDraft.name || '').trim();
+                    const sku = String(this.productDraft.sku || '').trim() || this.suggestSku(name);
+                    const quantity = this.productDraft.quantity;
+                    const price = this.productDraft.price;
+
+                    if (! name || ! sku || quantity === '' || quantity === null || price === '' || price === null) {
+                        this.productError = @json(__('validation.required', ['attribute' => __('admin::app.leads.common.products.product-name')]));
+
+                        return;
+                    }
+
+                    this.productSaving = true;
+                    this.productError = '';
+
+                    this.$axios.post("{{ route('admin.products.store') }}", {
+                            entity_type: 'products',
+                            name,
+                            sku,
+                            description: String(this.productDraft.description || '').trim(),
+                            quantity,
+                            price,
+                        })
+                        .then((response) => {
+                            const created = response.data.data || {};
+                            const lineQuantity = this.product.quantity || 1;
+
+                            this.addProduct({
+                                id: created.id,
+                                name: created.name || name,
+                                price: created.price ?? price,
+                                quantity: lineQuantity,
+                            });
+
+                            this.closeProductModal();
+
+                            this.$emitter.emit('add-flash', {
+                                type: 'success',
+                                message: response.data.message,
+                            });
+                        })
+                        .catch((error) => {
+                            const errors = error?.response?.data?.errors;
+                            const first = errors ? Object.values(errors)[0] : null;
+
+                            this.productError = Array.isArray(first)
+                                ? first[0]
+                                : (error?.response?.data?.message || '');
+                        })
+                        .finally(() => {
+                            this.productSaving = false;
+                        });
                 },
 
                 /**

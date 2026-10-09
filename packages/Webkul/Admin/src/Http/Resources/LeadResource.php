@@ -15,12 +15,40 @@ class LeadResource extends JsonResource
      */
     public function toArray($request)
     {
+        $leadValue = $this->lead_value;
+
+        if (is_numeric($leadValue)) {
+            $leadValue = number_format((float) $leadValue, 2, '.', '');
+        }
+
+        $nextActivity = null;
+
+        if ($this->relationLoaded('activities')) {
+            $activity = $this->activities
+                ->where('is_done', 0)
+                ->sortBy(fn ($item) => $item->schedule_from?->timestamp ?? PHP_INT_MAX)
+                ->first();
+
+            if ($activity) {
+                $nextActivity = [
+                    'id' => $activity->id,
+                    'title' => $activity->title,
+                    'type' => $activity->type,
+                    'schedule_from' => $activity->schedule_from,
+                    'schedule_to' => $activity->schedule_to,
+                ];
+            }
+        }
+
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'lead_value' => $this->lead_value,
-            'formatted_lead_value' => core()->formatBasePrice($this->lead_value),
+            'description' => $this->description,
+            'lead_value' => $leadValue,
+            'formatted_lead_value' => $leadValue,
             'status' => $this->status,
+            'user_id' => $this->user_id,
+            'lead_pipeline_stage_id' => $this->lead_pipeline_stage_id,
             'expected_close_date' => $this->expected_close_date,
             'rotten_days' => $this->rotten_days,
             'closed_at' => $this->closed_at,
@@ -33,6 +61,7 @@ class LeadResource extends JsonResource
             'pipeline' => $this->pipeline ? new PipelineResource($this->pipeline) : null,
             'stage' => $this->stage ? new StageResource($this->stage) : null,
             'tags' => TagResource::collection($this->tags),
+            'next_activity' => $nextActivity,
         ];
     }
 }

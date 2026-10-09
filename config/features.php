@@ -79,6 +79,12 @@ return [
         'route_prefixes' => ['admin.activities.'],
         'menu_keys' => ['activities'],
     ],
+    'tasks' => [
+        'label' => 'Tasks',
+        'default_enabled' => true,
+        'route_prefixes' => ['admin.tasks.'],
+        'menu_keys' => ['tasks'],
+    ],
     'user_management' => [
         'label' => 'User management',
         'default_enabled' => true,

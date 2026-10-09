@@ -7,8 +7,11 @@ use App\Models\Tenant;
 use App\Models\TenantFeature;
 use App\Observers\RejectSupportUserOwnership;
 use App\Services\FeatureEntitlementService;
+use App\Services\TenantClock;
 use App\Services\TenantOverviewService;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Multitenancy\Events\ForgettingCurrentTenantEvent;
+use Spatie\Multitenancy\Events\MadeTenantCurrentEvent;
 use Webkul\Activity\Models\Activity;
 use Webkul\Activity\Models\Participant;
 use Webkul\Contact\Models\Organization;
@@ -24,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(TenantOverviewService::class);
+        $this->app->singleton(TenantClock::class);
     }
 
     /**
@@ -70,6 +74,14 @@ class AppServiceProvider extends ServiceProvider
             if ($tenant->wasChanged('plan_id')) {
                 app(FeatureEntitlementService::class)->forgetTenantCache($tenant->id);
             }
+        });
+
+        $this->app['events']->listen(MadeTenantCurrentEvent::class, function (): void {
+            app(TenantClock::class)->apply();
+        });
+
+        $this->app['events']->listen(ForgettingCurrentTenantEvent::class, function (): void {
+            app(TenantClock::class)->reset();
         });
     }
 }

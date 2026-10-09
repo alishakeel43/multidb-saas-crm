@@ -3,7 +3,58 @@
 Neeche wala block **poora copy** karke Copilot / Claude / Codex / Cursor ko bhejo.
 Iske alawa pehli baar kuch explain karne ki zaroorat nahi — agent files padh kar kaam start karega.
 
+**Wave 1 (P9–P16) active:** use Message B below. Message A is for historical V1 reference only.
+
 ---
+
+## Message B — Wave 1 feature port (P9–P16) — USE THIS NOW
+
+```text
+You are continuing the Wave-1 feature port. Do not redesign the multi-DB SaaS architecture.
+
+PROJECT PATH:
+/Users/ali/Desktop/krayin-saas-crm
+
+SOURCE REFERENCE (read-only):
+/Users/ali/Desktop/Krayin_laravel_CRM_local
+- feature/todo-management (Task package + SaaS UX)
+- feature/multi-tenant-saas (reminders, kanban, branding, etc.)
+
+STARTUP (mandatory, in this order):
+1. Read docs/SAAS_HANDOFF.md
+2. Read docs/PROGRESS.md
+3. Read docs/DECISIONS.md
+4. Read docs/CHECKLIST.md
+5. Read docs/DOMAIN_AND_URLS.md
+6. Read docs/agents/PLAN_PORT_FEATURES_COPILOT.md
+
+THEN:
+→ Do ONLY the first PHASE 9–16 item in docs/PROGRESS.md that is not DONE.
+
+HARD RULES:
+- Context7 is OPTIONAL. Never block for Context7.
+- Separate MySQL database per tenant (Spatie). Landlord: zaristech_saas. MAMP: 127.0.0.1:8889.
+- Filament /super-admin on landlord. CRM /admin on {slug}.krayinsaas.localhost.
+- NEVER copy packages/Webkul/TenantManagement. NEVER add tenant_id to CRM tenant-DB tables.
+- NEVER port UnifiedInbox / AI / Stripe / Meta ads / Google Calendar tenancy in Wave 1.
+- Keep Krayin Bouncer/ACL. No Spatie Permission. No Stancl.
+- Never trust tenant_id from the request; tenant comes from domain.
+- Branch phase/NN-…; commit verified milestones; no push/PR/merge without user ask.
+- Do not add Co-authored-by unless the user explicitly requests it.
+
+Wave 1 scope: Task, activity reminders, lead kanban, Product Entrusted, workspace timezone/locale, dashboard fixes, Zaristech branding.
+
+WHEN YOU STOP:
+1. Update docs/PROGRESS.md
+2. Update docs/SAAS_HANDOFF.md
+3. Append docs/CHANGELOG_SAAS.md
+
+Begin with the startup reads, then execute the next incomplete PHASE 9–16.
+```
+
+---
+
+## Message A — V1 foundation (P0–P8) — historical only
 
 ## Message (English — best for all agents)
 

@@ -50,21 +50,33 @@ class Person extends AbstractReporting
      *
      * @param  int  $limit
      */
-    public function getTopCustomersByRevenue($limit = null): Collection
+    public function getTopCustomersByRevenue($limit = null, ?int $pipelineId = null): Collection
     {
         $tablePrefix = DB::getTablePrefix();
 
-        $items = $this->personRepository
+        $query = $this->personRepository
             ->resetModel()
-            ->leftJoin('leads', 'persons.id', '=', 'leads.person_id')
-            ->select('*', 'persons.id as id')
-            ->addSelect(DB::raw('SUM('.$tablePrefix.'leads.lead_value) as revenue'))
+            ->join('leads', 'persons.id', '=', 'leads.person_id')
+            ->join('lead_pipeline_stages', function ($join) {
+                $join->on('leads.lead_pipeline_stage_id', '=', 'lead_pipeline_stages.id')
+                    ->where('lead_pipeline_stages.code', 'won');
+            })
+            ->select('persons.id')
+            ->selectRaw('MAX('.$tablePrefix.'persons.name) as name')
+            ->selectRaw('MAX('.$tablePrefix.'persons.emails) as emails')
+            ->selectRaw('MAX('.$tablePrefix.'persons.contact_numbers) as contact_numbers')
+            ->selectRaw('SUM('.$tablePrefix.'leads.lead_value) as revenue')
             ->whereBetween('leads.closed_at', [$this->startDate, $this->endDate])
+            ->groupBy('persons.id')
             ->having(DB::raw('SUM('.$tablePrefix.'leads.lead_value)'), '>', 0)
-            ->groupBy('person_id')
             ->orderBy('revenue', 'DESC')
-            ->limit($limit)
-            ->get();
+            ->limit($limit);
+
+        if ($pipelineId) {
+            $query->where('leads.lead_pipeline_id', $pipelineId);
+        }
+
+        $items = $query->get();
 
         $items = $items->map(function ($item) {
             return [
@@ -72,7 +84,7 @@ class Person extends AbstractReporting
                 'name' => $item->name,
                 'emails' => $item->emails,
                 'contact_numbers' => $item->contact_numbers,
-                'revenue' => $item->revenue,
+                'revenue' => (float) $item->revenue,
                 'formatted_revenue' => core()->formatBasePrice($item->revenue),
             ];
         });

@@ -24,36 +24,42 @@ class Product extends AbstractReporting
      *
      * @param  int  $limit
      */
-    public function getTopSellingProductsByRevenue($limit = null): Collection
+    public function getTopSellingProductsByRevenue($limit = null, ?int $pipelineId = null): Collection
     {
         $tablePrefix = DB::getTablePrefix();
 
-        $items = $this->productRepository
+        $query = $this->productRepository
             ->resetModel()
-            ->with('product')
-            ->leftJoin('leads', 'lead_products.lead_id', '=', 'leads.id')
+            ->join('leads', 'lead_products.lead_id', '=', 'leads.id')
+            ->join('lead_pipeline_stages', function ($join) {
+                $join->on('leads.lead_pipeline_stage_id', '=', 'lead_pipeline_stages.id')
+                    ->where('lead_pipeline_stages.code', 'won');
+            })
             ->leftJoin('products', 'lead_products.product_id', '=', 'products.id')
-            ->select('*')
-            ->addSelect(DB::raw('SUM('.$tablePrefix.'lead_products.amount) as revenue'))
+            ->select('lead_products.product_id')
+            ->selectRaw('MAX('.$tablePrefix.'products.name) as name')
+            ->selectRaw('MAX('.$tablePrefix.'products.price) as catalog_price')
+            ->selectRaw('SUM('.$tablePrefix.'lead_products.amount) as revenue')
             ->whereBetween('leads.closed_at', [$this->startDate, $this->endDate])
+            ->groupBy('lead_products.product_id')
             ->having(DB::raw('SUM('.$tablePrefix.'lead_products.amount)'), '>', 0)
-            ->groupBy('product_id')
             ->orderBy('revenue', 'DESC')
-            ->limit($limit)
-            ->get();
+            ->limit($limit);
 
-        $items = $items->map(function ($item) {
+        if ($pipelineId) {
+            $query->where('leads.lead_pipeline_id', $pipelineId);
+        }
+
+        return $query->get()->map(function ($item) {
             return [
                 'id' => $item->product_id,
                 'name' => $item->name,
-                'price' => $item->product?->price,
-                'formatted_price' => core()->formatBasePrice($item->price),
-                'revenue' => $item->revenue,
+                'price' => $item->catalog_price,
+                'formatted_price' => core()->formatBasePrice($item->catalog_price),
+                'revenue' => (float) $item->revenue,
                 'formatted_revenue' => core()->formatBasePrice($item->revenue),
             ];
         });
-
-        return $items;
     }
 
     /**

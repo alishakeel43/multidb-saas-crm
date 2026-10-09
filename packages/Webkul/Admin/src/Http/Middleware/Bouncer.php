@@ -102,6 +102,23 @@ class Bouncer
 
         $user = auth()->guard('user')->user();
 
+        if ($routeName === 'admin.settings.attributes.check_unique_validation') {
+            $hasValidationPermission = collect([
+                'leads.create',
+                'leads.edit',
+                'contacts.persons.create',
+                'contacts.persons.edit',
+                'settings.automation.attributes',
+                'settings.automation.attributes.edit',
+            ])->contains(fn ($permission) => $user->hasPermission($permission));
+
+            if (! $hasValidationPermission) {
+                abort(401, 'This action is unauthorized.');
+            }
+
+            return;
+        }
+
         if (
             $user?->is_support_account
             && ! in_array($routeName, ['admin.user.account.update', 'admin.session.destroy'], true)

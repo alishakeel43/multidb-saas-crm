@@ -6,9 +6,12 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Prettus\Repository\Criteria\RequestCriteria;
 use Webkul\Admin\DataGrids\Lead\LeadDataGrid;
@@ -81,6 +84,7 @@ class LeadController extends Controller
         return view('admin::leads.index', [
             'pipeline' => $pipeline,
             'columns' => $this->getKanbanColumns(),
+            'assignableUsers' => $this->getAssignableUsers(),
         ]);
     }
 
@@ -117,6 +121,16 @@ class LeadController extends Controller
                 $query->whereIn('leads.user_id', $userIds);
             }
 
+            if (request()->filled('assigned_user_id')) {
+                $assignedUserId = request()->query('assigned_user_id');
+
+                if ((string) $assignedUserId === '0') {
+                    $query->whereNull('leads.user_id');
+                } else {
+                    $query->where('leads.user_id', (int) $assignedUserId);
+                }
+            }
+
             $this->applyDateRangeFilters($query);
 
             $stage->lead_value = (clone $query)->sum('lead_value');
@@ -135,6 +149,11 @@ class LeadController extends Controller
                     'pipeline.stages',
                     'stage',
                     'attribute_values',
+                    'activities' => function ($activityQuery) {
+                        $activityQuery->where('is_done', 0)
+                            ->orderByRaw('schedule_from IS NULL')
+                            ->orderBy('schedule_from');
+                    },
                 ])->orderBy('updated_at', 'desc')->paginate(10)),
 
                 'meta' => [
@@ -307,6 +326,60 @@ class LeadController extends Controller
         } else {
             return redirect()->route('admin.leads.index', $data['lead_pipeline_id']);
         }
+    }
+
+    /**
+     * Quick-update a lead from the kanban drawer (title, assignee, value, stage, date).
+     */
+    public function quickUpdate(int $id): JsonResponse
+    {
+        $lead = $this->leadRepository->findOrFail($id);
+
+        $this->preventUnauthorizedAccess($lead->user_id);
+
+        $data = $this->validate(request(), [
+            'title' => 'sometimes|required|string|max:255',
+            'user_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::in($this->getAssignableUserIds()),
+            ],
+            'lead_value' => 'sometimes|nullable|string|max:255',
+            'lead_pipeline_stage_id' => 'sometimes|nullable|integer|exists:lead_pipeline_stages,id',
+            'expected_close_date' => 'sometimes|nullable|date',
+            'description' => 'sometimes|nullable|string',
+        ]);
+
+        $data['entity_type'] = 'leads';
+
+        Event::dispatch('lead.update.before', $id);
+
+        $lead = $this->leadRepository->update($data, $id, array_keys(array_diff_key($data, ['entity_type' => true])));
+
+        $lead->load([
+            'tags',
+            'type',
+            'source',
+            'user',
+            'person',
+            'person.organization',
+            'pipeline',
+            'pipeline.stages',
+            'stage',
+            'activities' => function ($activityQuery) {
+                $activityQuery->where('is_done', 0)
+                    ->orderByRaw('schedule_from IS NULL')
+                    ->orderBy('schedule_from');
+            },
+        ]);
+
+        Event::dispatch('lead.update.after', $lead);
+
+        return response()->json([
+            'message' => trans('admin::app.leads.update-success'),
+            'data' => new LeadResource($lead),
+        ]);
     }
 
     /**
@@ -554,12 +627,65 @@ class LeadController extends Controller
             $repository = $repository->where('is_support_account', false);
         }
 
+        if (is_a($repositoryClass, UserRepository::class, true)) {
+            $repository = $repository->whereIn('users.id', $this->getAssignableUserIds());
+        }
+
         return $repository
             ->select([$column['filterable_options']['column']['label'].' as label', $column['filterable_options']['column']['value'].' as value'])
             ->where($column['filterable_options']['column']['label'], 'LIKE', '%'.$params['search'].'%')
             ->get()
             ->map
             ->only('label', 'value');
+    }
+
+    /**
+     * Active tenant CRM user IDs available for assignment (view-permission constrained).
+     *
+     * @return array<int, int>
+     */
+    private function getAssignableUserIds(): array
+    {
+        $query = DB::table('users')->where('status', 1);
+
+        if (Schema::hasColumn('users', 'is_support_account')) {
+            $query->where('is_support_account', false);
+        }
+
+        $workspaceUserIds = $query->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($authorizedIds = bouncer()->getAuthorizedUserIds()) {
+            $workspaceUserIds = array_values(array_intersect($workspaceUserIds, array_map('intval', $authorizedIds)));
+        }
+
+        return $workspaceUserIds;
+    }
+
+    /**
+     * Users available for kanban assignee filter / quick-view assignment.
+     *
+     * @return Collection<int, array{id:int, name:string}>
+     */
+    private function getAssignableUsers(): Collection
+    {
+        $userIds = $this->getAssignableUserIds();
+
+        if ($userIds === []) {
+            return collect();
+        }
+
+        return $this->userRepository->getModel()
+            ->newQuery()
+            ->whereIn('id', $userIds)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($user) => [
+                'id' => (int) $user->id,
+                'name' => $user->name,
+            ])
+            ->values();
     }
 
     /**

@@ -30,9 +30,9 @@ class SuperAdminPanelProvider extends PanelProvider
             ->path('super-admin')
             ->authGuard('platform')
             ->login()
-            ->brandName('Krayin SaaS Platform')
+            ->brandName('Zaristech SaaS Platform')
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => Color::hex('#2846A0'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->pages([

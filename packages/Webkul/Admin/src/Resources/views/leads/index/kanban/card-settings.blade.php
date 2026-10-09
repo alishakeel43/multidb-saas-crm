@@ -88,6 +88,7 @@
                         { key: 'source', label: '@lang('admin::app.leads.index.kanban.toolbar.card-settings.source')' },
                         { key: 'type', label: '@lang('admin::app.leads.index.kanban.toolbar.card-settings.lead-type')' },
                         { key: 'tags', label: '@lang('admin::app.leads.index.kanban.toolbar.card-settings.tags')' },
+                        { key: 'nextActivity', label: '@lang('admin::app.leads.index.kanban.toolbar.card-settings.next-activity')' },
                     ],
                 };
             },

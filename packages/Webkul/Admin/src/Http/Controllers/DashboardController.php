@@ -63,7 +63,13 @@ class DashboardController extends Controller
      */
     public function stats()
     {
-        $stats = $this->dashboardHelper->{$this->typeFunctions[request()->query('type')]}();
+        $type = (string) request()->query('type');
+
+        if (! isset($this->typeFunctions[$type])) {
+            abort(404);
+        }
+
+        $stats = $this->dashboardHelper->{$this->typeFunctions[$type]}();
 
         return response()->json([
             'statistics' => $stats,

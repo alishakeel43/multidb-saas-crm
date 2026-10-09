@@ -1,5 +1,60 @@
 # SaaS Change Log
 
+## 2026-10-09 — Compact Task quick-view drawer
+
+- Added an opt-in content-height mode to the shared drawer and enabled it for the Task quick view. Compact drawers no longer inherit full-height flex sizing, reset to the top when opened, and keep Open Full View and Save Changes beside the form while scrolling when content exceeds the viewport.
+
+## 2026-10-09 — Restore Lead kanban quick-view translations
+
+- Added the missing English Lead kanban quick-view strings so the drawer displays translated labels and actions instead of raw translation keys.
+
+## 2026-10-09 — Fix middleware and empty contact-number warnings
+
+- Removed unused middleware constructor assignments that created PHP dynamic-property warnings.
+- Guarded the person unique-ID generation when optional contact numbers are empty after filtering.
+
+## 2026-10-09 — Repair person email uniqueness validation
+
+- Restored the missing tenant `persons.emails` and `persons.contact_numbers` system attributes with a forward migration, preserving existing customized attribute records.
+- Scoped remote uniqueness lookups by entity type and return a validation response when the requested attribute is missing.
+- Fixed unique-value checks for new records so a null entity ID checks for duplicates across existing records rather than silently skipping them.
+- Allowed users with Lead/Person create or edit access to use the shared read-only email uniqueness endpoint, without requiring unrelated Settings permissions.
+- Added regression coverage for restored metadata, duplicate email detection, and editing a record without rejecting its own email.
+
+## 2026-10-10 — Restore tenant workspace user repository scope
+
+- Restored `UserRepository::scopeToWorkspace()` for Task create/edit and other existing dropdown paths; isolated tenant databases provide the workspace boundary, and queries outside an active tenant return no users.
+- Added a tenant-switching regression assertion to verify that workspace-scoped user listings only return users from the active tenant database.
+- Restored active-user and permission filtering for Lead kanban assignee search, and hid comparison percentages when the previous period has no baseline.
+
+## 2026-10-09 — Wave 1 complete (P11–P16)
+
+- Activity reminders: tenant-DB schema without `tenant_id`; `activities:dispatch-reminders` fans out over landlord tenants; `SendActivityReminder` switches tenant DB per job.
+- Lead kanban UX: assignee filter, next activity on cards, quick-update route; Product Entrusted attribute rename + text storage migrations applied to `tenant_demo`.
+- `App\Services\TenantClock` + `ApplyTenantClock` middleware and Spatie tenant current/forget listeners (no TenantManagement).
+- Dashboard reporting helpers/views and empty-baseline percentage behavior; EN win/lost share strings.
+- Zaristech branding: Admin logos/favicon, Filament brand `#2846A0`, EN help/footer copy, `.env.example` APP_NAME.
+- Expanded regression coverage for reminder scheduling, tenant fan-out/delivery, Task validation/scopes/reminder fan-out, Product Entrusted conversion/rollback, tenant-clock reset, dashboard request dates, and Zaristech branding.
+- Made Product Entrusted numeric-value normalization database-driver independent while preserving the existing zero-trimming behavior.
+- Added missing English translations for the lead kanban user-filter tabs.
+- Guarded the person organization lookup when its system attribute record is missing, following the reference CRM behavior.
+- Restored missing standard lead/person attributes per tenant and adapted the reference CRM's deferred product quick-create modal to the tenant-local catalog endpoint.
+- Validation: full Pest suite, focused Wave 1 regression tests, Pint, and `git diff --check`.
+
+## 2026-10-09 — PHASE 10 Task package (multi-DB)
+
+- Ported `packages/Webkul/Task` from `Krayin_laravel_CRM_local` `feature/todo-management` with all shared-DB tenancy removed (`tenant_id`, `HasTenant`, `TenantContext`, `tenant_users`).
+- Registered Task in Composer, Concord, and `bootstrap/providers.php`; added `tasks` entitlement in `config/features.php`.
+- `tasks:check-reminders` fans out over active landlord tenants via `$tenant->execute()`.
+- Admin EN lang keys, dashboard tasks widget blade, and two-database isolation Pest tests added; `tenants:migrate demo` applied Task schema.
+
+## 2026-10-09 — PHASE 9 Wave-1 port playbook
+
+- Added `docs/agents/PLAN_PORT_FEATURES_COPILOT.md` for post-V1 Wave 1 (Task, reminders, kanban, Product Entrusted, timezone/locale, dashboard, branding).
+- Wired `docs/agents/README.md` and coordinator Message B to the Wave-1 playbook.
+- Locked D19–D22 in `docs/DECISIONS.md`; extended `PROGRESS` / `HANDOFF` / `CHECKLIST` for phases P9–P16.
+- Explicitly deferred UnifiedInbox, AI, Stripe, Meta/CSV intake, and Google Calendar tenancy; forbids copying TenantManagement / CRM `tenant_id`.
+
 ## 2026-10-09 — Tenant support-account management
 
 - Added a Super Admin support-user management resource to create, view, update, activate/deactivate, and delete multiple support identities per tenant. Each account uses an individual tenant CRM email and password; passwords are stored only as tenant-side hashes.

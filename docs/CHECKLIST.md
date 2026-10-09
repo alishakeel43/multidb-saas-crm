@@ -82,3 +82,62 @@ Live verification created only the previously absent `tenant_demo`, confirmed it
 - [x] Cross-tenant data reads fail.
 - [x] Relevant Pest suite passes.
 - [x] Handoff records `V1_COMPLETE` and clearly lists remaining known issues.
+
+## PHASE 9 — Port playbook + continuity docs
+
+- [x] `docs/agents/PLAN_PORT_FEATURES_COPILOT.md` exists with paste prompt, scope, adaptation checklist, P9–P16 criteria.
+- [x] `docs/agents/README.md` points Wave-1 work at the port playbook.
+- [x] `docs/agents/COORDINATOR_MESSAGE.md` has Message B for Wave 1.
+- [x] `docs/DECISIONS.md` records D19–D22.
+- [x] `docs/PROGRESS.md` / `docs/SAAS_HANDOFF.md` list P9–P16 and next action PHASE 9/10.
+- [x] No product/package code required for PHASE 9 completion.
+
+## PHASE 10 — Task / To-Do (multi-DB)
+
+- [x] `packages/Webkul/Task` registered (concord, Composer, provider).
+- [x] Migrations have no `tenant_id` / no FK to `tenants`.
+- [x] No `HasTenant` / TenantManagement imports.
+- [x] `tasks` feature key in `config/features.php`; ACL + menu wired.
+- [x] Reminder command fans out via landlord tenants + `makeCurrent()`.
+- [x] Two-database isolation tests pass; CRUD/kanban tests pass without shared-DB assumptions.
+- [x] `tenants:migrate` applies Task schema to existing tenants.
+
+## PHASE 11 — Activity reminders
+
+- [x] Reminder schema on tenant DB without `tenant_id`.
+- [x] Dispatch fans out over active landlord tenants.
+- [x] Jobs are tenant-aware; no cross-tenant notification leakage.
+- [x] Focused reminder tests pass.
+
+## PHASE 12 — Lead kanban + Product Entrusted
+
+- [x] Kanban assignee / activity / quick-view (or equivalent source UX) works on tenant host.
+- [x] Product Entrusted migrations/label/text storage applied safely on tenant DBs.
+- [x] Focused tests cover label/storage; no UnifiedInbox files introduced.
+
+## PHASE 13 — Workspace timezone / locale
+
+- [x] App-level clock/locale reads `core_config` from current tenant connection.
+- [x] No TenantManagement dependency; no session `active_tenant_id`.
+- [x] Sequential `makeCurrent()` for two tenants does not permanently clobber process timezone incorrectly.
+- [x] Focused timezone/locale tests pass.
+
+## PHASE 14 — Dashboard correctness
+
+- [x] Win/lost share, empty previous-period, null-pipeline (and related) fixes ported.
+- [x] No cross-tenant analytics queries.
+- [x] Focused dashboard tests pass.
+
+## PHASE 15 — Zaristech branding
+
+- [x] Logos / primary color `#2846A0` / lang keys applied where appropriate.
+- [x] Filament Super Admin branding remains platform-consistent.
+- [x] No TenantManagement platform Blade layouts reintroduced.
+
+## PHASE 16 — Wave 1 regression + handoff
+
+- [x] Two-tenant isolation matrix covers Task, reminders, kanban/entrusted, timezone.
+- [x] Task feature disabled → 403 + menu hidden.
+- [x] Full `php artisan test --compact` passes (upstream deprecations OK).
+- [x] Pint and `git diff --check` pass.
+- [x] HANDOFF records Wave 1 DONE; deferred modules listed PENDING only.

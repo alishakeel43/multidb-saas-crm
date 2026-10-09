@@ -99,7 +99,7 @@
 
                     <li
                         v-if="canAddNew"
-                        @click="selectItem({ id: '', name: searchTerm })"
+                        @mousedown.prevent.stop="addAsNew"
                         class="cursor-pointer border-t border-gray-800 px-4 py-4 text-brandColor hover:bg-brandColor hover:text-white dark:border-gray-300 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-white"
                     >
                         <i class="icon-add text-md ltr:mr-2 rtl:ml-2"></i>
@@ -156,6 +156,11 @@
                     default: false,
                 },
 
+                deferAddNew: {
+                    type: Boolean,
+                    default: false,
+                },
+
                 preload: {
                     type: Boolean,
                     default: false,
@@ -167,7 +172,7 @@
                 },
             },
 
-            emits: ['on-selected'],
+            emits: ['on-selected', 'add-new'],
 
             data() {
                 return {
@@ -246,6 +251,26 @@
 
                         this.$nextTick(() => this.$refs.searchInput.focus());
                     }
+                },
+
+                addAsNew() {
+                    const name = (this.$refs.searchInput?.value || '').trim();
+
+                    if (! name) {
+                        this.$refs.searchInput?.focus();
+
+                        return;
+                    }
+
+                    if (this.deferAddNew) {
+                        this.showPopup = false;
+                        this.searchTerm = '';
+                        this.$emit('add-new', name);
+
+                        return;
+                    }
+
+                    this.selectItem({ id: '', name });
                 },
 
                 /**

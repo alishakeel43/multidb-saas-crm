@@ -51,6 +51,7 @@ class Activity extends Model implements ActivityContract
         'schedule_to',
         'is_done',
         'user_id',
+        'reminder_minutes',
     ];
 
     /**

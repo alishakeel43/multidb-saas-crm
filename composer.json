@@ -80,6 +80,7 @@
             "Webkul\\Product\\": "packages/Webkul/Product/src",
             "Webkul\\Quote\\": "packages/Webkul/Quote/src",
             "Webkul\\Tag\\": "packages/Webkul/Tag/src",
+            "Webkul\\Task\\": "packages/Webkul/Task/src",
             "Webkul\\User\\": "packages/Webkul/User/src",
             "Webkul\\Warehouse\\": "packages/Webkul/Warehouse/src",
             "Webkul\\WebForm\\": "packages/Webkul/WebForm/src",

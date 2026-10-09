@@ -13,27 +13,39 @@ class Lead extends AbstractReporting
     /**
      * The channel ids.
      */
-    protected array $stageIds;
+    protected array $stageIds = [];
 
     /**
      * The all stage ids.
      */
-    protected array $allStageIds;
+    protected array $allStageIds = [];
 
     /**
      * The won stage ids.
      */
-    protected array $wonStageIds;
+    protected array $wonStageIds = [];
 
     /**
      * The lost stage ids.
      */
-    protected array $lostStageIds;
+    protected array $lostStageIds = [];
 
     /**
      * The pipeline the dashboard is scoped to.
      */
     protected $pipeline;
+
+    /**
+     * Whether pipeline/stage ids have been resolved for this request.
+     */
+    protected bool $pipelineResolved = false;
+
+    /**
+     * Won and lost revenue for this request, loaded once for both cards.
+     *
+     * @var array{current_won: float, current_lost: float, previous_won: float, previous_lost: float}|null
+     */
+    protected ?array $closedRevenueCache = null;
 
     /**
      * Create a helper instance.
@@ -45,12 +57,55 @@ class Lead extends AbstractReporting
         protected StageRepository $stageRepository,
         protected PipelineRepository $pipelineRepository
     ) {
+        // Pipeline/stages are resolved lazily on first use. Laravel may
+        // instantiate this helper while gathering controller middleware —
+        // before session auth + tenant context exist — which would freeze a
+        // null pipeline and zero-out dashboard lead/revenue widgets.
+        parent::__construct();
+    }
+
+    /**
+     * Dates and the selected pipeline both come from the current request.
+     * A reused controller must not keep the previous request's pipeline.
+     */
+    public function applyRequest(): void
+    {
+        parent::applyRequest();
+
+        $this->pipelineResolved = false;
+        $this->closedRevenueCache = null;
+        $this->pipeline = null;
+    }
+
+    /**
+     * Ensure pipeline + stage id sets are loaded under the current tenant.
+     */
+    protected function ensurePipelineResolved(): void
+    {
+        if ($this->pipelineResolved) {
+            return;
+        }
+
+        $this->pipelineResolved = true;
+
         $this->pipeline = request('pipeline_id')
             ? $this->pipelineRepository->find(request('pipeline_id'))
             : null;
 
         if (! $this->pipeline) {
             $this->pipeline = $this->pipelineRepository->getDefaultPipeline();
+        }
+
+        /**
+         * Multi-tenant workspaces may briefly have no pipeline (new tenant /
+         * missing seed). Keep dashboard bootable with empty stage sets.
+         */
+        if (! $this->pipeline) {
+            $this->allStageIds = [];
+            $this->wonStageIds = [];
+            $this->lostStageIds = [];
+
+            return;
         }
 
         $stages = $this->pipeline->stages;
@@ -60,8 +115,6 @@ class Lead extends AbstractReporting
         $this->wonStageIds = $stages->where('code', 'won')->pluck('id')->toArray();
 
         $this->lostStageIds = $stages->where('code', 'lost')->pluck('id')->toArray();
-
-        parent::__construct();
     }
 
     /**
@@ -71,11 +124,13 @@ class Lead extends AbstractReporting
      */
     public function getTotalLeadsOverTime($period = 'auto'): array
     {
+        $this->ensurePipelineResolved();
+
         $this->stageIds = $this->allStageIds;
 
         $period = $this->determinePeriod($period);
 
-        return $this->getOverTimeStats($this->startDate, $this->endDate, 'leads.id', 'created_at', $period);
+        return $this->getOverTimeStats($this->startDate, $this->endDate, 'lead_value', 'created_at', $period);
     }
 
     /**
@@ -85,11 +140,13 @@ class Lead extends AbstractReporting
      */
     public function getTotalWonLeadsOverTime($period = 'auto'): array
     {
+        $this->ensurePipelineResolved();
+
         $this->stageIds = $this->wonStageIds;
 
         $period = $this->determinePeriod($period);
 
-        return $this->getOverTimeStats($this->startDate, $this->endDate, 'leads.id', 'closed_at', $period);
+        return $this->getOverTimeStats($this->startDate, $this->endDate, 'lead_value', 'closed_at', $period);
     }
 
     /**
@@ -99,11 +156,13 @@ class Lead extends AbstractReporting
      */
     public function getTotalLostLeadsOverTime($period = 'auto'): array
     {
+        $this->ensurePipelineResolved();
+
         $this->stageIds = $this->lostStageIds;
 
         $period = $this->determinePeriod($period);
 
-        return $this->getOverTimeStats($this->startDate, $this->endDate, 'leads.id', 'closed_at', $period);
+        return $this->getOverTimeStats($this->startDate, $this->endDate, 'lead_value', 'closed_at', $period);
     }
 
     /**
@@ -117,19 +176,17 @@ class Lead extends AbstractReporting
             return $period;
         }
 
-        $diffInDays = $this->startDate->diffInDays($this->endDate);
-        $diffInMonths = $this->startDate->diffInMonths($this->endDate);
-        $diffInYears = $this->startDate->diffInYears($this->endDate);
+        $span = $this->inclusiveDayCount($this->startDate, $this->endDate) - 1;
 
-        if ($diffInYears > 3) {
+        if ($span > 365 * 3) {
             return 'year';
-        } elseif ($diffInMonths > 6) {
+        } elseif ($span > 183) {
             return 'month';
-        } elseif ($diffInDays > 60) {
+        } elseif ($span > 60) {
             return 'week';
-        } else {
-            return 'day';
         }
+
+        return 'day';
     }
 
     /**
@@ -152,6 +209,12 @@ class Lead extends AbstractReporting
      */
     public function getTotalLeads($startDate, $endDate): int
     {
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline) {
+            return 0;
+        }
+
         return $this->leadRepository
             ->resetModel()
             ->where('lead_pipeline_id', $this->pipeline->id)
@@ -179,13 +242,7 @@ class Lead extends AbstractReporting
      */
     public function getAverageLeadsPerDay($startDate, $endDate): float
     {
-        $days = $startDate->diffInDays($endDate);
-
-        if ($days == 0) {
-            return 0;
-        }
-
-        return $this->getTotalLeads($startDate, $endDate) / $days;
+        return $this->getTotalLeads($startDate, $endDate) / $this->inclusiveDayCount($startDate, $endDate);
     }
 
     /**
@@ -209,7 +266,13 @@ class Lead extends AbstractReporting
      */
     public function getTotalLeadValue($startDate, $endDate): float
     {
-        return $this->leadRepository
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline) {
+            return 0;
+        }
+
+        return (float) $this->leadRepository
             ->resetModel()
             ->where('lead_pipeline_id', $this->pipeline->id)
             ->whereBetween('created_at', [$startDate, $endDate])
@@ -237,11 +300,17 @@ class Lead extends AbstractReporting
      */
     public function getAverageLeadValue($startDate, $endDate): float
     {
-        return $this->leadRepository
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline) {
+            return 0;
+        }
+
+        return (float) ($this->leadRepository
             ->resetModel()
             ->where('lead_pipeline_id', $this->pipeline->id)
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->avg('lead_value') ?? 0;
+            ->avg('lead_value') ?? 0);
     }
 
     /**
@@ -249,11 +318,14 @@ class Lead extends AbstractReporting
      */
     public function getTotalWonLeadValueProgress(): array
     {
+        $closed = $this->closedRevenue();
+        $current = $closed['current_won'];
+
         return [
-            'previous' => $previous = $this->getTotalWonLeadValue($this->lastStartDate, $this->lastEndDate),
-            'current' => $current = $this->getTotalWonLeadValue($this->startDate, $this->endDate),
+            'previous' => $closed['previous_won'],
+            'current' => $current,
             'formatted_total' => core()->formatBasePrice($current),
-            'progress' => $this->getPercentageChange($previous, $current),
+            'progress' => $this->sharePercentage($current, $current + $closed['current_lost']),
         ];
     }
 
@@ -264,12 +336,19 @@ class Lead extends AbstractReporting
      * @param  Carbon  $endDate
      * @return array
      */
-    public function getTotalWonLeadValue($startDate, $endDate): ?float
+    public function getTotalWonLeadValue($startDate, $endDate): float
     {
-        return $this->leadRepository
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline || $this->wonStageIds === []) {
+            return 0.0;
+        }
+
+        return (float) $this->leadRepository
             ->resetModel()
+            ->where('lead_pipeline_id', $this->pipeline->id)
             ->whereIn('lead_pipeline_stage_id', $this->wonStageIds)
-            ->whereBetween('created_at', [$startDate, $endDate])
+            ->whereBetween('closed_at', [$startDate, $endDate])
             ->sum('lead_value');
     }
 
@@ -278,11 +357,14 @@ class Lead extends AbstractReporting
      */
     public function getTotalLostLeadValueProgress(): array
     {
+        $closed = $this->closedRevenue();
+        $current = $closed['current_lost'];
+
         return [
-            'previous' => $previous = $this->getTotalLostLeadValue($this->lastStartDate, $this->lastEndDate),
-            'current' => $current = $this->getTotalLostLeadValue($this->startDate, $this->endDate),
+            'previous' => $closed['previous_lost'],
+            'current' => $current,
             'formatted_total' => core()->formatBasePrice($current),
-            'progress' => $this->getPercentageChange($previous, $current),
+            'progress' => $this->sharePercentage($current, $closed['current_won'] + $current),
         ];
     }
 
@@ -293,13 +375,80 @@ class Lead extends AbstractReporting
      * @param  Carbon  $endDate
      * @return array
      */
-    public function getTotalLostLeadValue($startDate, $endDate): ?float
+    public function getTotalLostLeadValue($startDate, $endDate): float
     {
-        return $this->leadRepository
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline || $this->lostStageIds === []) {
+            return 0.0;
+        }
+
+        return (float) $this->leadRepository
             ->resetModel()
+            ->where('lead_pipeline_id', $this->pipeline->id)
             ->whereIn('lead_pipeline_stage_id', $this->lostStageIds)
-            ->whereBetween('created_at', [$startDate, $endDate])
+            ->whereBetween('closed_at', [$startDate, $endDate])
             ->sum('lead_value');
+    }
+
+    /**
+     * Won and lost revenue for the selected range and the preceding range.
+     *
+     * Closed deals are dated by closed_at. One query supplies both cards.
+     *
+     * @return array{current_won: float, current_lost: float, previous_won: float, previous_lost: float}
+     */
+    protected function closedRevenue(): array
+    {
+        if (isset($this->closedRevenueCache)) {
+            return $this->closedRevenueCache;
+        }
+
+        $empty = [
+            'current_won' => 0.0,
+            'current_lost' => 0.0,
+            'previous_won' => 0.0,
+            'previous_lost' => 0.0,
+        ];
+
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline || ($this->wonStageIds === [] && $this->lostStageIds === [])) {
+            return $this->closedRevenueCache = $empty;
+        }
+
+        $wonIn = $this->wonStageIds === [] ? 'NULL' : implode(',', array_map('intval', $this->wonStageIds));
+        $lostIn = $this->lostStageIds === [] ? 'NULL' : implode(',', array_map('intval', $this->lostStageIds));
+        $lead = DB::getTablePrefix().'leads';
+
+        $row = $this->leadRepository
+            ->resetModel()
+            ->where('lead_pipeline_id', $this->pipeline->id)
+            ->whereNotNull('closed_at')
+            ->where(function ($query) {
+                $query->whereBetween('closed_at', [$this->startDate, $this->endDate])
+                    ->orWhereBetween('closed_at', [$this->lastStartDate, $this->lastEndDate]);
+            })
+            ->selectRaw(
+                "COALESCE(SUM(CASE WHEN {$lead}.lead_pipeline_stage_id IN ($wonIn) AND {$lead}.closed_at BETWEEN ? AND ? THEN {$lead}.lead_value ELSE 0 END), 0) as current_won,
+                COALESCE(SUM(CASE WHEN {$lead}.lead_pipeline_stage_id IN ($lostIn) AND {$lead}.closed_at BETWEEN ? AND ? THEN {$lead}.lead_value ELSE 0 END), 0) as current_lost,
+                COALESCE(SUM(CASE WHEN {$lead}.lead_pipeline_stage_id IN ($wonIn) AND {$lead}.closed_at BETWEEN ? AND ? THEN {$lead}.lead_value ELSE 0 END), 0) as previous_won,
+                COALESCE(SUM(CASE WHEN {$lead}.lead_pipeline_stage_id IN ($lostIn) AND {$lead}.closed_at BETWEEN ? AND ? THEN {$lead}.lead_value ELSE 0 END), 0) as previous_lost",
+                [
+                    $this->startDate, $this->endDate,
+                    $this->startDate, $this->endDate,
+                    $this->lastStartDate, $this->lastEndDate,
+                    $this->lastStartDate, $this->lastEndDate,
+                ]
+            )
+            ->first();
+
+        return $this->closedRevenueCache = [
+            'current_won' => (float) ($row->current_won ?? 0),
+            'current_lost' => (float) ($row->current_lost ?? 0),
+            'previous_won' => (float) ($row->previous_won ?? 0),
+            'previous_lost' => (float) ($row->previous_lost ?? 0),
+        ];
     }
 
     /**
@@ -307,17 +456,28 @@ class Lead extends AbstractReporting
      */
     public function getTotalWonLeadValueBySources()
     {
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline || $this->wonStageIds === []) {
+            return collect();
+        }
+
+        $prefix = DB::getTablePrefix();
+
         return $this->leadRepository
             ->resetModel()
             ->select(
-                'lead_sources.name',
-                DB::raw('SUM(lead_value) as total')
+                DB::raw("COALESCE(MAX({$prefix}lead_sources.name), 'Unassigned') as name"),
+                DB::raw("COALESCE(SUM({$prefix}leads.lead_value), 0) as total")
             )
             ->leftJoin('lead_sources', 'leads.lead_source_id', '=', 'lead_sources.id')
-            ->whereIn('lead_pipeline_stage_id', $this->wonStageIds)
-            ->whereBetween('leads.created_at', [$this->startDate, $this->endDate])
-            ->groupBy('lead_source_id')
-            ->get();
+            ->where('leads.lead_pipeline_id', $this->pipeline->id)
+            ->whereIn('leads.lead_pipeline_stage_id', $this->wonStageIds)
+            ->whereBetween('leads.closed_at', [$this->startDate, $this->endDate])
+            ->groupBy('leads.lead_source_id')
+            ->having('total', '>', 0)
+            ->get()
+            ->each(fn ($row) => $row->total = (float) $row->total);
     }
 
     /**
@@ -325,17 +485,28 @@ class Lead extends AbstractReporting
      */
     public function getTotalWonLeadValueByTypes()
     {
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline || $this->wonStageIds === []) {
+            return collect();
+        }
+
+        $prefix = DB::getTablePrefix();
+
         return $this->leadRepository
             ->resetModel()
             ->select(
-                'lead_types.name',
-                DB::raw('SUM(lead_value) as total')
+                DB::raw("COALESCE(MAX({$prefix}lead_types.name), 'Unassigned') as name"),
+                DB::raw("COALESCE(SUM({$prefix}leads.lead_value), 0) as total")
             )
             ->leftJoin('lead_types', 'leads.lead_type_id', '=', 'lead_types.id')
-            ->whereIn('lead_pipeline_stage_id', $this->wonStageIds)
-            ->whereBetween('leads.created_at', [$this->startDate, $this->endDate])
-            ->groupBy('lead_type_id')
-            ->get();
+            ->where('leads.lead_pipeline_id', $this->pipeline->id)
+            ->whereIn('leads.lead_pipeline_stage_id', $this->wonStageIds)
+            ->whereBetween('leads.closed_at', [$this->startDate, $this->endDate])
+            ->groupBy('leads.lead_type_id')
+            ->having('total', '>', 0)
+            ->get()
+            ->each(fn ($row) => $row->total = (float) $row->total);
     }
 
     /**
@@ -343,19 +514,37 @@ class Lead extends AbstractReporting
      */
     public function getOpenLeadsByStates()
     {
-        return $this->leadRepository
+        $this->ensurePipelineResolved();
+
+        if (! $this->pipeline) {
+            return collect();
+        }
+
+        $prefix = DB::getTablePrefix();
+
+        $query = $this->leadRepository
             ->resetModel()
             ->select(
                 'lead_pipeline_stages.name',
-                DB::raw('COUNT(lead_value) as total')
+                DB::raw("COUNT({$prefix}leads.id) as total")
             )
             ->leftJoin('lead_pipeline_stages', 'leads.lead_pipeline_stage_id', '=', 'lead_pipeline_stages.id')
-            ->whereNotIn('lead_pipeline_stage_id', $this->wonStageIds)
-            ->whereNotIn('lead_pipeline_stage_id', $this->lostStageIds)
-            ->whereBetween('leads.created_at', [$this->startDate, $this->endDate])
-            ->groupBy('lead_pipeline_stage_id')
+            ->where('leads.lead_pipeline_id', $this->pipeline->id)
+            ->whereBetween('leads.created_at', [$this->startDate, $this->endDate]);
+
+        if ($this->wonStageIds !== []) {
+            $query->whereNotIn('leads.lead_pipeline_stage_id', $this->wonStageIds);
+        }
+
+        if ($this->lostStageIds !== []) {
+            $query->whereNotIn('leads.lead_pipeline_stage_id', $this->lostStageIds);
+        }
+
+        return $query
+            ->groupBy('leads.lead_pipeline_stage_id', 'lead_pipeline_stages.name')
             ->orderByDesc('total')
-            ->get();
+            ->get()
+            ->each(fn ($row) => $row->total = (int) $row->total);
     }
 
     /**
@@ -369,26 +558,35 @@ class Lead extends AbstractReporting
      */
     public function getOverTimeStats($startDate, $endDate, $valueColumn, $dateColumn = 'created_at', $period = 'auto'): array
     {
+        $this->ensurePipelineResolved();
         $period = $this->determinePeriod($period);
 
         $intervals = $this->generateTimeIntervals($startDate, $endDate, $period);
 
         $groupColumn = $this->getGroupColumn($dateColumn, $period);
 
-        $query = $this->leadRepository
-            ->resetModel()
-            ->select(
-                DB::raw("$groupColumn AS date"),
-                DB::raw('COUNT(DISTINCT id) AS count'),
-                DB::raw('SUM('.\DB::getTablePrefix()."$valueColumn) AS total")
-            )
-            ->whereIn('lead_pipeline_stage_id', $this->stageIds)
-            ->whereBetween($dateColumn, [$startDate, $endDate])
-            ->groupBy(DB::raw($groupColumn))
-            ->orderBy(DB::raw($groupColumn));
+        $results = collect();
 
-        $results = $query->get();
-        $resultLookup = $results->keyBy('date');
+        if ($this->pipeline && $this->stageIds !== []) {
+            $prefix = DB::getTablePrefix();
+
+            $results = $this->leadRepository
+                ->resetModel()
+                ->select(
+                    DB::raw("$groupColumn AS date"),
+                    DB::raw("COUNT(DISTINCT {$prefix}leads.id) AS count"),
+                    DB::raw("COALESCE(SUM({$prefix}leads.lead_value), 0) AS total")
+                )
+                ->where('lead_pipeline_id', $this->pipeline->id)
+                ->whereIn('lead_pipeline_stage_id', $this->stageIds)
+                ->whereBetween($dateColumn, [$startDate, $endDate])
+                ->groupBy(DB::raw($groupColumn))
+                ->orderBy(DB::raw($groupColumn))
+                ->get();
+        }
+        $resultLookup = $results->keyBy(
+            fn ($row) => $this->normalizeGroupKey($row->date, $period)
+        );
 
         $stats = [];
 
@@ -411,15 +609,20 @@ class Lead extends AbstractReporting
     protected function generateTimeIntervals(Carbon $startDate, Carbon $endDate, string $period): array
     {
         $intervals = [];
+        $seen = [];
         $current = $startDate->copy();
 
         while ($current <= $endDate) {
-            $interval = [
-                'key' => $this->formatDateForGrouping($current, $period),
-                'label' => $this->formatDateForLabel($current, $period),
-            ];
+            $key = $this->formatDateForGrouping($current, $period);
 
-            $intervals[] = $interval;
+            if (! isset($seen[$key])) {
+                $seen[$key] = true;
+
+                $intervals[] = [
+                    'key' => $key,
+                    'label' => $this->formatDateForLabel($current, $period),
+                ];
+            }
 
             switch ($period) {
                 case 'day':
@@ -445,6 +648,30 @@ class Lead extends AbstractReporting
     }
 
     /**
+     * The pipeline used by every lead widget, or null when the workspace has none.
+     */
+    public function resolvedPipelineId(): ?int
+    {
+        $this->ensurePipelineResolved();
+
+        return $this->pipeline?->id ? (int) $this->pipeline->id : null;
+    }
+
+    /**
+     * Match SQL date buckets to the labels generated in PHP.
+     */
+    protected function normalizeGroupKey(mixed $value, string $period): string
+    {
+        $value = (string) $value;
+
+        return match ($period) {
+            'day' => substr($value, 0, 10),
+            'year' => substr($value, 0, 4),
+            default => $value,
+        };
+    }
+
+    /**
      * Get the SQL group column based on period
      */
     protected function getGroupColumn(string $dateColumn, string $period): string
@@ -453,7 +680,7 @@ class Lead extends AbstractReporting
             case 'day':
                 return "DATE($dateColumn)";
             case 'week':
-                return "DATE_FORMAT($dateColumn, '%Y-%u')";
+                return "DATE_FORMAT($dateColumn, '%x-%v')";
             case 'month':
                 return "DATE_FORMAT($dateColumn, '%Y-%m')";
             case 'year':
@@ -472,7 +699,7 @@ class Lead extends AbstractReporting
             case 'day':
                 return $date->format('Y-m-d');
             case 'week':
-                return $date->format('Y-W');
+                return $date->format('o-W');
             case 'month':
                 return $date->format('Y-m');
             case 'year':
@@ -491,7 +718,7 @@ class Lead extends AbstractReporting
             case 'day':
                 return $date->format('M d');
             case 'week':
-                return 'Week '.$date->format('W, Y');
+                return 'Week '.$date->format('W, o');
             case 'month':
                 return $date->format('M Y');
             case 'year':

@@ -125,14 +125,28 @@ class AttributeValueRepository extends Repository
     {
         $query = $this->resetScope()->model
             ->where('attribute_id', $attribute->id)
-            ->where('entity_type', $entityType)
-            ->where('entity_id', '!=', $entityId);
+            ->where('entity_type', $entityType);
+
+        if ($entityId !== null) {
+            $query->where('entity_id', '!=', $entityId);
+        }
 
         /**
          * If the attribute type is email or phone, check the JSON value.
          */
         if (in_array($attribute->type, ['email', 'phone'])) {
-            $query->whereJsonContains($this->model::$attributeTypeFields[$attribute->type], [['value' => $value]]);
+            $column = $this->model::$attributeTypeFields[$attribute->type];
+
+            if ($query->getConnection()->getDriverName() === 'sqlite') {
+                $query->whereExists(function ($subQuery) use ($column, $value) {
+                    $subQuery
+                        ->selectRaw('1')
+                        ->fromRaw('json_each(attribute_values.'.$column.') as contact_value')
+                        ->whereRaw("json_extract(contact_value.value, '$.value') = ?", [$value]);
+                });
+            } else {
+                $query->whereJsonContains($column, [['value' => $value]]);
+            }
         } else {
             $query->where($this->model::$attributeTypeFields[$attribute->type], $value);
         }

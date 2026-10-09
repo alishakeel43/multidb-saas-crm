@@ -2,6 +2,7 @@
 
 namespace Webkul\User\Repositories;
 
+use App\Models\Tenant;
 use Webkul\Core\Eloquent\Repository;
 
 class UserRepository extends Repository
@@ -25,6 +26,22 @@ class UserRepository extends Repository
     public function model()
     {
         return 'Webkul\User\Contracts\User';
+    }
+
+    /**
+     * Scope user queries to the active tenant workspace.
+     *
+     * CRM users live in each tenant's isolated database, so an active tenant
+     * needs no additional membership join. Outside a tenant context, deny the
+     * query rather than exposing users from whichever database is configured.
+     */
+    public function scopeToWorkspace(): static
+    {
+        return $this->scopeQuery(function ($query) {
+            return Tenant::current()
+                ? $query
+                : $query->whereRaw('0 = 1');
+        });
     }
 
     /**

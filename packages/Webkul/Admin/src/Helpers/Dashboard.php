@@ -28,10 +28,25 @@ class Dashboard
     ) {}
 
     /**
+     * Re-read dates (and the lead pipeline) from the current request.
+     */
+    protected function applyRequest(): void
+    {
+        $this->leadReporting->applyRequest();
+        $this->activityReporting->applyRequest();
+        $this->productReporting->applyRequest();
+        $this->personReporting->applyRequest();
+        $this->organizationReporting->applyRequest();
+        $this->quoteReporting->applyRequest();
+    }
+
+    /**
      * Returns the overall revenue statistics.
      */
     public function getRevenueStats(): array
     {
+        $this->applyRequest();
+
         return [
             'total_won_revenue' => $this->leadReporting->getTotalWonLeadValueProgress(),
             'total_lost_revenue' => $this->leadReporting->getTotalLostLeadValueProgress(),
@@ -43,6 +58,8 @@ class Dashboard
      */
     public function getOverAllStats(): array
     {
+        $this->applyRequest();
+
         return [
             'total_leads' => $this->leadReporting->getTotalLeadsProgress(),
             'average_lead_value' => $this->leadReporting->getAverageLeadValueProgress(),
@@ -58,6 +75,8 @@ class Dashboard
      */
     public function getTotalLeadsStats(): array
     {
+        $this->applyRequest();
+
         return [
             'all' => [
                 'over_time' => $this->leadReporting->getTotalLeadsOverTime(),
@@ -77,6 +96,8 @@ class Dashboard
      */
     public function getLeadsStatsBySources(): mixed
     {
+        $this->applyRequest();
+
         return $this->leadReporting->getTotalWonLeadValueBySources();
     }
 
@@ -85,6 +106,8 @@ class Dashboard
      */
     public function getLeadsStatsByTypes(): mixed
     {
+        $this->applyRequest();
+
         return $this->leadReporting->getTotalWonLeadValueByTypes();
     }
 
@@ -93,6 +116,8 @@ class Dashboard
      */
     public function getOpenLeadsByStates(): mixed
     {
+        $this->applyRequest();
+
         return $this->leadReporting->getOpenLeadsByStates();
     }
 
@@ -101,15 +126,31 @@ class Dashboard
      */
     public function getTopSellingProducts(): Collection
     {
-        return $this->productReporting->getTopSellingProductsByRevenue(5);
+        $this->applyRequest();
+
+        $pipelineId = $this->leadReporting->resolvedPipelineId();
+
+        if (! $pipelineId) {
+            return collect();
+        }
+
+        return $this->productReporting->getTopSellingProductsByRevenue(5, $pipelineId);
     }
 
     /**
-     * Returns top selling products statistics.
+     * Returns top persons statistics.
      */
     public function getTopPersons(): Collection
     {
-        return $this->personReporting->getTopCustomersByRevenue(5);
+        $this->applyRequest();
+
+        $pipelineId = $this->leadReporting->resolvedPipelineId();
+
+        if (! $pipelineId) {
+            return collect();
+        }
+
+        return $this->personReporting->getTopCustomersByRevenue(5, $pipelineId);
     }
 
     /**
@@ -119,6 +160,8 @@ class Dashboard
      */
     public function getStartDate(): Carbon
     {
+        $this->applyRequest();
+
         return $this->leadReporting->getStartDate();
     }
 
@@ -129,6 +172,8 @@ class Dashboard
      */
     public function getEndDate(): Carbon
     {
+        $this->applyRequest();
+
         return $this->leadReporting->getEndDate();
     }
 

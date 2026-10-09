@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ApplyTenantClock;
 use App\Http\Middleware\FeatureEntitlementMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,7 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([__DIR__.'/../app/Console/Commands'])
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->append(CanInstall::class);
-        $middleware->appendToGroup('web', FeatureEntitlementMiddleware::class);
+        $middleware->appendToGroup('web', [
+            ApplyTenantClock::class,
+            FeatureEntitlementMiddleware::class,
+        ]);
 
         $middleware->encryptCookies(except: [
             'dark_mode',

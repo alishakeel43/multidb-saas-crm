@@ -2,6 +2,7 @@
     'isActive' => false,
     'position' => 'right',
     'width' => '500px',
+    'autoHeight' => false,
 ])
 
 <v-drawer
@@ -9,6 +10,7 @@
     is-active="{{ $isActive }}"
     position="{{ $position }}"
     width="{{ $width }}"
+    :auto-height="{{ $autoHeight ? 'true' : 'false' }}"
 >
     @isset($toggle)
         <template v-slot:toggle>
@@ -34,7 +36,7 @@
 
     @isset($content)
         <template v-slot:content>
-            <div {{ $content->attributes->merge(['class' => 'flex-1 overflow-auto p-3 max-sm:px-4']) }}>
+            <div {{ $content->attributes->merge(['class' => $autoHeight ? 'overflow-auto p-3 max-sm:px-4' : 'flex-1 overflow-auto p-3 max-sm:px-4']) }}>
                 {{ $content }}
             </div>
         </template>
@@ -90,20 +92,28 @@
                 :leave-to-class="enterFromLeaveToClasses"
             >
                 <div
-                    class="fixed z-[10003] m-3 rounded-lg bg-white dark:bg-gray-900 max-sm:!w-[calc(100%-24px)]"
-                    :class="{
+                ref="drawerPanel"
+                class="fixed z-[10003] m-3 overflow-auto rounded-lg bg-white dark:bg-gray-900 max-sm:!w-[calc(100%-24px)]"
+                :class="{
                         'inset-x-0 top-0': position == 'top',
                         'inset-x-0 bottom-0': position == 'bottom',
                         'inset-y-0 ltr:right-0 rtl:left-0': position == 'right',
-                        'inset-y-0 ltr:left-0 rtl:right-0': position == 'left'
+                        'inset-y-0 ltr:left-0 rtl:right-0': position == 'left',
+                        '!bottom-auto !h-auto max-h-[calc(100vh-24px)]': autoHeight && ['left', 'right'].includes(position),
                     }"
                     :style="'width:' + width"
                     v-if="isOpen"
                 >
-                    <div class="pointer-events-auto h-full w-full overflow-auto rounded-lg bg-white dark:bg-gray-900">
-                        <div class="flex h-full w-full flex-col">
-                            <div class="min-h-0 min-w-0 flex-1 overflow-auto">
-                                <div class="flex h-full flex-col">
+                    <div
+                        class="pointer-events-auto w-full rounded-lg bg-white dark:bg-gray-900"
+                        :class="{ 'h-full overflow-auto': ! autoHeight }"
+                    >
+                        <div
+                            class="w-full"
+                            :class="autoHeight ? 'flex flex-col' : 'flex h-full flex-col'"
+                        >
+                            <div :class="autoHeight ? 'min-w-0' : 'min-h-0 min-w-0 flex-1 overflow-auto'">
+                                <div :class="autoHeight ? 'flex flex-col' : 'flex h-full flex-col'">
                                     <!-- Header Slot-->
                                     <slot
                                         name="header"
@@ -129,11 +139,12 @@
         app.component('v-drawer', {
             template: '#v-drawer-template',
 
-            props: [
-                'isActive',
-                'position',
-                'width'
-            ],
+            props: {
+                isActive: String,
+                position: String,
+                width: String,
+                autoHeight: Boolean,
+            },
 
             emits: [
                 'toggle',
@@ -150,6 +161,10 @@
             watch: {
                 isActive: function(newVal, oldVal) {
                     this.isOpen = newVal;
+
+                    if (newVal) {
+                        this.resetAutoHeightScroll();
+                    }
                 }
             },
 
@@ -185,7 +200,21 @@
 
                     document.body.style.overflow = 'hidden';
 
+                    this.resetAutoHeightScroll();
+
                     this.$emit('open', { isActive: this.isOpen });
+                },
+
+                resetAutoHeightScroll() {
+                    if (! this.autoHeight) {
+                        return;
+                    }
+
+                    this.$nextTick(() => {
+                        if (this.$refs.drawerPanel) {
+                            this.$refs.drawerPanel.scrollTop = 0;
+                        }
+                    });
                 },
 
                 close() {

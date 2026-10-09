@@ -40,9 +40,34 @@ abstract class AbstractReporting
      */
     public function __construct()
     {
-        $this->setStartDate(request()->date('start'));
+        $this->applyRequest();
+    }
 
-        $this->setEndDate(request()->date('end'));
+    /**
+     * The route keeps one controller for the life of the process, so a later
+     * stats request must read its own dates instead of the first request's.
+     */
+    public function applyRequest(): void
+    {
+        $this->setStartDate($this->requestedDate('start'));
+
+        $this->setEndDate($this->requestedDate('end'));
+    }
+
+    /**
+     * Read a dashboard date without failing the page on a malformed value.
+     */
+    protected function requestedDate(string $key): ?Carbon
+    {
+        if (! request()->filled($key)) {
+            return null;
+        }
+
+        try {
+            return request()->date($key)?->copy();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -54,9 +79,9 @@ abstract class AbstractReporting
      */
     public function setStartDate(?Carbon $startDate = null): self
     {
-        $this->startDate = $startDate ? $startDate->startOfDay() : $this->getDefaultStartDate();
+        $this->startDate = $startDate ? $startDate->copy()->startOfDay() : $this->getDefaultStartDate();
 
-        $this->setLastStartDate();
+        $this->setPreviousPeriod();
 
         return $this;
     }
@@ -94,17 +119,26 @@ abstract class AbstractReporting
     }
 
     /**
-     * Sets the end date to the provided date's end of day, or to the current
-     * date if not provided or if the provided date is in the future.
+     * The end of the range is the end of the selected calendar day. A missing
+     * or future day stops at the end of today, so later hours today still count.
      *
      * @param  \Carbon\Carbon|null  $endDate
-     * @return void
      */
     public function setEndDate(?Carbon $endDate = null): self
     {
-        $this->endDate = ($endDate && $endDate->endOfDay() <= now()) ? $endDate->endOfDay() : now();
+        $end = $endDate ? $endDate->copy()->endOfDay() : now()->endOfDay();
 
-        $this->setLastEndDate();
+        if ($end->greaterThan(now()->endOfDay())) {
+            $end = now()->endOfDay();
+        }
+
+        $this->endDate = $end;
+
+        if (isset($this->startDate) && $this->startDate->greaterThan($this->endDate)) {
+            $this->startDate = $this->endDate->copy()->startOfDay();
+        }
+
+        $this->setPreviousPeriod();
 
         return $this;
     }
@@ -130,27 +164,31 @@ abstract class AbstractReporting
     }
 
     /**
-     * Sets the start date for the last period.
+     * The previous window is the same number of calendar days and ends the
+     * day before the selected range starts, so the two ranges do not overlap.
      */
-    private function setLastStartDate(): void
+    private function setPreviousPeriod(): void
     {
-        if (! isset($this->startDate)) {
-            $this->setStartDate(request()->date('start'));
+        if (! isset($this->startDate, $this->endDate)) {
+            return;
         }
 
-        if (! isset($this->endDate)) {
-            $this->setEndDate(request()->date('end'));
-        }
+        $startDay = $this->startDate->copy()->startOfDay();
+        $days = $this->inclusiveDayCount($startDay, $this->endDate);
 
-        $this->lastStartDate = $this->startDate->clone()->subDays($this->startDate->diffInDays($this->endDate));
+        $this->lastStartDate = $startDay->copy()->subDays($days)->startOfDay();
+        $this->lastEndDate = $startDay->copy()->subDay()->endOfDay();
     }
 
     /**
-     * Sets the end date for the last period.
+     * Inclusive calendar-day count. DateInterval::$days stays correct across
+     * DST, unlike a truncated Carbon diffInDays() float.
      */
-    private function setLastEndDate(): void
+    public function inclusiveDayCount(Carbon $startDate, Carbon $endDate): int
     {
-        $this->lastEndDate = $this->startDate->clone();
+        $days = $startDate->copy()->startOfDay()->diff($endDate->copy()->startOfDay())->days;
+
+        return max(1, (int) $days + 1);
     }
 
     /**
@@ -174,18 +212,42 @@ abstract class AbstractReporting
     }
 
     /**
-     * Calculate the percentage change between previous and current values.
+     * Percentage change from the previous period to the current one.
      *
-     * @param  float|int  $previous
-     * @param  float|int  $current
+     * A zero previous value is not divided. When there is no baseline, null is
+     * returned so the UI can hide a meaningless percentage.
+     *
+     * @param  float|int|string|null  $previous
+     * @param  float|int|string|null  $current
      */
-    public function getPercentageChange($previous, $current): float|int
+    public function getPercentageChange($previous, $current): ?float
     {
-        if (! $previous) {
-            return $current ? 100 : 0;
+        $previous = (float) $previous;
+        $current = (float) $current;
+
+        if ($previous == 0.0) {
+            return $current == 0.0 ? 0.0 : null;
         }
 
-        return ($current - $previous) / $previous * 100;
+        return (($current - $previous) / $previous) * 100;
+    }
+
+    /**
+     * Share of a closed total. Zero closed leads is 0%, never a division error.
+     *
+     * @param  float|int|string|null  $part
+     * @param  float|int|string|null  $whole
+     */
+    public function sharePercentage($part, $whole): float
+    {
+        $part = (float) $part;
+        $whole = (float) $whole;
+
+        if ($whole <= 0.0) {
+            return 0.0;
+        }
+
+        return ($part / $whole) * 100;
     }
 
     /**
