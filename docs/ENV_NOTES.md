@@ -17,6 +17,13 @@
 
 - Krayin CRM: `/admin` (or `APP_ADMIN_PATH`)
 - Filament Super Admin: `/super-admin`
+- Local MAMP virtual host: `http://demo.krayin.localhost:8888` (serves this workspace's `public/` directory; `.localhost` resolves to loopback and requires no `/etc/hosts` entry).
+- MAMP Apache configuration: `/Applications/MAMP/conf/apache/extra/httpd-vhosts.conf`; the `demo.krayin.localhost` vhost points at `/Users/ali/Desktop/krayin-saas-crm/public`.
+- Local ignored `.env` sets `APP_URL=http://demo.krayin.localhost:8888`.
+- Keep MAMP Apache running to use the virtual host. Start/stop MAMP using the MAMP app; `php artisan serve` is not required.
+- After manually changing the MAMP Apache config, validate and reload with:
+  `/Applications/MAMP/Library/bin/httpd -t -f /Applications/MAMP/conf/apache/httpd.conf`
+  `/Applications/MAMP/Library/bin/httpd -k graceful -f /Applications/MAMP/conf/apache/httpd.conf`
 
 ## Secrets and local configuration
 
@@ -26,6 +33,8 @@
 ## Tenant hostnames
 
 - `App\Multitenancy\TenantFinder\DomainTenantFinder` matches the request hostname against `domains.domain`, returning only active domains whose tenant status is `active`. It does not read tenant IDs from request data.
+- `demo.krayin.localhost` is the existing active local `demo` tenant domain and is mapped by MAMP Apache to this repository's `public/` directory.
+- Open `http://demo.krayin.localhost:8888/admin/login` for Krayin CRM and `http://demo.krayin.localhost:8888/super-admin/login` for Filament Super Admin.
 
 ## Queue worker
 

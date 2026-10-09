@@ -107,3 +107,10 @@
 - Context7 and official Filament docs failed DNS; the installed Filament 3.3.56 package source was used. No tenant DB or landlord migration was run.
 - Validation: focused tests (14 assertions), full Pest suite (210 assertions, zero failures), Pint, route registration, and whitespace checks passed. Existing PHP 8.5 PDO SSL-CA deprecation notices remain.
 - Marked PHASE 5 complete. PHASE 6 — feature entitlements is next on `phase/06-feature-entitlements`.
+
+## 2026-10-09 — Local MAMP virtual host
+
+- Added a MAMP Apache vhost for `demo.krayin.localhost:8888` pointing to this workspace's `public/` directory; left the existing legacy `krayin.localhost` mapping untouched.
+- Updated the local ignored `.env` APP_URL to the virtual host and documented CRM/Super Admin URLs plus MAMP config test/reload commands.
+- Validated Apache configuration, gracefully reloaded MAMP Apache, and verified `/admin/login` and `/super-admin/login` return HTTP 200. `php artisan serve` is no longer needed while MAMP Apache is running.
+- The MAMP vhost file and ignored `.env` are machine-local; only the repository documentation is committed.
