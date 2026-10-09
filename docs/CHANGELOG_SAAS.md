@@ -38,3 +38,19 @@
 - Created `phase/02-spatie-multitenancy` from the completed PHASE 1 branch.
 - Retried Context7 library resolution for Laravel 12 and Spatie Multitenancy; both requests were rejected because the configured API key is invalid.
 - Made no Laravel configuration, package, or application code changes; the mandated documentation gate is not met.
+
+## 2026-10-09 — Context7 MCP authentication repair
+
+- Removed the invalid Context7 Authorization header from the user-level VS Code MCP configuration without printing its value or adding a credential.
+- Verified that the direct Context7 MCP endpoint works without Authorization and returned Spatie Multitenancy documentation. Laravel's Context7 index currently lacks Laravel 12 database pages, so the official Laravel 12 database page was checked separately.
+- The already-running VS Code MCP integration may still need a reload to discard its cached configuration.
+
+## 2026-10-09 — PHASE 2 completed
+
+- Installed `spatie/laravel-multitenancy` v4.2.1 and published its configuration.
+- Configured the default tenant connection, the named landlord connection, Spatie's domain finder, and `SwitchTenantDatabaseTask`; updated the environment example and local ignored `.env`.
+- Confirmed `zaristech_saas` was absent, created it empty, and verified it still has zero tables while `tenant_bootstrap` retains its 60 Krayin tables.
+- Manually made a tenant current and confirmed the tenant connection queried `tenant_bootstrap`; the landlord connection queried `zaristech_saas`.
+- `composer validate`, config caching, `route:list`, and all 42 project tests succeeded (1 passed, 41 marked deprecated due to the stock PHP 8.5 `PDO::MYSQL_ATTR_SSL_CA` deprecation).
+- Marked PHASE 2 complete. PHASE 3 is next; it must integrate the planned `Domain` model with tenant lookup before persisted domain routing is tested.
+- Committed the implementation as `f5c1a65` (`feat(phase-02): configure tenant database switching`) without a co-author trailer.
