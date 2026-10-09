@@ -18,7 +18,8 @@ STARTUP (mandatory, in this order):
 2. Read docs/PROGRESS.md
 3. Read docs/DECISIONS.md
 4. Read docs/CHECKLIST.md
-5. Read the plan copy for your tool:
+5. Read docs/DOMAIN_AND_URLS.md (platform vs tenant hosts)
+6. Read the plan copy for your tool:
    - GitHub Copilot → docs/agents/PLAN_GITHUB_COPILOT.md
    - OpenAI Codex → docs/agents/PLAN_OPENAI_CODEX.md
    - Claude → docs/agents/PLAN_CLAUDE.md
@@ -37,8 +38,8 @@ HARD RULES:
 - Separate MySQL database per tenant (Spatie laravel-multitenancy).
 - Central/landlord DB: zaristech_saas.
 - MAMP MySQL: 127.0.0.1 port 8889.
-- Filament Super Admin at /super-admin only.
-- Krayin CRM stays at /admin.
+- Filament Super Admin at /super-admin on landlord DB + platform guard. Preferred host: platform.{base} (local: platform.krayinsaas.localhost). See docs/DOMAIN_AND_URLS.md.
+- Krayin CRM at /admin on tenant host {slug}.{base} (local base: krayinsaas.localhost). Never reuse krayin.localhost for this SaaS app.
 - Keep Krayin Bouncer/ACL for tenant permissions (NO Spatie Permission in v1).
 - NO Stancl Tenancy.
 - NO shared-DB tenant_id multi-tenancy.

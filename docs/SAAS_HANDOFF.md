@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Date: 2026-10-09 09:00 +05:00
+- Date: 2026-10-09 09:27 +05:00
 - Working branch: `fix/local-mamp-virtual-host`
 - Current phase: PHASE 6 — feature entitlements
 - PHASE 5 status: COMPLETE
@@ -15,8 +15,8 @@
 - PHASE 3 added landlord models and migrations for plans, features, tenants, domains, subscriptions, platform users, and settings. `zaristech_saas` has eight SaaS tables plus Laravel's migrations table. Implementation commit: `749e600`.
 - PHASE 4 implements guarded tenant DB management, safe Krayin baseline seeding, tenant provision/migrate/seed commands, explicit tenant administrator creation, and compensating rollback.
 - PHASE 5 installs and configures Filament 3.3 at `/super-admin`, isolated from Krayin `/admin` using a dedicated `platform` guard and landlord `PlatformUser`. Tenant/domain/plan/plan-feature/subscription/tenant-feature resources and safe provisioning integration are in place.
-- Local development uses MAMP Apache virtual host `http://demo.krayin.localhost:8888`, mapped to this repository's `public/` directory. The local ignored `.env` now sets `APP_URL` to that host; use the MAMP app to run Apache rather than `php artisan serve`.
-- Verified MAMP Apache configuration syntax and graceful reload; `http://demo.krayin.localhost:8888/admin/login` and `/super-admin/login` both return HTTP 200. `/` redirects as expected. No `/etc/hosts` edit was needed and the pre-existing `krayin.localhost` vhost was left unchanged.
+- Local development uses MAMP Apache virtual host `http://krayinsaas.localhost:8888`, mapped to this repository's `public/` directory. The local ignored `.env` now sets `APP_URL` to that host; use the MAMP app to run Apache rather than `php artisan serve`.
+- Verified MAMP Apache configuration syntax and graceful reload; base `http://krayinsaas.localhost:8888/admin/login` and `/super-admin/login`, plus `http://platform.krayinsaas.localhost:8888/super-admin/login`, return HTTP 200. Landlord domain row maps the base hostname to the active `demo` tenant. No `/etc/hosts` edit was needed and the pre-existing `krayin.localhost` vhost was left unchanged.
 - The vhost configuration is local to `/Applications/MAMP/conf/apache/extra/httpd-vhosts.conf`; this machine-specific path is not part of the repository commit. The local `.env` APP_URL edit is ignored and is also not committed.
 
 ## PHASE 5 implementation and verification
@@ -89,6 +89,14 @@ Do not stage or commit the pre-existing `.gitignore` changes, `.vscode/` content
 ## Documentation sources
 
 - Context7 is OPTIONAL. Prefer it when available; otherwise use official docs + `vendor/` and continue. Never block for Context7 alone.
+
+## Domain / URL process
+
+- Canonical: `docs/DOMAIN_AND_URLS.md` (D17/D18).
+- Platform Super Admin preferred: `platform.krayinsaas.localhost/super-admin`.
+- Tenant CRM: `{slug}.krayinsaas.localhost/admin`.
+- Base vhost: `krayinsaas.localhost` (not `krayin.localhost`).
+- MAMP vhost and landlord base-domain routing were verified 2026-10-09; preferred per-tenant `demo.krayinsaas.localhost` routing requires a matching active landlord Domain record before using that hostname for CRM.
 
 ## Do NOT
 

@@ -1,5 +1,7 @@
 # Agent plan copies (same plan × 3)
 
+**Domains/URLs:** [../DOMAIN_AND_URLS.md](../DOMAIN_AND_URLS.md)
+
 **Coordinator:** kisi bhi agent ko assign karne se pehle yeh message copy-paste karo → [COORDINATOR_MESSAGE.md](./COORDINATOR_MESSAGE.md)
 
 Ye folder **ek hi plan** ki teen copies rakhta hai taake Cursor limit ke baad bhi kaam continue ho sake.

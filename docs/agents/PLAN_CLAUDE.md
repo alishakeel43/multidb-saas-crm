@@ -65,6 +65,7 @@ Before writing any code, the agent MUST:
    - `docs/PROGRESS.md` — phase checklist with DONE/IN_PROGRESS/PENDING
    - `docs/DECISIONS.md` — locked architecture decisions (do not reopen without user ask)
    - `docs/CHECKLIST.md` — acceptance checks for the current phase
+- `docs/DOMAIN_AND_URLS.md` — correct platform vs tenant host/URL process
 3. Run: `git status` and `git log -5 --oneline` (if git exists)
 4. Start **exactly** at the first phase in `docs/PROGRESS.md` that is not `DONE`
 5. After finishing a phase (or stopping mid-phase): **update the three docs** before ending the turn
@@ -164,8 +165,21 @@ Workflow:
 | D14 | Never trust `tenant_id` from request; resolve tenant from domain only |
 | D15 | Do not destroy unrelated projects; do not commit secrets |
 | D16 | Context7 optional; never hard-block — use official docs/vendor and continue |
+| D17 | Local SaaS base `krayinsaas.localhost`; see docs/DOMAIN_AND_URLS.md |
+| D18 | Platform host `/super-admin` vs tenant host `/admin` — see DOMAIN_AND_URLS.md |
 
 ---
+
+
+## Domain & URL process (correct)
+
+Canonical doc: `docs/DOMAIN_AND_URLS.md` (also decisions D17/D18).
+
+- Local SaaS base: `krayinsaas.localhost` + `*.krayinsaas.localhost` (not `krayin.localhost`).
+- Platform Super Admin: preferred `platform.krayinsaas.localhost/super-admin` — landlord DB, `platform` guard only.
+- Tenant CRM: `{slug}.krayinsaas.localhost/admin` — that tenant's DB, Krayin Bouncer.
+- Hostname alone identifies the tenant. Never trust request `tenant_id`.
+- `/super-admin` may still open on the shared apex host in v1; it must remain platform-auth only. Later harden to block Super Admin on pure tenant subdomains.
 
 ## 2. Target architecture (summary)
 

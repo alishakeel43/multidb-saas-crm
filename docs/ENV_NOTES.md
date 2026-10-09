@@ -13,15 +13,19 @@
 - `zaristech_saas` was confirmed absent before PHASE 2 and was provisioned as the landlord database. PHASE 3 added eight SaaS tables; with Laravel's migration repository it currently contains nine tables.
 - The default connection is `tenant`; Spatie changes its database name when a tenant becomes current. The named `landlord` connection is reserved for platform data.
 
-## Application paths
+## Application paths & hosts
 
-- Krayin CRM: `/admin` (or `APP_ADMIN_PATH`)
-- Filament Super Admin: `/super-admin`
-- Local MAMP virtual host: `http://demo.krayin.localhost:8888` (serves this workspace's `public/` directory; `.localhost` resolves to loopback and requires no `/etc/hosts` entry).
-- MAMP Apache configuration: `/Applications/MAMP/conf/apache/extra/httpd-vhosts.conf`; the `demo.krayin.localhost` vhost points at `/Users/ali/Desktop/krayin-saas-crm/public`.
-- Local ignored `.env` sets `APP_URL=http://demo.krayin.localhost:8888`.
-- Keep MAMP Apache running to use the virtual host. Start/stop MAMP using the MAMP app; `php artisan serve` is not required.
-- After manually changing the MAMP Apache config, validate and reload with:
+Full correct process: [`docs/DOMAIN_AND_URLS.md`](./DOMAIN_AND_URLS.md)
+
+- Local SaaS base: `krayinsaas.localhost:8888` + wildcard `*.krayinsaas.localhost` → `krayin-saas-crm/public`
+- **Do not** map this app to `krayin.localhost` (old `Krayin_laravel_CRM_local` project).
+- Tenant CRM (correct): `http://{slug}.krayinsaas.localhost:8888/admin/login`
+- Platform Super Admin (correct): `http://platform.krayinsaas.localhost:8888/super-admin/login` (landlord + `platform` guard)
+- v1 transitional: apex `http://krayinsaas.localhost:8888/admin/login` and `.../super-admin/login` both work on the shared vhost; Super Admin remains platform-auth/landlord-only even if the hostname also maps a demo tenant.
+- MAMP config: `/Applications/MAMP/conf/apache/extra/httpd-vhosts.conf`
+- Local ignored `.env` sets `APP_URL=http://krayinsaas.localhost:8888`
+- Keep MAMP Apache running; `php artisan serve` is not required.
+- After Apache config changes, validate/reload:
   `/Applications/MAMP/Library/bin/httpd -t -f /Applications/MAMP/conf/apache/httpd.conf`
   `/Applications/MAMP/Library/bin/httpd -k graceful -f /Applications/MAMP/conf/apache/httpd.conf`
 
@@ -33,8 +37,8 @@
 ## Tenant hostnames
 
 - `App\Multitenancy\TenantFinder\DomainTenantFinder` matches the request hostname against `domains.domain`, returning only active domains whose tenant status is `active`. It does not read tenant IDs from request data.
-- `demo.krayin.localhost` is the existing active local `demo` tenant domain and is mapped by MAMP Apache to this repository's `public/` directory.
-- Open `http://demo.krayin.localhost:8888/admin/login` for Krayin CRM and `http://demo.krayin.localhost:8888/super-admin/login` for Filament Super Admin.
+- Current demo tenant domain (landlord): `krayinsaas.localhost` (apex convenience). Preferred future CRM host: `demo.krayinsaas.localhost`.
+- Which tenant? Read the hostname (`{slug}.krayinsaas.localhost`).
 
 ## Queue worker
 

@@ -12,14 +12,16 @@ These decisions are the source of truth for v1. Do not change them silently; ask
 | D6 | MAMP MySQL host and port: `127.0.0.1:8889`. Never commit database credentials. |
 | D7 | Landlord database name: `zaristech_saas`. |
 | D8 | Tenant database name pattern: `tenant_{slug}`. |
-| D9 | Filament Super Admin runs at `/super-admin` against the landlord database. |
-| D10 | Krayin CRM remains at `/admin` (or the configured `APP_ADMIN_PATH`) against the tenant database. |
+| D9 | Filament Super Admin runs at `/super-admin` against the **landlord** database with the `platform` guard. Preferred host: `platform.{base}` (local: `platform.krayinsaas.localhost`). Not a tenant CRM feature. |
+| D10 | Krayin CRM remains at `/admin` (or `APP_ADMIN_PATH`) against the **tenant** database on `{slug}.{base}` (local base: `krayinsaas.localhost`). |
 | D11 | Keep Krayin Bouncer/ACL for tenant authorization; do not add Spatie Permission in v1. |
 | D12 | Use custom `plans`, `plan_features`, and `tenant_features` tables for feature entitlements; do not use Pennant in v1. |
 | D13 | A tenant feature override takes precedence over its plan default. |
 | D14 | Never trust `tenant_id` from a request; resolve the tenant from its domain. |
 | D15 | Do not destroy unrelated projects or commit secrets. |
 | D16 | Context7 MCP is OPTIONAL preference only — never a hard dependency. If Context7 is unavailable or incomplete, implement immediately using official docs (laravel.com, Spatie, Filament) and/or installed vendor/package source. Do not mark any phase BLOCKED solely because Context7 failed. Note the fallback in SAAS_HANDOFF and continue. |
+| D17 | Local SaaS base host is `krayinsaas.localhost` (MAMP `:8888`, wildcard `*.krayinsaas.localhost`). Do not reuse `krayin.localhost` (old project). Full URL process: `docs/DOMAIN_AND_URLS.md`. |
+| D18 | Correct URL split: platform → `platform.{base}/super-admin` (landlord); tenant CRM → `{slug}.{base}/admin` (tenant DB). Path `/super-admin` on shared vhost may work in v1 but must stay platform-auth only; later harden to block Super Admin on pure tenant hosts. |
 
 ## V1 exclusions
 

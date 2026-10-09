@@ -114,3 +114,10 @@
 - Updated the local ignored `.env` APP_URL to the virtual host and documented CRM/Super Admin URLs plus MAMP config test/reload commands.
 - Validated Apache configuration, gracefully reloaded MAMP Apache, and verified `/admin/login` and `/super-admin/login` return HTTP 200. `php artisan serve` is no longer needed while MAMP Apache is running.
 - The MAMP vhost file and ignored `.env` are machine-local; only the repository documentation is committed.
+
+## 2026-10-09 — Domain & URL process documented
+
+- Added `docs/DOMAIN_AND_URLS.md`: correct platform vs tenant hosts (`platform.{base}/super-admin` vs `{slug}.{base}/admin`).
+- Locked D17/D18; updated ENV_NOTES, coordinator prompt, and agent plans.
+- Verified MAMP `krayinsaas.localhost` plus wildcard vhost serves this app; landlord maps the apex host to active demo tenant. Existing `krayin.localhost` still points to the unrelated legacy project.
+- Gracefully reloaded Apache and confirmed the base CRM/Super Admin login routes and platform subdomain Super Admin login return HTTP 200. A per-tenant hostname still needs an active landlord Domain row.

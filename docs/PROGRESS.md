@@ -1,6 +1,6 @@
 # PROGRESS — Krayin Multi-Tenant SaaS
 
-Last updated: 2026-10-09 09:00 +05:00
+Last updated: 2026-10-09 09:27 +05:00
 Current phase: PHASE 6
 Status: READY
 
@@ -22,7 +22,7 @@ Status: READY
 - PHASE 4 is complete: strict MAMP tenant database manager, compensating provisioning service, safe CRM baseline seeder, local-only provision command, tenant migrate/seed wrappers, reserved slug/domain validation, isolated service tests, and live provision/rollback verification.
 - PHASE 5 is complete: Filament 3.3 is isolated at `/super-admin` with a landlord-only platform guard; the panel manages tenants, domains, plans, plan features, subscriptions, and tenant feature overrides. Tenant provisioning delegates to `TenantProvisioningService`, and its one-time administrator password is cleared from Livewire state. CRM users cannot authenticate to the panel. An interactive `platform-admin:create` command bootstraps the first platform administrator without password command-line arguments.
 - PHASE 5 verification passed: dedicated authentication/form tests (14 assertions), the full Pest suite (210 assertions, zero failures), Pint, route registration, and whitespace checks. No tenant DB or landlord migration was run in this phase. The suite reports 83 existing PHP 8.5.7 PDO SSL-CA deprecations from the upstream database configuration.
-- Local MAMP virtual host `demo.krayin.localhost:8888` points to this workspace `public/`; verified the app root redirects and `/admin/login` plus `/super-admin/login` respond successfully without `php artisan serve`.
+- Local MAMP Apache uses `krayinsaas.localhost:8888` and wildcard `*.krayinsaas.localhost` for this workspace `public/`; landlord maps the apex hostname to active demo tenant. Verified base CRM and Super Admin login routes and platform subdomain Super Admin route after graceful reload; `php artisan serve` is unnecessary.
 - Context7 and official Filament documentation were unavailable due to DNS; Filament 3.3.56 installed package source was used for implementation and verification.
 - Provisioned `demo` at `demo.krayin.localhost` into the previously absent `tenant_demo`; confirmed active landlord rows, eight plan-feature defaults, trial subscription, 60 tenant tables, 93 migrations, an active Administrator user with a valid password hash, and tenant DB switching. `tenants:migrate demo` and `tenants:seed demo` also completed successfully (`Nothing to migrate`; safe baseline seeding succeeded).
 - Triggered a controlled migration failure for `demo-rollback`; its newly created `tenant_demo_rollback`, landlord tenant/domain rows, and storage were all removed. The successful `demo` tenant remained active.
