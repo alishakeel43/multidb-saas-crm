@@ -11,11 +11,11 @@ Check a phase only after its acceptance criteria are verified and its status is 
 
 ## PHASE 1 — Bootstrap official Krayin
 
-- [ ] Official `krayin/laravel-crm` 2.2 is installed in the workspace.
-- [ ] `php artisan --version` succeeds.
-- [ ] The app boots without fatal errors.
-- [ ] `composer.json` identifies Krayin and Laravel 12.
-- [ ] Install commands and non-secret environment notes are recorded.
+- [x] Official `krayin/laravel-crm` v2.2.6 is installed in the workspace.
+- [x] `php artisan --version` succeeds.
+- [x] The app boots and registers routes without fatal errors.
+- [x] `composer.json` identifies `krayin/laravel-crm` and Laravel 12.
+- [x] Install commands and non-secret environment notes are recorded.
 
 ## PHASE 2 — Spatie Multitenancy foundation
 
