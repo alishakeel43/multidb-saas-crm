@@ -89,6 +89,10 @@ it('shows a platform overview instead of the default framework information card'
     expect($panel->getPages())->toContain(SuperAdminDashboard::class)
         ->and($panel->getWidgets())
         ->toContain(PlatformStatsOverview::class, TenantGrowthChart::class, RecentTenantsTable::class);
+
+    $recentTenants = app(RecentTenantsTable::class);
+    $recentTenants->bootedInteractsWithTable();
+    expect($recentTenants->getTable()->getQuery()->toBase()->limit)->toBe(5);
 });
 
 it('renders tenant provisioning credentials without database connection fields', function () {

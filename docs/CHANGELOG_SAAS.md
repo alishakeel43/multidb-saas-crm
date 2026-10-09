@@ -1,5 +1,11 @@
 # SaaS Change Log
 
+## 2026-10-09 — Super Admin recent-tenants table query fix
+
+- Configured the recent-tenants widget query directly on Filament's table, removing the runtime `must have a [query()]` error.
+- Added a regression assertion that initializes the widget table and verifies the five-tenant query limit.
+- Validation passed: focused Super Admin and tenant overview tests (30 assertions), Pint, and Super Admin route registration.
+
 ## 2026-10-09 — Super Admin dashboard and tenant overview
 
 - Replaced the default Filament information card with platform KPI cards, a six-month tenant-growth chart, and a recent-tenants table.

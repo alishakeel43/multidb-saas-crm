@@ -29,6 +29,7 @@ Status: V1_COMPLETE
 
 - [x] Super Admin dashboard overview widgets are implemented on `feat/super-admin-overview`.
 - [x] Tenant list and detail view display domain, primary administrator contact, user counts, plan/subscription, database health, and CRM usage counts.
+- [x] Recent-tenants widget uses Filament's required explicit table query; regression test verifies the configured five-record limit.
 - [x] Focused and full Pest tests, Pint, syntax, route registration, and whitespace checks pass.
 - [x] Browser confirms branded Super Admin login; authenticated visual review is pending a platform account and no credentials were read/created for this task.
 

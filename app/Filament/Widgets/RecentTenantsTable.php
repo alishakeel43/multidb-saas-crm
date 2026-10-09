@@ -9,7 +9,6 @@ use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
-use Illuminate\Database\Eloquent\Builder;
 
 class RecentTenantsTable extends TableWidget
 {
@@ -17,22 +16,20 @@ class RecentTenantsTable extends TableWidget
 
     protected int|string|array $columnSpan = 1;
 
-    protected function getTableQuery(): Builder
-    {
-        return Tenant::query()
-            ->with([
-                'domains' => fn ($query) => $query
-                    ->where('is_primary', true)
-                    ->where('is_active', true),
-                'plan',
-            ])
-            ->latest()
-            ->limit(5);
-    }
-
     public function table(Table $table): Table
     {
         return $table
+            ->query(
+                Tenant::query()
+                    ->with([
+                        'domains' => fn ($query) => $query
+                            ->where('is_primary', true)
+                            ->where('is_active', true),
+                        'plan',
+                    ])
+                    ->latest()
+                    ->limit(5)
+            )
             ->heading('Recent tenants')
             ->description('Latest workspaces with their primary administrator and CRM seat usage.')
             ->columns([
