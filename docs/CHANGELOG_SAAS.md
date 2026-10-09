@@ -92,3 +92,8 @@
 - Confirmed `zaristech_saas` remains at nine tables and `tenant_bootstrap` at 60; the existing database inventory is unchanged except for the intended new `tenant_demo`. No pre-existing database was dropped or modified.
 - Context7 could not be reached for Laravel references and `laravel.com` documentation lookup failed DNS. Continued with installed Laravel 12, Spatie, and Krayin sources plus reachable Spatie docs; no dependency or secret was added.
 - Validation passed: focused tests (99 assertions), full suite (196 assertions, zero failures), Pint, PHP syntax, command registration, and whitespace checks. The 77 full-suite deprecations are the existing upstream PHP 8.5 PDO SSL-CA notice.
+
+## 2026-10-09 — Context7 policy: optional, never block
+
+- Clarified across DECISIONS (D16), agent plans, coordinator message, and handoff: Context7 is not a hard dependency.
+- If Context7 fails, agents must implement via official docs and/or vendor source without marking the phase BLOCKED.

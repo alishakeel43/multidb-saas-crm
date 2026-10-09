@@ -32,7 +32,7 @@ THEN:
 → Do not start later phases in the same session unless PHASE is fully DONE and checklisted.
 
 HARD RULES:
-- MANDATORY: Use the Context7 MCP for Laravel (and related packages: Spatie Multitenancy, Filament, Livewire) before writing or changing framework/API code. Do not rely on memory or guesswork for Laravel 12 APIs — look up docs via Context7 MCP first.
+- Context7 is OPTIONAL. If unavailable, use official Laravel/Spatie/Filament docs and vendor/ source and IMPLEMENT anyway. Never block a phase for Context7; note fallback in SAAS_HANDOFF.
 - One shared Krayin CRM codebase (official Krayin 2.2).
 - Separate MySQL database per tenant (Spatie laravel-multitenancy).
 - Central/landlord DB: zaristech_saas.
@@ -70,7 +70,7 @@ Pehle docs/SAAS_HANDOFF.md aur docs/PROGRESS.md padho.
 Phir docs/agents/ mein apne tool ki PLAN_*.md file follow karo.
 Sirf agla incomplete PHASE karo.
 Khatam par SAAS_HANDOFF + PROGRESS update karna zaroori hai.
-Context7 MCP (Laravel) lazmi use karna hai.
+Context7 optional hai — jis process se bhi implementation ho sake (official docs/vendor), wohi karo; Context7 pe dependent mat raho.
 Neeche wala English block agent ko paste kar do.
 ```
 
@@ -83,5 +83,5 @@ Neeche wala English block agent ko paste kar do.
 3. Upar wala **Message** block paste karo
 4. Agent se confirm lo: usne `SAAS_HANDOFF` + `PROGRESS` padha, aur kaunsa PHASE start kiya
 5. Session khatam hone se pehle handoff docs update hue ya nahi — check karo
-6. Agent Context7 MCP (Laravel) use kar raha ho — lazmi
+6. Context7 optional — fail ho ya na ho, jis process se implement ho (official docs/vendor) wohi karo; phase block mat karo
 7. Agent ne sahi phase/task branch use ki aur har coherent, verified milestone ke liye commit banaya — verify karo

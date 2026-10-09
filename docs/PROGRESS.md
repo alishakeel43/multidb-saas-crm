@@ -18,6 +18,7 @@ Status: READY
 
 ## Notes
 
+- User policy 2026-10-09: Context7 is optional only; never hard-block. Any working implementation path (official docs, vendor source) is allowed.
 - PHASE 4 is complete: strict MAMP tenant database manager, compensating provisioning service, safe CRM baseline seeder, local-only provision command, tenant migrate/seed wrappers, reserved slug/domain validation, isolated service tests, and live provision/rollback verification.
 - Provisioned `demo` at `demo.krayin.localhost` into the previously absent `tenant_demo`; confirmed active landlord rows, eight plan-feature defaults, trial subscription, 60 tenant tables, 93 migrations, an active Administrator user with a valid password hash, and tenant DB switching. `tenants:migrate demo` and `tenants:seed demo` also completed successfully (`Nothing to migrate`; safe baseline seeding succeeded).
 - Triggered a controlled migration failure for `demo-rollback`; its newly created `tenant_demo_rollback`, landlord tenant/domain rows, and storage were all removed. The successful `demo` tenant remained active.

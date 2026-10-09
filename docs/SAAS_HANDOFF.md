@@ -55,6 +55,10 @@ Begin PHASE 5 on a new phase branch. Retain `tenant_demo` as the local verificat
 
 The existing staged `.gitignore` changes and `.vscode/mcp.json` were not modified; exclude them from the PHASE 4 commit.
 
+## Documentation sources
+
+- Context7 is OPTIONAL. Prefer it when available; otherwise use official docs + `vendor/` and continue. Never block for Context7 alone.
+
 ## Do NOT
 
 - Use `krayin-crm:install`, `migrate:fresh`, or destructive installer `RoleSeeder` / `UserSeeder` during tenant provisioning.

@@ -19,7 +19,7 @@ These decisions are the source of truth for v1. Do not change them silently; ask
 | D13 | A tenant feature override takes precedence over its plan default. |
 | D14 | Never trust `tenant_id` from a request; resolve the tenant from its domain. |
 | D15 | Do not destroy unrelated projects or commit secrets. |
-| D16 | Context7 is mandatory for current Laravel and related package documentation before framework/API work. |
+| D16 | Context7 MCP is OPTIONAL preference only — never a hard dependency. If Context7 is unavailable or incomplete, implement immediately using official docs (laravel.com, Spatie, Filament) and/or installed vendor/package source. Do not mark any phase BLOCKED solely because Context7 failed. Note the fallback in SAAS_HANDOFF and continue. |
 
 ## V1 exclusions
 
