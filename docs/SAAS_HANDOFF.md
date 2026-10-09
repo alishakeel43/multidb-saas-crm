@@ -3,10 +3,17 @@
 ## Snapshot
 
 - Date: 2026-10-09
-- Working branch: `phase/07-storage-queues`
-- Current phase: COMPLETE — `V1_COMPLETE`
+- Working branch: `feat/super-admin-overview`
+- Current phase: V1_COMPLETE; post-V1 Super Admin dashboard improvement implemented and validated
 - PHASE 8 status: COMPLETE
 - PHASE 7 status: COMPLETE
+
+## Post-V1 Super Admin dashboard improvement
+
+- Replaced the default Filament information card with a platform overview: tenant/workspace, active tenant, trial subscription, and active domain stats; six-month tenant-growth chart; and a recent tenant list with primary administrator, contact email, user count, database status, and a management link.
+- Expanded the Tenants table with domain, primary administrator contact, CRM user count, plan, lifecycle status, and trial details. Its View action presents tenant profile, domains, plan/subscription, database health, user counts, and CRM lead/contact/organization totals.
+- Owner/contact and CRM usage details are queried only after switching into that tenant's own database. The administrator is identified by Krayin's full-permission role; database issues are reported in logs and shown as an explicit unavailable state rather than fake zero counts.
+- Targeted tests verified dashboard/page/widget registration, tenant administrator/user/CRM counts, and the recent-tenants widget's explicit five-record query. This query configuration fixes Filament's `must have a [query()]` runtime error. Focused Super Admin and tenant overview tests pass (30 assertions); Pint and Super Admin route registration pass. The full Pest suite passed before this follow-up (279 assertions, zero failures). The browser confirmed the branded Super Admin login route; viewing the authenticated dashboard still requires a platform account, and no credentials were read or created for this check.
 
 ## Final V1 isolation verification
 
@@ -113,6 +120,10 @@ Do not stage or commit the pre-existing `.gitignore` changes, `.vscode/` content
 - Context7 is OPTIONAL. Prefer it when available; otherwise use official docs + `vendor/` and continue. Never block for Context7 alone.
 
 ## Domain / URL process
+
+- Domain split active: apex `krayinsaas.localhost` has no tenant row (platform/landing); Demo CRM is `demo.krayinsaas.localhost` → `tenant_demo`.
+
+- Next step: when a platform account is available, visually verify the authenticated Super Admin dashboard; no additional V1 phase work is pending.
 
 - Canonical: `docs/DOMAIN_AND_URLS.md` (D17/D18).
 - Platform Super Admin preferred: `platform.krayinsaas.localhost/super-admin`.

@@ -4,6 +4,9 @@
 .php_cs.cache
 .phpunit.result.cache
 .vscode
+!.vscode/
+.vscode/*
+!.vscode/mcp.json
 .vagrant
 *.hot
 /stubs

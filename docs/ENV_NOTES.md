@@ -21,7 +21,7 @@ Full correct process: [`docs/DOMAIN_AND_URLS.md`](./DOMAIN_AND_URLS.md)
 - **Do not** map this app to `krayin.localhost` (old `Krayin_laravel_CRM_local` project).
 - Tenant CRM (correct): `http://{slug}.krayinsaas.localhost:8888/admin/login`
 - Platform Super Admin (correct): `http://platform.krayinsaas.localhost:8888/super-admin/login` (landlord + `platform` guard)
-- v1 transitional: apex `http://krayinsaas.localhost:8888/admin/login` and `.../super-admin/login` both work on the shared vhost; Super Admin remains platform-auth/landlord-only even if the hostname also maps a demo tenant.
+- Apex `http://krayinsaas.localhost:8888/super-admin/login` = platform. Demo CRM = `http://demo.krayinsaas.localhost:8888/admin/login`.
 - MAMP config: `/Applications/MAMP/conf/apache/extra/httpd-vhosts.conf`
 - Local ignored `.env` sets `APP_URL=http://krayinsaas.localhost:8888`
 - Keep MAMP Apache running; `php artisan serve` is not required.
@@ -37,35 +37,12 @@ Full correct process: [`docs/DOMAIN_AND_URLS.md`](./DOMAIN_AND_URLS.md)
 ## Tenant hostnames
 
 - `App\Multitenancy\TenantFinder\DomainTenantFinder` matches the request hostname against `domains.domain`, returning only active domains whose tenant status is `active`. It does not read tenant IDs from request data.
-- Current demo tenant domain (landlord): `krayinsaas.localhost` (apex convenience). Preferred future CRM host: `demo.krayinsaas.localhost`.
+- Current demo tenant domain (landlord): `demo.krayinsaas.localhost`. Apex `krayinsaas.localhost` has no tenant domain row (platform/landing).
 - Which tenant? Read the hostname (`{slug}.krayinsaas.localhost`).
 
 ## Queue worker
 
-- The local `.env.example` defaults to `QUEUE_CONNECTION=sync`; this executes queued jobs inline and does not require a worker.
-- For a persistent database-backed queue, set these values in the ignored local `.env` (do not commit `.env`):
-
-  ```dotenv
-  QUEUE_CONNECTION=database
-  DB_QUEUE_CONNECTION=landlord
-  QUEUE_FAILED_DATABASE=landlord
-  ```
-
-- Queue and failed-job infrastructure tables are created on the landlord connection, not in tenant CRM databases. Create them there:
-
-  ```bash
-  php artisan migrate --database=landlord --path=database/migrations/2024_09_09_094042_create_jobs_table.php --no-interaction
-  php artisan migrate --database=landlord --path=database/migrations/2019_08_19_000000_create_failed_jobs_table.php --no-interaction
-  ```
-
-- Start a worker from the project root:
-
-  ```bash
-  php artisan queue:work database --queue=default --tries=3 --timeout=90
-  ```
-
-- Keep the worker running under a process supervisor in production. After deployment or worker-affecting configuration changes, run `php artisan queue:restart` and let the supervisor restart it. Tenant-aware payloads restore the landlord tenant record before handling each job and return to the prior context afterward.
-- Verified automated coverage executes a queued tenant-aware job with Laravel's database worker against isolated SQLite landlord/tenant databases. Local MAMP MySQL worker startup was not separately exercised.
+- Document the tenant-aware worker command and runtime setup in PHASE 7.
 
 ## PHASE 1 bootstrap record
 
@@ -97,6 +74,7 @@ The isolated `tenant_bootstrap` database was created on local MAMP MySQL and the
 
 - Ran `php artisan migrate --database=landlord --path=database/migrations/landlord --no-interaction`; the landlord migration repository records the migration on `zaristech_saas`.
 - The migration creates `plans`, `plan_features`, `tenants`, `domains`, `tenant_features`, `subscriptions`, `platform_users`, and `platform_settings`. Each SaaS model uses the landlord connection; the tenant model extends Spatie's tenant model.
+- The Super Admin support-user registry is added by a later migration in the same folder. Apply pending landlord migrations with the same command. Before managing support users for existing tenants, run `php artisan tenants:migrate --all` (or target a specific tenant) to add the tenant support-account markers.
 - Seeded the zero-cost `starter` plan and eight enabled stock-module feature keys using `php artisan db:seed --database=landlord --class='Database\Seeders\DefaultPlanSeeder' --no-interaction`. Re-running the seeder is idempotent.
 - Smoke-tested request-host lookup through the Domain relationship, tenant status and domain active guards, and tenant DB switching back to `tenant_bootstrap`. Temporary tenant/domain records were deleted afterward.
 - Verified `zaristech_saas` contains the eight SaaS tables plus Laravel's migration repository; tenant DB still contains 60 Krayin tables. No platform user or CRM data was seeded into the landlord DB.
