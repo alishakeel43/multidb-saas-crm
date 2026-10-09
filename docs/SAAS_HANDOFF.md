@@ -37,6 +37,7 @@
 - `php artisan --version` — Laravel Framework 12.66.0.
 - `php artisan route:list` — succeeded.
 - Verified 60 tables in the isolated `tenant_bootstrap` database; no landlord migration was run.
+- Committed PHASE 1 as `ae7a28c` (`feat(phase-01): bootstrap Krayin CRM 2.2.6`), without a co-author trailer.
 
 ## Files touched this session
 

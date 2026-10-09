@@ -31,3 +31,4 @@
 - Verified `php artisan --version` and `php artisan route:list` succeed.
 - No admin account was created. Stock code reports non-fatal PDO SSL-CA deprecation warnings under PHP 8.5.7.
 - Marked PHASE 1 done. PHASE 2 is next but blocked until Context7 MCP is available for mandatory framework/package docs.
+- PHASE 1 source and handoff updates were committed as `ae7a28c` (`feat(phase-01): bootstrap Krayin CRM 2.2.6`), without a co-author trailer.
