@@ -145,20 +145,38 @@
                     <p class="text-blue-800 dark:text-blue-300">
                         Configure this single central URL in your Meta App Dashboard. All tenant channels (WhatsApp, Messenger, Instagram) are automatically resolved and routed to their isolated tenant databases.
                     </p>
-                    <div class="mt-1 flex flex-col gap-1">
-                        <div>
-                            <span class="text-slate-500 font-semibold">Callback URL:</span>
-                            <code class="rounded bg-white/90 px-2 py-0.5 font-mono text-[11px] text-blue-800 shadow-sm dark:bg-gray-900 dark:text-blue-300 ml-1">
-                                {{ url('unified-inbox/meta/webhook') }}
+                    <div class="mt-2 flex flex-col gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-slate-500 font-semibold min-w-[90px]">Callback URL:</span>
+                            <code class="rounded bg-white/90 px-2.5 py-1 font-mono text-[11px] font-bold text-blue-900 shadow-sm dark:bg-gray-900 dark:text-blue-200 border border-blue-200/50">
+                                {{ $centralWebhookUrl }}
                             </code>
+                            <button
+                                type="button"
+                                onclick="navigator.clipboard.writeText('{{ $centralWebhookUrl }}'); alert('Central Webhook URL copied to clipboard!');"
+                                class="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white shadow hover:bg-blue-700 transition"
+                            >
+                                Copy
+                            </button>
                         </div>
-                        <div>
-                            <span class="text-slate-500 font-semibold">Verify Token:</span>
-                            <code class="rounded bg-white/90 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-800 shadow-sm dark:bg-gray-900 dark:text-blue-300 ml-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-slate-500 font-semibold min-w-[90px]">Verify Token:</span>
+                            <code class="rounded bg-white/90 px-2.5 py-1 font-mono text-[11px] font-bold text-blue-900 shadow-sm dark:bg-gray-900 dark:text-blue-200 border border-blue-200/50">
                                 {{ config('unified-inbox.meta.verify_token') ?: 'krayin_crm_unified_inbox' }}
                             </code>
+                            <button
+                                type="button"
+                                onclick="navigator.clipboard.writeText('{{ config('unified-inbox.meta.verify_token') ?: 'krayin_crm_unified_inbox' }}'); alert('Verify Token copied to clipboard!');"
+                                class="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white shadow hover:bg-blue-700 transition"
+                            >
+                                Copy
+                            </button>
                         </div>
+                        <p class="mt-1 text-[11px] text-blue-700 dark:text-blue-300">
+                            💡 <strong>Important:</strong> Enter this root platform URL into the Meta Developer App Dashboard. Meta will deliver all events here, and Krayin dynamically routes them to tenant databases based on phone number or page ID.
+                        </p>
                     </div>
+
                 </div>
             </div>
         </div>

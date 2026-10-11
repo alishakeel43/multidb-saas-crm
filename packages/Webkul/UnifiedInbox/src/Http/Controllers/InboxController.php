@@ -13,6 +13,7 @@ use Webkul\Lead\Repositories\PipelineRepository;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Repositories\ConversationRepository;
 use Webkul\UnifiedInbox\Repositories\MessageRepository;
+use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
 use Webkul\UnifiedInbox\Services\MetaGraphClient;
 use Webkul\User\Models\UserProxy;
 
@@ -25,7 +26,8 @@ class InboxController extends Controller
         protected MetaGraphClient $metaClient,
         protected PersonRepository $personRepository,
         protected LeadRepository $leadRepository,
-        protected PipelineRepository $pipelineRepository
+        protected PipelineRepository $pipelineRepository,
+        protected CentralWebhookRouter $router
     ) {}
 
     public function index(Request $request): View
@@ -88,6 +90,7 @@ class InboxController extends Controller
             'users' => $users,
             'pipelines' => $pipelines,
             'connections' => $connections,
+            'centralWebhookUrl' => $this->router->getCentralWebhookUrl(),
             'channelFilter' => $channelFilter,
             'statusFilter' => $statusFilter,
             'search' => $search,

@@ -53,6 +53,7 @@ class ChannelController extends Controller
 
         return view('unified_inbox::admin.channels.index', [
             'channels' => $channels,
+            'centralWebhookUrl' => $this->router->getCentralWebhookUrl(),
             'metaConfig' => [
                 'app_id' => (string) config('unified-inbox.meta.app_id'),
                 'version' => (string) config('unified-inbox.meta.version', 'v21.0'),

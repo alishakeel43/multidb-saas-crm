@@ -11,6 +11,52 @@ use Illuminate\Support\Facades\Log;
 class CentralWebhookRouter
 {
     /**
+     * Get the authoritative central webhook URL using the root platform URL.
+     */
+    public function getCentralWebhookUrl(): string
+    {
+        $explicit = config('unified-inbox.webhook_url');
+        if (filled($explicit)) {
+            return (string) $explicit;
+        }
+
+        $appUrl = (string) config('app.url', '');
+        $tenantBaseDomain = (string) config('multitenancy.tenant_base_domain', '');
+
+        if (filled($appUrl)) {
+            $parsed = parse_url($appUrl);
+            $host = $parsed['host'] ?? '';
+
+            // If the host in app.url contains a tenant subdomain (e.g., demo.krayinsaas.localhost),
+            // strip the tenant subdomain so it is strictly the root platform domain.
+            if ($tenantBaseDomain && str_ends_with($host, $tenantBaseDomain) && $host !== $tenantBaseDomain) {
+                $scheme = $parsed['scheme'] ?? 'http';
+                $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+
+                return "{$scheme}://{$tenantBaseDomain}{$port}/unified-inbox/meta/webhook";
+            }
+
+            return rtrim($appUrl, '/').'/unified-inbox/meta/webhook';
+        }
+
+        if (request()) {
+            $scheme = request()->getScheme();
+            $port = request()->getPort();
+            $base = $tenantBaseDomain ?: request()->getHost();
+
+            if ($tenantBaseDomain && str_ends_with($base, $tenantBaseDomain)) {
+                $base = $tenantBaseDomain;
+            }
+
+            $portStr = ($port && ! in_array($port, [80, 443])) ? ":{$port}" : '';
+
+            return "{$scheme}://{$base}{$portStr}/unified-inbox/meta/webhook";
+        }
+
+        return 'http://localhost/unified-inbox/meta/webhook';
+    }
+
+    /**
      * Resolve the target Tenant based on the incoming channel and external account ID.
      */
     public function resolveTenant(string $channel, string $externalAccountId, ?string $wabaId = null): ?Tenant

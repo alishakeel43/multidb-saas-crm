@@ -12,7 +12,7 @@
         <div class="flex w-[360px] flex-shrink-0 flex-col border-r border-slate-200/80 bg-white dark:border-slate-800/80 dark:bg-slate-900 select-none">
             
             <!-- Sidebar Header & Controls -->
-            <div class="flex flex-col gap-3.5 border-b border-slate-100 p-4 dark:border-slate-800">
+            <div class="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-500/30">
@@ -28,19 +28,91 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-1">
+                    <!-- Prominent Connect Channels Button -->
+                    <a
+                        href="{{ route('admin.unified_inbox.channels.index') }}"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
+                        title="Connect WhatsApp, Messenger, or Instagram Channels"
+                    >
+                        <svg class="h-3.5 w-3.5 stroke-current fill-none" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>Connect Channels</span>
+                    </a>
+                </div>
+
+                @php
+                    $waConn = $connections->firstWhere('channel', 'whatsapp');
+                    $msgConn = $connections->firstWhere('channel', 'messenger');
+                    $igConn = $connections->firstWhere('channel', 'instagram');
+                    $connectedCount = $connections->where('status', 'connected')->count();
+                @endphp
+
+                <!-- Channel Connection Status Bar -->
+                <div class="flex items-center justify-between rounded-xl bg-slate-50/90 px-3 py-2 border border-slate-200/70 text-xs dark:bg-slate-800/60 dark:border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <!-- WhatsApp status -->
                         <a
                             href="{{ route('admin.unified_inbox.channels.index') }}"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800"
-                            title="Manage Messaging Channels"
+                            class="inline-flex items-center gap-1 transition hover:opacity-80"
+                            title="{{ $waConn ? 'WhatsApp Connected: ' . $waConn->name : 'WhatsApp Disconnected - Click to Connect' }}"
                         >
-                            <svg class="h-4 w-4 stroke-current fill-none" viewBox="0 0 24 24" stroke-width="2">
-                                <circle cx="12" cy="12" r="3"></circle>
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                            </svg>
+                            <span class="h-2 w-2 rounded-full {{ $waConn ? 'bg-[#25D366] shadow-sm shadow-emerald-400' : 'bg-slate-300 dark:bg-slate-600' }}"></span>
+                            <span class="text-[11px] font-semibold {{ $waConn ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500' }}">WA</span>
+                        </a>
+
+                        <span class="text-slate-300 dark:text-slate-700 text-[10px]">&bull;</span>
+
+                        <!-- Messenger status -->
+                        <a
+                            href="{{ route('admin.unified_inbox.channels.index') }}"
+                            class="inline-flex items-center gap-1 transition hover:opacity-80"
+                            title="{{ $msgConn ? 'Messenger Connected: ' . $msgConn->name : 'Messenger Disconnected - Click to Connect' }}"
+                        >
+                            <span class="h-2 w-2 rounded-full {{ $msgConn ? 'bg-[#0084FF] shadow-sm shadow-blue-400' : 'bg-slate-300 dark:bg-slate-600' }}"></span>
+                            <span class="text-[11px] font-semibold {{ $msgConn ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500' }}">Messenger</span>
+                        </a>
+
+                        <span class="text-slate-300 dark:text-slate-700 text-[10px]">&bull;</span>
+
+                        <!-- Instagram status -->
+                        <a
+                            href="{{ route('admin.unified_inbox.channels.index') }}"
+                            class="inline-flex items-center gap-1 transition hover:opacity-80"
+                            title="{{ $igConn ? 'Instagram Connected: ' . $igConn->name : 'Instagram Disconnected - Click to Connect' }}"
+                        >
+                            <span class="h-2 w-2 rounded-full {{ $igConn ? 'bg-[#E1306C] shadow-sm shadow-pink-400' : 'bg-slate-300 dark:bg-slate-600' }}"></span>
+                            <span class="text-[11px] font-semibold {{ $igConn ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500' }}">Instagram</span>
                         </a>
                     </div>
+
+                    <a
+                        href="{{ route('admin.unified_inbox.channels.index') }}"
+                        class="text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 inline-flex items-center gap-0.5"
+                    >
+                        <span>Manage</span>
+                        <span>&rarr;</span>
+                    </a>
                 </div>
+
+                @if ($connectedCount === 0)
+                    <!-- Notice if no channel is connected yet -->
+                    <div class="flex items-center justify-between rounded-xl bg-amber-50 p-2.5 border border-amber-200/80 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm">⚠️</span>
+                            <div>
+                                <p class="text-[11px] font-bold leading-tight">No Channels Connected</p>
+                                <p class="text-[10px] text-amber-700 dark:text-amber-400">Connect to start receiving chats</p>
+                            </div>
+                        </div>
+                        <a
+                            href="{{ route('admin.unified_inbox.channels.index') }}"
+                            class="rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-amber-700 transition"
+                        >
+                            Connect &rarr;
+                        </a>
+                    </div>
+                @endif
 
                 <!-- Channel Filter Pills -->
                 <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
@@ -173,14 +245,21 @@
                         </div>
                     </a>
                 @empty
-                    <div class="flex flex-col items-center justify-center p-12 text-center text-slate-400">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 mb-3">
+                    <div class="flex flex-col items-center justify-center p-8 text-center text-slate-400">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 mb-3 shadow-sm">
                             <svg class="h-6 w-6 stroke-current fill-none" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
                         </div>
                         <p class="text-xs font-bold text-slate-700 dark:text-slate-300">No conversations yet</p>
                         <p class="mt-1 text-[11px] text-slate-400 max-w-[200px]">Incoming WhatsApp, Messenger, and Instagram inquiries will stream right here.</p>
+                        <a
+                            href="{{ route('admin.unified_inbox.channels.index') }}"
+                            class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+                        >
+                            <span>+ Connect Channels</span>
+                            <span>&rarr;</span>
+                        </a>
                     </div>
                 @endforelse
             </div>
@@ -359,19 +438,139 @@
                     </form>
                 </div>
             @else
-                <!-- Empty State When No Chat is Selected -->
-                <div class="flex h-full flex-col items-center justify-center p-8 text-center text-slate-400">
-                    <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 mb-4 shadow-sm">
-                        <svg class="h-8 w-8 stroke-current fill-none" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
+                <!-- Rich Onboarding / Channel Connection Canvas -->
+                <div class="flex h-full flex-col items-center justify-center p-8 text-center bg-slate-50/50 dark:bg-slate-900/40 overflow-y-auto">
+                    <div class="w-full max-w-xl flex flex-col items-center gap-6">
+                        
+                        <!-- Top Icon & Header -->
+                        <div class="flex flex-col items-center">
+                            <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 mb-3">
+                                <svg class="h-8 w-8 fill-current" viewBox="0 0 24 24">
+                                    <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-xl font-extrabold text-slate-900 dark:text-white">
+                                Unified Omnichannel Inbox
+                            </h2>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md">
+                                Connect WhatsApp Business, Facebook Messenger, and Instagram Direct to chat with leads and customers in one unified place.
+                            </p>
+                        </div>
+
+                        <!-- 3 Channel Status Cards Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 w-full text-left">
+                            
+                            <!-- WhatsApp Card -->
+                            <div class="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#25D366] text-white shadow-sm">
+                                            <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                                                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.586 1.83.896 2.791.896 3.181 0 5.767-2.587 5.767-5.766.001-3.187-2.575-5.782-5.767-5.782zm9.969 5.828c0 5.518-4.482 10-10 10-1.748 0-3.389-.452-4.821-1.242l-5.179 1.355 1.378-5.044c-.878-1.478-1.378-3.21-1.378-5.069 0-5.518 4.482-10 10-10 5.518 0 10 4.482 10 10z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $waConn ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' }}">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $waConn ? 'bg-emerald-500' : 'bg-slate-400' }}"></span>
+                                            {{ $waConn ? 'Connected' : 'Not Connected' }}
+                                        </span>
+                                    </div>
+                                    <h4 class="mt-2.5 text-xs font-bold text-slate-900 dark:text-white">WhatsApp Business</h4>
+                                    <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        Cloud API messaging with verified WABA and phone number.
+                                    </p>
+                                </div>
+                                <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                                    <a
+                                        href="{{ route('admin.unified_inbox.channels.index') }}"
+                                        class="text-[11px] font-bold text-emerald-600 hover:underline dark:text-emerald-400 inline-flex items-center gap-1"
+                                    >
+                                        <span>{{ $waConn ? 'Manage WA' : 'Connect WhatsApp' }}</span>
+                                        <span>&rarr;</span>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- Messenger Card -->
+                            <div class="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0084FF] text-white shadow-sm">
+                                            <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                                                <path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.22 5.58 3.22 7.49V22l3.41-1.87c1.07.3 2.2.46 3.37.46 5.64 0 10-4.13 10-9.7S17.64 2 12 2zm1.09 13.06l-2.61-2.78-5.09 2.78 5.6-5.94 2.67 2.78 5.03-2.78-5.6 5.94z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $msgConn ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' }}">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $msgConn ? 'bg-blue-500' : 'bg-slate-400' }}"></span>
+                                            {{ $msgConn ? 'Connected' : 'Not Connected' }}
+                                        </span>
+                                    </div>
+                                    <h4 class="mt-2.5 text-xs font-bold text-slate-900 dark:text-white">Facebook Messenger</h4>
+                                    <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        Facebook Page DMs and customer inquiries.
+                                    </p>
+                                </div>
+                                <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                                    <a
+                                        href="{{ route('admin.unified_inbox.channels.index') }}"
+                                        class="text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400 inline-flex items-center gap-1"
+                                    >
+                                        <span>{{ $msgConn ? 'Manage Messenger' : 'Connect Messenger' }}</span>
+                                        <span>&rarr;</span>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- Instagram Card -->
+                            <div class="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white shadow-sm">
+                                            <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                                                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $igConn ? 'bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' }}">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $igConn ? 'bg-pink-500' : 'bg-slate-400' }}"></span>
+                                            {{ $igConn ? 'Connected' : 'Not Connected' }}
+                                        </span>
+                                    </div>
+                                    <h4 class="mt-2.5 text-xs font-bold text-slate-900 dark:text-white">Instagram Direct</h4>
+                                    <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        Instagram Professional account direct messaging.
+                                    </p>
+                                </div>
+                                <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                                    <a
+                                        href="{{ route('admin.unified_inbox.channels.index') }}"
+                                        class="text-[11px] font-bold text-pink-600 hover:underline dark:text-pink-400 inline-flex items-center gap-1"
+                                    >
+                                        <span>{{ $igConn ? 'Manage IG' : 'Connect Instagram' }}</span>
+                                        <span>&rarr;</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Primary CTA Button & Central Webhook info -->
+                        <div class="flex flex-col items-center gap-3">
+                            <a
+                                href="{{ route('admin.unified_inbox.channels.index') }}"
+                                class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-xs font-bold text-white shadow-md shadow-blue-500/30 transition hover:bg-blue-700 hover:scale-105 active:scale-95"
+                            >
+                                <svg class="h-4 w-4 stroke-current fill-none" viewBox="0 0 24 24" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>Connect Channels with Meta</span>
+                                <span>&rarr;</span>
+                            </a>
+                            <p class="text-[11px] text-slate-400 flex items-center gap-1">
+                                <span>🌐 Meta Central Webhook:</span>
+                                <code class="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-600 dark:text-slate-300">
+                                    {{ $centralWebhookUrl }}
+                                </code>
+                            </p>
+                        </div>
                     </div>
-                    <h3 class="text-base font-bold text-slate-800 dark:text-slate-200">
-                        @lang('unified_inbox::app.inbox.select-conversation')
-                    </h3>
-                    <p class="mt-1 text-xs text-slate-400 max-w-sm">
-                        @lang('unified_inbox::app.inbox.select-conversation-desc')
-                    </p>
                 </div>
             @endif
         </div>

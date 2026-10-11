@@ -16,4 +16,7 @@ return [
         'whatsapp_config_id' => env('UNIFIED_INBOX_WHATSAPP_CONFIG_ID'),
         'messaging_config_id' => env('UNIFIED_INBOX_MESSAGING_CONFIG_ID'),
     ],
+
+    // Explicit central webhook override (defaults to root app.url)
+    'webhook_url' => env('UNIFIED_INBOX_WEBHOOK_URL'),
 ];

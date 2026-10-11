@@ -264,3 +264,32 @@ it('can convert a conversation into a CRM lead', function () {
         ->and($lead->title)->toBe('Big Beet Farm Deal')
         ->and((int) $lead->lead_value)->toBe(5000);
 });
+
+it('displays Connect Channels button and channel statuses in Unified Inbox view', function () {
+    $response = $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.index'));
+
+    $response->assertSuccessful()
+        ->assertSee('Connect Channels')
+        ->assertSee(route('admin.unified_inbox.channels.index'), false)
+        ->assertSee('Omnichannel Hub')
+        ->assertSee('WhatsApp')
+        ->assertSee('Messenger')
+        ->assertSee('Instagram');
+});
+
+it('ensures central webhook URL always targets the root platform domain and strips tenant subdomains', function () {
+    $router = app(CentralWebhookRouter::class);
+
+    // Default configured app.url
+    $url = $router->getCentralWebhookUrl();
+    expect($url)->toBe('http://krayinsaas.localhost:8888/unified-inbox/meta/webhook')
+        ->and($url)->not->toContain('demo.');
+
+    // When tenant subdomain exists in app.url, it is stripped to root domain
+    config(['app.url' => 'http://demo.krayinsaas.localhost:8888']);
+    config(['multitenancy.tenant_base_domain' => 'krayinsaas.localhost']);
+    $strippedUrl = $router->getCentralWebhookUrl();
+    expect($strippedUrl)->toBe('http://krayinsaas.localhost:8888/unified-inbox/meta/webhook')
+        ->and($strippedUrl)->not->toContain('demo.');
+});

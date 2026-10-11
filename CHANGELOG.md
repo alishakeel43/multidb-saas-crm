@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add Unified Inbox package (`Webkul/UnifiedInbox`) with Meta Embedded Signup v4 (WhatsApp, Messenger, Instagram), centralized multi-tenant webhook router with landlord channel route resolution, polished 3-panel chat canvas UI, outbound Graph API messaging, and CRM Contact/Lead linking.
+- Add Unified Inbox package (`Webkul/UnifiedInbox`) with Meta Embedded Signup v4 (WhatsApp, Messenger, Instagram), centralized root webhook URL routing with landlord channel route resolution (guaranteeing root domain without tenant subdomains), prominent Connect Channels button and multi-channel status indicators on Unified Inbox UI, polished 3-panel chat canvas UI, outbound Graph API messaging, and CRM Contact/Lead linking.
 - Add demo-tenant P0 CRM smoke coverage (Pest live inventory + admin route checks; Super Admin Playwright Tenant seeders flow).
 
 

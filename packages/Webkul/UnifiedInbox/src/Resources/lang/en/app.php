@@ -34,6 +34,9 @@ return [
     'inbox' => [
         'title' => 'Unified Inbox',
         'all-channels' => 'All Channels',
+        'connect-channels' => 'Connect Channels',
+        'channels-status' => 'Channel Status',
+        'manage-channels' => 'Manage Channels',
         'whatsapp' => 'WhatsApp',
         'messenger' => 'Messenger',
         'instagram' => 'Instagram',
