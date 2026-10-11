@@ -3,18 +3,21 @@
 namespace Webkul\UnifiedInbox\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Tenant;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
+use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
 use Webkul\UnifiedInbox\Services\MetaGraphClient;
 
 class ChannelController extends Controller
 {
     public function __construct(
         protected ChannelConnectionRepository $channelRepository,
-        protected MetaGraphClient $metaClient
+        protected MetaGraphClient $metaClient,
+        protected CentralWebhookRouter $router
     ) {}
 
     public function index(): View
@@ -82,6 +85,7 @@ class ChannelController extends Controller
 
             $wabaId = (string) $request->input('waba_id');
             $phoneNumberId = (string) $request->input('phone_number_id');
+            $currentTenant = Tenant::current();
 
             // 1. WhatsApp Connection if WABA / phone number present
             if ($wabaId || $phoneNumberId) {
@@ -93,11 +97,12 @@ class ChannelController extends Controller
                 ];
 
                 $extId = (string) ($targetPhone['id'] ?? $phoneNumberId);
+                $channelName = (string) ($targetPhone['verified_name'] ?? $targetPhone['display_phone_number'] ?? 'WhatsApp');
 
                 $this->channelRepository->updateOrCreate(
                     ['channel' => 'whatsapp', 'external_id' => $extId],
                     [
-                        'name' => (string) ($targetPhone['verified_name'] ?? $targetPhone['display_phone_number'] ?? 'WhatsApp'),
+                        'name' => $channelName,
                         'status' => 'connected',
                         'credentials' => [
                             'access_token' => $accessToken,
@@ -110,6 +115,11 @@ class ChannelController extends Controller
                         ],
                     ]
                 );
+
+                // Register with central landlord router
+                if ($currentTenant) {
+                    $this->router->registerRoute($currentTenant->id, 'whatsapp', $extId, $wabaId, $channelName);
+                }
 
                 if ($wabaId) {
                     try {
@@ -145,6 +155,10 @@ class ChannelController extends Controller
                             ]
                         );
 
+                        if ($currentTenant) {
+                            $this->router->registerRoute($currentTenant->id, 'messenger', $pageId, null, $pageName);
+                        }
+
                         try {
                             $this->metaClient->subscribePageApps($pageId, $pageToken);
                         } catch (Exception) {
@@ -172,6 +186,10 @@ class ChannelController extends Controller
                                     ],
                                 ]
                             );
+
+                            if ($currentTenant) {
+                                $this->router->registerRoute($currentTenant->id, 'instagram', $igId, null, '@'.$igUsername);
+                            }
                         }
                     }
                 }
@@ -223,6 +241,17 @@ class ChannelController extends Controller
             ]
         );
 
+        $currentTenant = Tenant::current();
+        if ($currentTenant) {
+            $this->router->registerRoute(
+                $currentTenant->id,
+                $validated['channel'],
+                $validated['external_id'],
+                $validated['extra_id'] ?? null,
+                $validated['name']
+            );
+        }
+
         session()->flash('success', ucfirst($validated['channel']).' channel connected successfully.');
 
         return redirect()->route('admin.unified_inbox.channels.index');
@@ -233,6 +262,8 @@ class ChannelController extends Controller
         $connection = $this->channelRepository->find($id);
 
         if ($connection) {
+            $this->router->removeRoute($connection->channel, $connection->external_id);
+
             $connection->update([
                 'status' => 'disconnected',
             ]);

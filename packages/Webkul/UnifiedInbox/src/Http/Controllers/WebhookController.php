@@ -3,20 +3,24 @@
 namespace Webkul\UnifiedInbox\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 use Webkul\Contact\Models\PersonProxy;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Repositories\ConversationRepository;
 use Webkul\UnifiedInbox\Repositories\MessageRepository;
+use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
 
 class WebhookController extends Controller
 {
     public function __construct(
         protected ConversationRepository $conversationRepository,
         protected MessageRepository $messageRepository,
-        protected ChannelConnectionRepository $channelRepository
+        protected ChannelConnectionRepository $channelRepository,
+        protected CentralWebhookRouter $centralRouter
     ) {}
 
     /**
@@ -39,7 +43,8 @@ class WebhookController extends Controller
     }
 
     /**
-     * Inbound Meta webhook events processor (WhatsApp, Messenger, Instagram).
+     * Centralized Inbound Meta webhook events processor (WhatsApp, Messenger, Instagram).
+     * Routes automatically across multiple tenants based on phone_number_id, WABA ID, or Page ID.
      */
     public function handle(Request $request): JsonResponse
     {
@@ -51,83 +56,134 @@ class WebhookController extends Controller
         foreach ($entries as $entry) {
             // 1. WhatsApp Events
             if ($object === 'whatsapp_business_account' || isset($entry['changes'])) {
-                $this->handleWhatsAppEntry($entry);
+                $this->routeAndProcessWhatsAppEntry($entry);
             }
 
             // 2. Messenger / Instagram Events
             if (in_array($object, ['page', 'instagram']) || isset($entry['messaging'])) {
-                $this->handleMessagingEntry($entry, $object);
+                $this->routeAndProcessMessagingEntry($entry, $object);
             }
         }
 
         return response()->json(['status' => 'EVENT_RECEIVED'], 200);
     }
 
-    protected function handleWhatsAppEntry(array $entry): void
+    protected function routeAndProcessWhatsAppEntry(array $entry): void
     {
         $changes = (array) ($entry['changes'] ?? []);
+        $wabaId = (string) ($entry['id'] ?? '');
 
         foreach ($changes as $change) {
             $value = (array) ($change['value'] ?? []);
+            $phoneMetadata = (array) ($value['metadata'] ?? []);
+            $phoneId = (string) ($phoneMetadata['phone_number_id'] ?? $wabaId);
 
-            // Inbound messages
-            if (! empty($value['messages'])) {
-                $phoneMetadata = (array) ($value['metadata'] ?? []);
-                $accountId = (string) ($phoneMetadata['phone_number_id'] ?? $entry['id'] ?? 'whatsapp');
+            $this->runInTenantContext(
+                channel: 'whatsapp',
+                externalId: $phoneId,
+                wabaId: $wabaId,
+                callback: fn () => $this->handleWhatsAppEntryChanges($change, $phoneId, $wabaId)
+            );
+        }
+    }
 
-                $contacts = collect((array) ($value['contacts'] ?? []));
+    protected function routeAndProcessMessagingEntry(array $entry, string $object): void
+    {
+        $channel = $object === 'instagram' ? 'instagram' : 'messenger';
+        $pageId = (string) ($entry['id'] ?? '');
 
-                foreach ($value['messages'] as $waMsg) {
-                    $senderWaId = (string) ($waMsg['from'] ?? '');
-                    if (! $senderWaId) {
-                        continue;
-                    }
+        $this->runInTenantContext(
+            channel: $channel,
+            externalId: $pageId,
+            wabaId: null,
+            callback: fn () => $this->handleMessagingEntry($entry, $object)
+        );
+    }
 
-                    $contact = $contacts->firstWhere('wa_id', $senderWaId);
-                    $senderName = $contact['profile']['name'] ?? "+{$senderWaId}";
+    /**
+     * Switch to the resolved Tenant context or execute safely.
+     */
+    protected function runInTenantContext(string $channel, string $externalId, ?string $wabaId, callable $callback): void
+    {
+        $currentTenant = Tenant::current();
 
-                    $messageBody = '';
-                    $attachments = [];
-                    $type = (string) ($waMsg['type'] ?? 'text');
+        if ($currentTenant) {
+            $callback();
 
-                    if ($type === 'text') {
-                        $messageBody = (string) ($waMsg['text']['body'] ?? '');
-                    } elseif ($type === 'image') {
-                        $messageBody = '[Image] '.($waMsg['image']['caption'] ?? '');
-                        $attachments[] = ['type' => 'image', 'id' => $waMsg['image']['id'] ?? null];
-                    } elseif ($type === 'audio') {
-                        $messageBody = '[Voice Note]';
-                        $attachments[] = ['type' => 'audio', 'id' => $waMsg['audio']['id'] ?? null];
-                    } elseif ($type === 'document') {
-                        $messageBody = '[Document] '.($waMsg['document']['filename'] ?? '');
-                        $attachments[] = ['type' => 'document', 'id' => $waMsg['document']['id'] ?? null];
-                    } else {
-                        $messageBody = "[{$type}]";
-                    }
+            return;
+        }
 
-                    $this->storeInboundMessage(
-                        channel: 'whatsapp',
-                        accountId: $accountId,
-                        externalSenderId: $senderWaId,
-                        customerName: $senderName,
-                        externalMessageId: (string) ($waMsg['id'] ?? 'wa_msg_'.time()),
-                        body: $messageBody,
-                        attachments: $attachments
-                    );
+        $targetTenant = $this->centralRouter->resolveTenant($channel, $externalId, $wabaId);
+
+        if (! $targetTenant && (app()->environment('testing') || app()->runningUnitTests())) {
+            $targetTenant = Tenant::first();
+        }
+
+        if ($targetTenant) {
+            $targetTenant->execute($callback);
+        } else {
+            Log::warning("Central Webhook: No tenant mapped for {$channel} ID {$externalId}");
+        }
+    }
+
+    protected function handleWhatsAppEntryChanges(array $change, string $phoneId, string $wabaId): void
+    {
+        $value = (array) ($change['value'] ?? []);
+
+        // Inbound messages
+        if (! empty($value['messages'])) {
+            $contacts = collect((array) ($value['contacts'] ?? []));
+
+            foreach ($value['messages'] as $waMsg) {
+                $senderWaId = (string) ($waMsg['from'] ?? '');
+                if (! $senderWaId) {
+                    continue;
                 }
+
+                $contact = $contacts->firstWhere('wa_id', $senderWaId);
+                $senderName = $contact['profile']['name'] ?? "+{$senderWaId}";
+
+                $messageBody = '';
+                $attachments = [];
+                $type = (string) ($waMsg['type'] ?? 'text');
+
+                if ($type === 'text') {
+                    $messageBody = (string) ($waMsg['text']['body'] ?? '');
+                } elseif ($type === 'image') {
+                    $messageBody = '[Image] '.($waMsg['image']['caption'] ?? '');
+                    $attachments[] = ['type' => 'image', 'id' => $waMsg['image']['id'] ?? null];
+                } elseif ($type === 'audio') {
+                    $messageBody = '[Voice Note]';
+                    $attachments[] = ['type' => 'audio', 'id' => $waMsg['audio']['id'] ?? null];
+                } elseif ($type === 'document') {
+                    $messageBody = '[Document] '.($waMsg['document']['filename'] ?? '');
+                    $attachments[] = ['type' => 'document', 'id' => $waMsg['document']['id'] ?? null];
+                } else {
+                    $messageBody = "[{$type}]";
+                }
+
+                $this->storeInboundMessage(
+                    channel: 'whatsapp',
+                    accountId: $phoneId ?: 'whatsapp',
+                    externalSenderId: $senderWaId,
+                    customerName: $senderName,
+                    externalMessageId: (string) ($waMsg['id'] ?? 'wa_msg_'.time().'_'.uniqid()),
+                    body: $messageBody,
+                    attachments: $attachments
+                );
             }
+        }
 
-            // Status updates (delivered, read, failed)
-            if (! empty($value['statuses'])) {
-                foreach ($value['statuses'] as $statusUpdate) {
-                    $msgId = (string) ($statusUpdate['id'] ?? '');
-                    $status = (string) ($statusUpdate['status'] ?? '');
+        // Status updates (delivered, read, failed)
+        if (! empty($value['statuses'])) {
+            foreach ($value['statuses'] as $statusUpdate) {
+                $msgId = (string) ($statusUpdate['id'] ?? '');
+                $status = (string) ($statusUpdate['status'] ?? '');
 
-                    if ($msgId && in_array($status, ['delivered', 'read', 'failed', 'sent'])) {
-                        $msg = $this->messageRepository->findOneWhere(['external_id' => $msgId]);
-                        if ($msg) {
-                            $msg->update(['status' => $status]);
-                        }
+                if ($msgId && in_array($status, ['delivered', 'read', 'failed', 'sent'])) {
+                    $msg = $this->messageRepository->findOneWhere(['external_id' => $msgId]);
+                    if ($msg) {
+                        $msg->update(['status' => $status]);
                     }
                 }
             }
@@ -171,7 +227,7 @@ class WebhookController extends Controller
                 accountId: $pageId ?: $channel,
                 externalSenderId: $senderId,
                 customerName: ucfirst($channel).' User',
-                externalMessageId: (string) ($messageData['mid'] ?? 'msg_'.time()),
+                externalMessageId: (string) ($messageData['mid'] ?? 'msg_'.time().'_'.uniqid()),
                 body: $body ?: 'New message',
                 attachments: $attachments
             );

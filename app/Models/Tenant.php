@@ -62,6 +62,11 @@ class Tenant extends SpatieTenant
         return $this->hasMany(Payment::class);
     }
 
+    public function channelRoutes(): HasMany
+    {
+        return $this->hasMany(TenantChannelRoute::class);
+    }
+
     public function latestSubscription(): ?Subscription
     {
         return $this->subscriptions()->latest('starts_at')->first();

@@ -1,17 +1,24 @@
 <?php
 
+use App\Models\Tenant;
 use App\Services\FeatureEntitlementService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Webkul\Lead\Models\Lead;
 use Webkul\UnifiedInbox\Models\ChannelConnection;
 use Webkul\UnifiedInbox\Models\Conversation;
 use Webkul\UnifiedInbox\Models\Message;
+use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
 use Webkul\User\Models\Role;
 use Webkul\User\Models\User;
 
 uses(DatabaseTransactions::class);
 
 beforeEach(function () {
+    $this->tenant = Tenant::first();
+    if ($this->tenant) {
+        $this->tenant->makeCurrent();
+    }
+
     Message::query()->delete();
     Conversation::query()->delete();
     ChannelConnection::query()->delete();
@@ -123,6 +130,29 @@ it('receives an inbound WhatsApp message via Meta webhook and creates conversati
         ->and($message->direction)->toBe('inbound')
         ->and($message->body)->toBe('Hi, I need a CRM demo for our team.')
         ->and($message->status)->toBe('received');
+});
+
+it('routes central webhook to specific tenant database via landlord channel route', function () {
+    $tenant = Tenant::first();
+    if (! $tenant) {
+        $tenant = Tenant::create([
+            'name' => 'Acme Corp',
+            'slug' => 'acme_'.uniqid(),
+            'database' => 'tenant_test_'.uniqid(),
+            'status' => 'active',
+        ]);
+    }
+
+    $router = app(CentralWebhookRouter::class);
+    $router->registerRoute($tenant->id, 'whatsapp', 'PHONE_TENANT_ROUTE_99', 'WABA_99', 'Acme Support');
+
+    $resolved = $router->resolveTenant('whatsapp', 'PHONE_TENANT_ROUTE_99', 'WABA_99');
+
+    expect($resolved)->not->toBeNull()
+        ->and($resolved->id)->toBe($tenant->id);
+
+    // Clean up
+    $router->removeRoute('whatsapp', 'PHONE_TENANT_ROUTE_99');
 });
 
 it('renders unified inbox and can send an outbound message', function () {

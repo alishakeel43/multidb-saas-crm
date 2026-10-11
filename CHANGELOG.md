@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Add Unified Inbox package (`Webkul/UnifiedInbox`) with Meta Embedded Signup v4 (WhatsApp, Messenger, Instagram), live 3-panel chat inbox UI, webhook event ingestion, outbound Graph API messaging, and CRM Contact/Lead linking.
+- Add Unified Inbox package (`Webkul/UnifiedInbox`) with Meta Embedded Signup v4 (WhatsApp, Messenger, Instagram), centralized multi-tenant webhook router with landlord channel route resolution, polished 3-panel chat canvas UI, outbound Graph API messaging, and CRM Contact/Lead linking.
 - Add demo-tenant P0 CRM smoke coverage (Pest live inventory + admin route checks; Super Admin Playwright Tenant seeders flow).
+
 
 - Expose CRM baseline / demo+P0 seeders in Super Admin (Operations → Tenant seeders, plus Tenant list/edit actions) via `TenantSeedService`.
 - Add `TenantP0DemoSeeder` (via `tenants:seed {slug} --demo`) with idempotent dummy data for Assignment, Booking, Consent, Quote Approvals/fulfillment, Lead scoring, Notifications, and Sales-report-friendly lead outcomes.

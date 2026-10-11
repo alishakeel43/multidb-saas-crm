@@ -129,25 +129,41 @@
             @endforeach
         </div>
 
-        <!-- Webhook Info Box for Meta Developer Console -->
+        <!-- Centralized Webhook Info Box for Meta Developer Console -->
         <div class="rounded-xl border border-blue-200 bg-blue-50/70 p-5 dark:border-blue-900 dark:bg-blue-950/40">
             <div class="flex items-start gap-3">
-                <div class="mt-0.5 rounded-lg bg-blue-500 p-1 text-white">
+                <div class="mt-0.5 rounded-lg bg-blue-500 p-1.5 text-white shadow-sm">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
                 <div class="flex flex-col gap-1 text-xs text-blue-900 dark:text-blue-200">
-                    <h4 class="font-bold">Meta Webhook Configuration</h4>
-                    <p>Callback URL for WhatsApp Cloud API & Facebook Graph Webhook:</p>
-                    <code class="rounded bg-white/80 px-2 py-1 font-mono text-[11px] text-blue-800 shadow-sm dark:bg-gray-900 dark:text-blue-300">
-                        {{ url('unified-inbox/meta/webhook') }}
-                    </code>
-                    <p class="mt-1">Verify Token: <code class="font-mono font-bold">{{ config('unified-inbox.meta.verify_token') ?: 'krayin_crm_unified_inbox' }}</code></p>
+                    <div class="flex items-center gap-2">
+                        <h4 class="font-bold text-sm">Centralized Meta Webhook (Multi-Tenant Auto-Routing)</h4>
+                        <span class="rounded bg-blue-200/80 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:bg-blue-800 dark:text-blue-200">1 Webhook for All Tenants</span>
+                    </div>
+                    <p class="text-blue-800 dark:text-blue-300">
+                        Configure this single central URL in your Meta App Dashboard. All tenant channels (WhatsApp, Messenger, Instagram) are automatically resolved and routed to their isolated tenant databases.
+                    </p>
+                    <div class="mt-1 flex flex-col gap-1">
+                        <div>
+                            <span class="text-slate-500 font-semibold">Callback URL:</span>
+                            <code class="rounded bg-white/90 px-2 py-0.5 font-mono text-[11px] text-blue-800 shadow-sm dark:bg-gray-900 dark:text-blue-300 ml-1">
+                                {{ url('unified-inbox/meta/webhook') }}
+                            </code>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 font-semibold">Verify Token:</span>
+                            <code class="rounded bg-white/90 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-800 shadow-sm dark:bg-gray-900 dark:text-blue-300 ml-1">
+                                {{ config('unified-inbox.meta.verify_token') ?: 'krayin_crm_unified_inbox' }}
+                            </code>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
 
     <!-- Manual Connection Modal -->
     <div id="manual-connect-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-black/50 p-4">
