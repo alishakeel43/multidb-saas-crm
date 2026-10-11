@@ -7,6 +7,7 @@ use App\Models\Domain;
 use App\Models\Tenant;
 use App\Services\StorageQuotaService;
 use App\Services\TenantOverviewService;
+use App\Services\TenantSeedService;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -17,12 +18,16 @@ use Filament\Forms\Set;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Throwable;
 
 class TenantResource extends Resource
 {
@@ -282,8 +287,53 @@ class TenantResource extends Resource
                                 ]),
                         ])),
                 EditAction::make(),
+                ActionGroup::make([
+                    Action::make('seedBaseline')
+                        ->label('Seed CRM baseline')
+                        ->icon('heroicon-m-arrow-path')
+                        ->requiresConfirmation()
+                        ->modalHeading('Seed CRM baseline')
+                        ->modalDescription(fn (Tenant $record): string => "Run TenantCrmSeeder for {$record->slug}? Safe to re-run.")
+                        ->action(function (Tenant $record): void {
+                            self::runSeedAction($record, false);
+                        }),
+                    Action::make('seedDemo')
+                        ->label('Seed demo + P0 data')
+                        ->icon('heroicon-m-beaker')
+                        ->color('primary')
+                        ->requiresConfirmation()
+                        ->modalHeading('Seed demo CRM data')
+                        ->modalDescription(fn (Tenant $record): string => "Add sample CRM + P0 records for {$record->slug}? Does not delete existing data.")
+                        ->action(function (Tenant $record): void {
+                            self::runSeedAction($record, true);
+                        }),
+                ])
+                    ->label('Seeders')
+                    ->icon('heroicon-m-circle-stack')
+                    ->button()
+                    ->color('gray'),
             ])
             ->defaultSort('created_at', 'desc');
+    }
+
+    public static function runSeedAction(Tenant $record, bool $demo): void
+    {
+        try {
+            app(TenantSeedService::class)->seed($record, $demo);
+
+            Notification::make()
+                ->title($demo
+                    ? "Demo seed completed for {$record->slug}"
+                    : "Baseline seed completed for {$record->slug}")
+                ->success()
+                ->send();
+        } catch (Throwable $exception) {
+            Notification::make()
+                ->title("Seed failed for {$record->slug}")
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
     }
 
     public static function getEloquentQuery(): Builder

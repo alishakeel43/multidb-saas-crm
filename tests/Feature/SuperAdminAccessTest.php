@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Pages\SuperAdminDashboard;
+use App\Filament\Pages\TenantSeeders;
 use App\Filament\Resources\TenantResource\Pages\CreateTenant;
 use App\Filament\Widgets\PlatformStatsOverview;
 use App\Filament\Widgets\RecentTenantsTable;
@@ -103,6 +104,23 @@ it('shows a platform overview instead of the default framework information card'
     $recentTenants = app(RecentTenantsTable::class);
     $recentTenants->bootedInteractsWithTable();
     expect($recentTenants->getTable()->getQuery()->toBase()->limit)->toBe(5);
+});
+
+it('registers and serves the Tenant seeders Operations page', function () {
+    $panel = Filament::getPanel('super-admin');
+    $activeUser = new PlatformUser([
+        'name' => 'Platform Admin',
+        'email' => 'platform@example.test',
+        'is_active' => true,
+    ]);
+
+    expect($panel->getPages())->toContain(TenantSeeders::class);
+
+    $this->actingAs($activeUser, 'platform')
+        ->get('/super-admin/tenant-seeders')
+        ->assertOk()
+        ->assertSee('Tenant seeders')
+        ->assertSee('Demo + P0');
 });
 
 it('renders tenant provisioning credentials without database connection fields', function () {

@@ -11,6 +11,7 @@ use App\Filament\Pages\PlatformSettings;
 use App\Filament\Pages\SuperAdminDashboard;
 use App\Filament\Pages\SystemHealth;
 use App\Filament\Pages\TenantBackups;
+use App\Filament\Pages\TenantSeeders;
 use App\Filament\Widgets\PlatformStatsOverview;
 use App\Filament\Widgets\RecentTenantsTable;
 use App\Filament\Widgets\TenantGrowthChart;
@@ -84,6 +85,7 @@ class SuperAdminPanelProvider extends PanelProvider
                 SystemHealth::class,
                 PlatformSettings::class,
                 TenantBackups::class,
+                TenantSeeders::class,
                 ManagePlanFeatures::class,
                 ManageTenantFeatures::class,
                 ManageTwoFactorAuthentication::class,

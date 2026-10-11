@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expose CRM baseline / demo+P0 seeders in Super Admin (Operations → Tenant seeders, plus Tenant list/edit actions) via `TenantSeedService`.
+- Add `TenantP0DemoSeeder` (via `tenants:seed {slug} --demo`) with idempotent dummy data for Assignment, Booking, Consent, Quote Approvals/fulfillment, Lead scoring, Notifications, and Sales-report-friendly lead outcomes.
 - Add in-app CRM Notifications (header bell + inbox) for assignment alerts, upcoming follow-ups, overdue activities, and lead close-date deadlines (`notifications:dispatch-due --all`).
 - Add rules-based Lead scoring (Settings → Lead scoring) with persisted `leads.score`.
 - Add public booking page (`/book`) and admin reschedule action for appointments.

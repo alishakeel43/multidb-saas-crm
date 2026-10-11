@@ -142,7 +142,7 @@ databases, not the landlord database:
 php artisan tenants:migrate demo
 php artisan tenants:seed demo
 
-# Also add sample organizations, contacts, leads, and an activity
+# Also add sample organizations, contacts, leads, an activity, and P0 package demos
 php artisan tenants:seed demo --demo
 ```
 
@@ -150,6 +150,16 @@ Use `--all` instead of `demo` to target every registered tenant. The `--demo`
 option is repeatable: sample records are clearly marked and are not duplicated
 when the command is run again. It requires a provisioned tenant with an existing
 CRM user and baseline lookup data; it does not create users or delete records.
+
+With `--demo`, `TenantP0DemoSeeder` also seeds process-test data for Assignment,
+Booking (service + availability + appointments), Consent, Quote Approvals
+(pending / delivered / converted), Lead scoring rules, in-app Notifications,
+and mixed lead outcomes so Sales reports show non-zero metrics.
+
+The same seeders can be run from the Super Admin panel (`/super-admin`):
+**Operations → Tenant seeders**, or from a tenant’s list/edit actions
+(**Seeders** / header buttons). Tenant CRM Admin does not expose these
+maintenance actions.
 
 ##### On local:
 

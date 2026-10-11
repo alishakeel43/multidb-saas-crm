@@ -145,6 +145,9 @@ class TenantDemoSeeder extends Seeder
                 $this->attachIfMissing($connection, 'activity_participants', 'person_id', $personId, $activityId);
             }
         });
+
+        // P0 package demo rows (assignment, booking, consent, quotes, scoring, notifications).
+        $this->call(TenantP0DemoSeeder::class);
     }
 
     private function attachIfMissing($connection, string $table, string $relatedKey, int $relatedId, int $activityId): void
