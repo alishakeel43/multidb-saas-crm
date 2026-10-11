@@ -5,7 +5,7 @@
     </div>
     <div class="ui-conversations">
         @forelse ($conversations as $item)
-            <a class="ui-conversation" href="{{ route('admin.unified_inbox.index', array_merge(request()->query(), ['conversation_id' => $item->id])) }}" @if(isset($activeConversation) && $activeConversation->id === $item->id) aria-current="page" @endif>
+            <a class="ui-conversation" href="{{ route('admin.unified_inbox.index', array_merge(request()->query(), ['conversation_id' => $item->id])) }}" @if($activeConversation?->id === $item->id) aria-current="page" @endif>
                 <span class="ui-avatar" v-pre>{{ mb_strtoupper(mb_substr($item->customer_name, 0, 1)) }}</span>
                 <span class="ui-conversation-copy">
                     <strong v-pre>{{ $item->customer_name }}</strong>

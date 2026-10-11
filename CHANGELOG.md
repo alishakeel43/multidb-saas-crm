@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add Unified Inbox package (`Webkul/UnifiedInbox`) with Meta Embedded Signup v4 (WhatsApp, Messenger, Instagram), centralized root webhook URL routing with landlord channel route resolution (guaranteeing root domain without tenant subdomains), reference `.ui-workspace` design system and component structure (`partials/styles`, `partials/header`, `partials/list`, 3-tab CRM drawer, and channel cards), prominent Connect Channels button and multi-channel status indicators on Unified Inbox UI, outbound Graph API messaging, and CRM Contact/Lead linking.
+- Fix Unified Inbox blank screen by replacing invalid inline Blade `@php(...)` calls with standard blocks, adding `v-pre` to `.ui-workspace` containers to prevent Vue 3 in-DOM template compilation crashes, and adding safe null checks on conversation list.
 - Add demo-tenant P0 CRM smoke coverage (Pest live inventory + admin route checks; Super Admin Playwright Tenant seeders flow).
 
 

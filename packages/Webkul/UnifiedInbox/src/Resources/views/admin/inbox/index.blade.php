@@ -12,7 +12,7 @@
     @endphp
 
     <!-- Master Unified Inbox Workspace (Reference Design) -->
-    <div class="ui-workspace {{ $activeConversation ? 'ui-detail' : 'ui-index' }}">
+    <div class="ui-workspace {{ $activeConversation ? 'ui-detail' : 'ui-index' }}" v-pre>
         @include('unified_inbox::partials.header')
 
         <div class="ui-columns">
@@ -24,10 +24,12 @@
                     <section class="ui-chat">
                         <header class="ui-chat-header">
                             <a class="secondary-button" href="{{ route('admin.unified_inbox.index', request()->except('conversation_id')) }}" aria-label="Back">←</a>
-                            @php($displayName = $activeConversation->customer_name)
-                            <span class="ui-avatar" v-pre>{{ mb_strtoupper(mb_substr($displayName, 0, 1)) }}</span>
+                            @php
+                                $displayName = $activeConversation->customer_name;
+                            @endphp
+                            <span class="ui-avatar">{{ mb_strtoupper(mb_substr($displayName, 0, 1)) }}</span>
                             <div style="flex:1;min-width:0">
-                                <h1 v-pre class="truncate">{{ $displayName }}</h1>
+                                <h1 class="truncate">{{ $displayName }}</h1>
                                 <p class="ui-muted">{{ ucfirst($activeConversation->channel) }} · <span class="capitalize">{{ $activeConversation->status }}</span> · <span class="font-mono text-xs">{{ $activeConversation->external_id }}</span></p>
                             </div>
                             <div class="flex items-center gap-2">
@@ -112,7 +114,9 @@
                         </div>
 
                         <div class="ui-side-tabs-root">
-                            @php($sideTabGroup = 'ui-side-tabs-'.$activeConversation->id)
+                            @php
+                                $sideTabGroup = 'ui-side-tabs-'.$activeConversation->id;
+                            @endphp
                             <input type="radio" class="ui-side-radio" name="{{ $sideTabGroup }}" id="{{ $sideTabGroup }}-overview" data-side-tab="overview" checked>
                             <input type="radio" class="ui-side-radio" name="{{ $sideTabGroup }}" id="{{ $sideTabGroup }}-crm" data-side-tab="crm">
                             <input type="radio" class="ui-side-radio" name="{{ $sideTabGroup }}" id="{{ $sideTabGroup }}-work" data-side-tab="work">

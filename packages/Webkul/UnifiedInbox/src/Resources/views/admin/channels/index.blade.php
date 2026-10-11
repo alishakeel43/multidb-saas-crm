@@ -5,7 +5,7 @@
 
     @include('unified_inbox::partials.styles')
 
-    <div class="ui-workspace">
+    <div class="ui-workspace" v-pre>
         <header class="ui-header">
             <div>
                 <h1>@lang('unified_inbox::app.channels.title')</h1>
