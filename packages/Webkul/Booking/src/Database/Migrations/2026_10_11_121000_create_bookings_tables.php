@@ -16,6 +16,8 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->text('description')->nullable();
             $table->timestamps();
+
+            $table->index(['is_active', 'name'], 'booking_services_active_name_idx');
         });
 
         Schema::create('booking_availabilities', function (Blueprint $table) {
@@ -27,7 +29,11 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->index(['user_id', 'weekday']);
+            // isSlotAvailable(): staff windows for a weekday
+            $table->index(
+                ['user_id', 'weekday', 'is_active'],
+                'booking_availabilities_user_weekday_active_idx'
+            );
         });
 
         Schema::create('bookings', function (Blueprint $table) {
@@ -46,9 +52,24 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->foreign('booking_service_id')->references('id')->on('booking_services')->cascadeOnDelete();
-            $table->index(['starts_at', 'ends_at']);
-            $table->index('status');
+            $table->foreign('booking_service_id')
+                ->references('id')
+                ->on('booking_services')
+                ->cascadeOnDelete();
+
+            // overlap checks + staff calendar: user + time range
+            $table->index(
+                ['user_id', 'starts_at', 'ends_at'],
+                'bookings_user_starts_ends_idx'
+            );
+
+            // upcoming / status filters (SalesReportService, listings)
+            $table->index(['status', 'starts_at'], 'bookings_status_starts_idx');
+
+            // relation lookups from CRM records
+            $table->index('person_id', 'bookings_person_id_idx');
+            $table->index('lead_id', 'bookings_lead_id_idx');
+            $table->unique('activity_id', 'bookings_activity_id_unique');
         });
     }
 

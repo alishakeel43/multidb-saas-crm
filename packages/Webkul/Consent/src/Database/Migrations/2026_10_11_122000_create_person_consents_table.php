@@ -19,8 +19,14 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->unique(['person_id', 'channel']);
-            $table->index(['channel', 'is_opted_in']);
+            // ConsentService::set / isOptedIn / canMarket
+            $table->unique(['person_id', 'channel'], 'person_consents_person_channel_unique');
+
+            // suppression / marketing list by channel
+            $table->index(['channel', 'is_opted_in'], 'person_consents_channel_opt_in_idx');
+
+            // admin recent activity listing
+            $table->index('updated_at', 'person_consents_updated_at_idx');
         });
     }
 

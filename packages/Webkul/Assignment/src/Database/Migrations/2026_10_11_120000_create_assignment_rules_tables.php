@@ -18,6 +18,12 @@ return new class extends Migration
             $table->unsignedInteger('priority')->default(0);
             $table->json('conditions')->nullable();
             $table->timestamps();
+
+            // resolveRule(): active rules by entity, highest priority first
+            $table->index(
+                ['entity_type', 'is_active', 'priority'],
+                'assignment_rules_entity_active_priority_idx'
+            );
         });
 
         Schema::create('assignment_rule_users', function (Blueprint $table) {
@@ -34,6 +40,15 @@ return new class extends Migration
                 ->onDelete('cascade');
 
             $table->unique(['assignment_rule_id', 'user_id'], 'assignment_rule_user_unique');
+
+            // activeCandidates(): ordered pool for a rule
+            $table->index(
+                ['assignment_rule_id', 'is_active', 'sort_order'],
+                'assignment_rule_users_rule_active_sort_idx'
+            );
+
+            // reverse lookup: which rules include a user
+            $table->index('user_id', 'assignment_rule_users_user_id_idx');
         });
 
         Schema::create('assignment_cursors', function (Blueprint $table) {
@@ -47,7 +62,8 @@ return new class extends Migration
                 ->on('assignment_rules')
                 ->onDelete('cascade');
 
-            $table->unique('assignment_rule_id');
+            // round-robin cursor lockForUpdate() by rule
+            $table->unique('assignment_rule_id', 'assignment_cursors_rule_unique');
         });
     }
 

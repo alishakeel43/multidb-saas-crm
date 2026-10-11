@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Add client P0 CRM packages following Krayin Concord package flow (Contract / Model / Proxy / Repository / `ModuleServiceProvider` + `config/concord.php`): lead assignment (round-robin / workload / first-available via `Webkul/Assignment`), appointment booking with Spatie model-states (`Webkul/Booking`), person consent/suppression (`Webkul/Consent`), and quote approval workflow (`Webkul/QuoteApproval`), plus lead-duplicate checks and a `SalesReportService` metrics snapshot; gate them through SaaS feature entitlements.
+- Add composite/lookup indexes on P0 CRM package tables for hot paths (assignment rule resolution, booking overlap/availability, consent channel lookups, quote approval queues).
+- Add idempotent tenant migrations to backfill P0 CRM performance indexes on existing tenant databases (`php artisan tenants:migrate --all`).
 - Add `spatie/laravel-model-states` for professional booking status transitions (pending → confirmed/cancelled/completed/no-show).
 - Add idempotent `BillingDemoSeeder` with three sample invoices (open / paid / void) so Super Admin billing UI can be exercised before Stripe go-live.
 - Fix tenant CRM baseline seeding skipping AttributeSeeder when Installer migrations already inserted a few attribute rows (e.g. job_title), which left persons.organization_id missing and crashed lead contact forms.
