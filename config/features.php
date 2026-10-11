@@ -84,6 +84,17 @@ return [
         'route_prefixes' => ['admin.quotes.', 'admin.leads.quotes.'],
         'menu_keys' => ['quotes'],
     ],
+    'assignment' => [
+        'label' => 'Lead assignment',
+        'category' => 'sales',
+        'default_enabled' => true,
+        'depends_on' => ['leads'],
+        'route_prefixes' => [
+            'admin.settings.assignment.',
+            'admin.leads.duplicates.',
+        ],
+        'menu_keys' => ['settings.assignment'],
+    ],
     'mail' => [
         'label' => 'Mail',
         'category' => 'communication',

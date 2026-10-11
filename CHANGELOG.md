@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `Webkul/Assignment` package (Concord Contract/Model/Proxy/Repository): round-robin / workload / first-available lead assignment, settings UI, and lead-duplicate check API; gate via `assignment` feature entitlement.
 - Fix tenant CRM baseline seeding skipping AttributeSeeder when Installer migrations already inserted a few attribute rows (e.g. job_title), which left persons.organization_id missing and crashed lead contact forms.
 - Align SaaS feature entitlements with Krayin Contacts: one Contacts module now gates both Persons and Organizations menus (legacy `organizations` key remains as an alias) so tenant sidebars cannot show one without the other.
 - Fix tenant storage-quota middleware calling `Request::hasFile()` with no key (Laravel 12 requires a file field name); skip the check when the request has no uploads via `allFiles()`.

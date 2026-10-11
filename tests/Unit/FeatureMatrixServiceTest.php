@@ -35,6 +35,7 @@ it('groups features into configured categories', function () {
         ->and($grouped['crm']['features'])->toHaveKey('contacts')
         ->and($grouped['crm']['features'])->not->toHaveKey('organizations')
         ->and($grouped['sales']['features'])->toHaveKey('products')
+        ->and($grouped['sales']['features'])->toHaveKey('assignment')
         ->and($grouped['automation']['features'])->toHaveKey('workflows');
 });
 

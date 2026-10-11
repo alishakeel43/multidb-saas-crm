@@ -1,0 +1,25 @@
+{
+    "name": "webkul/assignment",
+    "description": "Sales assignment rules for Krayin CRM (round-robin, workload, first-available)",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Webkul",
+            "email": "support@webkul.com"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Webkul\\Assignment\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\Assignment\\Providers\\AssignmentServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev"
+}
