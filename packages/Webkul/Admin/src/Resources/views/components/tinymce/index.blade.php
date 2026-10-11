@@ -1,4 +1,8 @@
-@php($placeholders = app('\Webkul\Automation\Helpers\Entity')->getEmailTemplatePlaceholders())
+@php
+    $entityHelper = app(\Webkul\Automation\Helpers\Entity::class);
+    $placeholders = $entityHelper->getEmailTemplatePlaceholders();
+    $placeholderCatalog = $entityHelper->getEmailTemplatePlaceholderCatalog();
+@endphp
 
 <v-tinymce {{ $attributes }}></v-tinymce>
 
@@ -178,33 +182,97 @@
                         link_default_target: '_blank',
                         directionality: 'ltr',
                         setup: (editor) => {
-                            let toggleState = false;
+                            const placeholderGroups = @json($placeholders);
+                            const placeholderCatalog = @json($placeholderCatalog);
+
+                            const suggestPlaceholders = (pattern) => {
+                                const normalized = String(pattern || '').toLowerCase().trimStart();
+                                const results = [];
+
+                                if (! normalized.includes('.')) {
+                                    placeholderCatalog.forEach((entity) => {
+                                        const type = entity.type;
+                                        const label = entity.label;
+
+                                        if (
+                                            normalized !== ''
+                                            && ! type.startsWith(normalized)
+                                            && ! label.toLowerCase().startsWith(normalized)
+                                        ) {
+                                            return;
+                                        }
+
+                                        results.push({
+                                            type: 'autocompleteitem',
+                                            value: '{%' + type + '.',
+                                            text: label + ' (' + type + ')',
+                                        });
+                                    });
+
+                                    return results;
+                                }
+
+                                const parts = normalized.split('.');
+                                const entityPart = parts[0] || '';
+                                const attrPart = parts[1] || '';
+
+                                placeholderCatalog.forEach((entity) => {
+                                    if (entity.type !== entityPart) {
+                                        return;
+                                    }
+
+                                    (entity.attributes || []).forEach((attribute) => {
+                                        const code = String(attribute.code || '').toLowerCase();
+                                        const name = String(attribute.label || '').toLowerCase();
+
+                                        if (
+                                            attrPart !== ''
+                                            && ! code.startsWith(attrPart)
+                                            && ! name.startsWith(attrPart)
+                                        ) {
+                                            return;
+                                        }
+
+                                        results.push({
+                                            type: 'autocompleteitem',
+                                            value: attribute.value,
+                                            text: attribute.label + ' — ' + entity.type + '.' + attribute.code,
+                                        });
+                                    });
+                                });
+
+                                return results;
+                            };
 
                             editor.ui.registry.addMenuButton('placeholders', {
                                 text: 'Placeholders',
                                 fetch: function (callback) {
-                                    const items = [
-                                        @foreach($placeholders as $placeholder)
-                                            {
-                                                type: 'nestedmenuitem',
-                                                text: '{{ $placeholder['text'] }}',
-                                                getSubmenuItems: () => [
-                                                    @foreach($placeholder['menu'] as $child)
-                                                        {
-                                                            type: 'menuitem',
-                                                            text: '{{ $child['text'] }}',
-                                                            onAction: function () {
-                                                                editor.insertContent('{{ $child['value'] }}');
-                                                            },
-                                                        },
-                                                    @endforeach
-                                                ],
+                                    const items = placeholderGroups.map((group) => ({
+                                        type: 'nestedmenuitem',
+                                        text: group.text,
+                                        getSubmenuItems: () => (group.menu || []).map((child) => ({
+                                            type: 'menuitem',
+                                            text: child.text,
+                                            onAction: function () {
+                                                editor.insertContent(child.value);
                                             },
-                                        @endforeach
-                                    ];
+                                        })),
+                                    }));
 
                                     callback(items);
                                 }
+                            });
+
+                            editor.ui.registry.addAutocompleter('email-placeholders', {
+                                trigger: '{%',
+                                minChars: 0,
+                                columns: 1,
+                                fetch: (pattern) => Promise.resolve(suggestPlaceholders(pattern)),
+                                onAction: (autocompleteApi, rng, value) => {
+                                    editor.selection.setRng(rng);
+                                    editor.insertContent(value);
+                                    autocompleteApi.hide();
+                                },
                             });
 
                             ['change', 'paste', 'keyup'].forEach((event) => {

@@ -44,7 +44,9 @@ class EmailTemplateController extends Controller
     {
         $placeholders = $this->workflowEntityHelper->getEmailTemplatePlaceholders();
 
-        return view('admin::settings.email-templates.create', compact('placeholders'));
+        $placeholderCatalog = $this->workflowEntityHelper->getEmailTemplatePlaceholderCatalog();
+
+        return view('admin::settings.email-templates.create', compact('placeholders', 'placeholderCatalog'));
     }
 
     /**
@@ -78,7 +80,9 @@ class EmailTemplateController extends Controller
 
         $placeholders = $this->workflowEntityHelper->getEmailTemplatePlaceholders();
 
-        return view('admin::settings.email-templates.edit', compact('emailTemplate', 'placeholders'));
+        $placeholderCatalog = $this->workflowEntityHelper->getEmailTemplatePlaceholderCatalog();
+
+        return view('admin::settings.email-templates.edit', compact('emailTemplate', 'placeholders', 'placeholderCatalog'));
     }
 
     /**

@@ -77,12 +77,14 @@ abstract class AbstractEntity
 
     /**
      * Returns placeholders for email templates.
+     *
+     * Skip only binary media types so textarea/address stay available for templates.
      */
     public function getEmailTemplatePlaceholders(array $entity): array
     {
         $menuItems = [];
 
-        foreach ($this->getAttributes($this->entityType) as $attribute) {
+        foreach ($this->getAttributes($this->entityType, ['image', 'file']) as $attribute) {
             $menuItems[] = [
                 'text' => $attribute['name'],
                 'value' => '{%'.$this->entityType.'.'.$attribute['id'].'%}',

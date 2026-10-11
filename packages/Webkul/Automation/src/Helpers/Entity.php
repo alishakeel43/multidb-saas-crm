@@ -100,4 +100,13 @@ class Entity
 
         return $placeholders;
     }
+
+    /**
+     * Catalog of email-template placeholder entities/attributes for typeahead.
+     */
+    public function getEmailTemplatePlaceholderCatalog(): array
+    {
+        return app(EmailTemplatePlaceholderAutocomplete::class)
+            ->catalog($this->getEmailTemplatePlaceholders());
+    }
 }
