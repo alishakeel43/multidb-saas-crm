@@ -21,6 +21,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('inbound-emails:process')->everyFiveMinutes();
 Schedule::command('bookings:send-reminders --all')->everyFifteenMinutes();
+Schedule::command('notifications:dispatch-due --all')->everyFifteenMinutes();
 Schedule::command('saas:subscriptions:tick')->daily();
 Schedule::command('saas:tenants:backup --all')->dailyAt('02:15');
 Schedule::command('backup:run')->dailyAt('02:30');

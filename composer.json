@@ -79,6 +79,8 @@
             "Webkul\\Assignment\\": "packages/Webkul/Assignment/src",
             "Webkul\\Booking\\": "packages/Webkul/Booking/src",
             "Webkul\\Consent\\": "packages/Webkul/Consent/src",
+            "Webkul\\LeadScoring\\": "packages/Webkul/LeadScoring/src",
+            "Webkul\\Notification\\": "packages/Webkul/Notification/src",
             "Webkul\\QuoteApproval\\": "packages/Webkul/QuoteApproval/src",
             "Webkul\\Attribute\\": "packages/Webkul/Attribute/src",
             "Webkul\\Contact\\": "packages/Webkul/Contact/src",

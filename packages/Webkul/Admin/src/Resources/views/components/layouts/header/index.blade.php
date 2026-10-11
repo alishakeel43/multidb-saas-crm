@@ -43,6 +43,10 @@
             @include('admin::components.layouts.header.mobile.mega-search')
         </div>
         
+        @if (Route::has('admin.notifications.feed'))
+            @include('notification::bell')
+        @endif
+
         <!-- Dark mode -->
         <v-dark>
             <div class="flex">

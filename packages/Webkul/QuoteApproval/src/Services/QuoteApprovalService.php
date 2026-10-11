@@ -61,6 +61,34 @@ class QuoteApprovalService
         return $this->forQuote($quote)->status === QuoteApproval::STATUS_APPROVED;
     }
 
+    public function markDelivered(Quote $quote): QuoteApproval
+    {
+        $approval = $this->forQuote($quote);
+
+        if ($approval->status !== QuoteApproval::STATUS_APPROVED) {
+            throw new InvalidArgumentException('Only approved quotes can be marked delivered.');
+        }
+
+        return $this->quoteApprovalRepository->update([
+            'delivery_status' => QuoteApproval::DELIVERY_SENT,
+        ], $approval->id);
+    }
+
+    public function convertToOrder(Quote $quote, ?string $orderReference = null): QuoteApproval
+    {
+        $approval = $this->forQuote($quote);
+
+        if ($approval->status !== QuoteApproval::STATUS_APPROVED) {
+            throw new InvalidArgumentException('Only approved quotes can be converted.');
+        }
+
+        return $this->quoteApprovalRepository->update([
+            'delivery_status' => QuoteApproval::DELIVERY_CONVERTED,
+            'order_reference' => $orderReference ?: ('ORD-'.$quote->id.'-'.now()->format('YmdHis')),
+            'converted_at' => now(),
+        ], $approval->id);
+    }
+
     private function review(Quote $quote, string $status, ?string $notes): QuoteApproval
     {
         $approval = $this->forQuote($quote);

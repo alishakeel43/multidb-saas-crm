@@ -100,4 +100,21 @@ class BookingController extends Controller
 
         return redirect()->route('admin.bookings.index');
     }
+
+    public function reschedule(Request $request, int $id): RedirectResponse
+    {
+        $data = $request->validate([
+            'starts_at' => 'required|date',
+        ]);
+
+        try {
+            $booking = Booking::query()->findOrFail($id);
+            $this->bookings->reschedule($booking, $data['starts_at']);
+            session()->flash('success', trans('booking::app.messages.rescheduled'));
+        } catch (Throwable $exception) {
+            session()->flash('error', $exception->getMessage());
+        }
+
+        return redirect()->route('admin.bookings.index');
+    }
 }

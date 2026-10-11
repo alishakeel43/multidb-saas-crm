@@ -120,6 +120,29 @@ return [
         'route_prefixes' => ['admin.sales-reports.'],
         'menu_keys' => ['sales_reports'],
     ],
+    'lead_scoring' => [
+        'label' => 'Lead scoring',
+        'category' => 'sales',
+        'default_enabled' => true,
+        'depends_on' => ['leads'],
+        'route_prefixes' => ['admin.settings.lead-scoring.'],
+        'menu_keys' => ['settings.other_settings.lead_scoring'],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.settings.tags.index',
+        ],
+    ],
+    'notifications' => [
+        'label' => 'Notifications',
+        'category' => 'administration',
+        'default_enabled' => true,
+        'route_prefixes' => ['admin.notifications.'],
+        'menu_keys' => ['settings.other_settings.notifications'],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.settings.tags.index',
+        ],
+    ],
     'bookings' => [
         'label' => 'Appointment booking',
         'category' => 'crm',

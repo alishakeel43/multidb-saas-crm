@@ -41,6 +41,9 @@ beforeEach(function () {
         $table->timestamp('requested_at')->nullable();
         $table->timestamp('reviewed_at')->nullable();
         $table->text('notes')->nullable();
+        $table->string('delivery_status', 32)->default('none');
+        $table->string('order_reference')->nullable();
+        $table->timestamp('converted_at')->nullable();
         $table->timestamps();
     });
 });
@@ -68,4 +71,20 @@ it('rejects a pending quote', function () {
     $rejected = $service->reject($quote, 'Too high');
 
     expect($rejected->status)->toBe(QuoteApproval::STATUS_REJECTED);
+});
+
+it('marks approved quotes delivered and converted', function () {
+    $quote = Quote::query()->create(['subject' => 'Proposal']);
+    $service = app(QuoteApprovalService::class);
+
+    $service->submit($quote);
+    $service->approve($quote);
+
+    $delivered = $service->markDelivered($quote);
+    expect($delivered->delivery_status)->toBe(QuoteApproval::DELIVERY_SENT);
+
+    $converted = $service->convertToOrder($quote, 'ORD-100');
+    expect($converted->delivery_status)->toBe(QuoteApproval::DELIVERY_CONVERTED)
+        ->and($converted->order_reference)->toBe('ORD-100')
+        ->and($converted->converted_at)->not->toBeNull();
 });

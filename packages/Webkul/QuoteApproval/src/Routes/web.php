@@ -15,5 +15,7 @@ Route::middleware(['web', 'admin_locale', 'user'])
                 Route::post('{quoteId}/submit', 'submit')->name('submit');
                 Route::post('{quoteId}/approve', 'approve')->name('approve');
                 Route::post('{quoteId}/reject', 'reject')->name('reject');
+                Route::post('{quoteId}/deliver', 'deliver')->name('deliver');
+                Route::post('{quoteId}/convert', 'convert')->name('convert');
             });
     });

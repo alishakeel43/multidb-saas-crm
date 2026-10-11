@@ -1,0 +1,7 @@
+{
+    "name": "webkul/lead-scoring",
+    "description": "Rules-based lead scoring for Krayin CRM",
+    "license": "MIT",
+    "autoload": { "psr-4": { "Webkul\\LeadScoring\\": "src/" } },
+    "extra": { "laravel": { "providers": ["Webkul\\LeadScoring\\Providers\\LeadScoringServiceProvider"] } }
+}

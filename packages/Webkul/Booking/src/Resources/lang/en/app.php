@@ -32,6 +32,8 @@ return [
         'save' => 'Save appointment',
         'confirm' => 'Confirm',
         'cancel' => 'Cancel',
+        'reschedule' => 'Reschedule',
+        'public-link' => 'Public booking page',
     ],
     'settings' => [
         'add-service' => 'Add service',
@@ -53,8 +55,10 @@ return [
     ],
     'messages' => [
         'created' => 'Booking created successfully.',
+        'public-created' => 'Thanks! Your booking request was submitted.',
         'confirmed' => 'Booking confirmed.',
         'cancelled' => 'Booking cancelled.',
+        'rescheduled' => 'Booking rescheduled successfully.',
         'service-created' => 'Booking service created.',
         'availability-created' => 'Availability saved.',
         'defaults-seeded' => 'Default Mon–Fri hours added for the selected staff member.',

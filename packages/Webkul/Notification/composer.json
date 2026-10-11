@@ -1,0 +1,13 @@
+{
+    "name": "webkul/notification",
+    "description": "In-app CRM notifications for follow-ups, assignments, and deadlines",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": { "Webkul\\Notification\\": "src/" }
+    },
+    "extra": {
+        "laravel": {
+            "providers": ["Webkul\\Notification\\Providers\\NotificationServiceProvider"]
+        }
+    }
+}

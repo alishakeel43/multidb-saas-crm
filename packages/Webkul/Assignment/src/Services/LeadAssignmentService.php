@@ -38,6 +38,8 @@ class LeadAssignmentService
         $lead->user_id = $user->id;
         $lead->save();
 
+        event('assignment.lead.assigned', [$lead, $user]);
+
         return $user;
     }
 

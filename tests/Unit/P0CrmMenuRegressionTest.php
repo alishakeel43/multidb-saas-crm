@@ -61,6 +61,8 @@ it('nests P0 settings under Other Settings so Settings index shows clickable car
     expect($otherSettings)->toContain('settings.other_settings.assignment')
         ->and($otherSettings)->toContain('settings.other_settings.booking')
         ->and($otherSettings)->toContain('settings.other_settings.consent')
+        ->and($otherSettings)->toContain('settings.other_settings.notifications')
+        ->and($otherSettings)->toContain('settings.other_settings.lead_scoring')
         ->and($otherSettings)->toContain('settings.other_settings.tags');
 });
 
@@ -75,6 +77,8 @@ it('maps P0 and core admin routes to the intended feature entitlements', functio
         ->and($svc->featureForRoute('admin.activities.index'))->toBe('activities')
         ->and($svc->featureForRoute('admin.bookings.index'))->toBe('bookings')
         ->and($svc->featureForRoute('admin.sales-reports.index'))->toBe('sales_reports')
+        ->and($svc->featureForRoute('admin.notifications.index'))->toBe('notifications')
+        ->and($svc->featureForRoute('admin.settings.lead-scoring.index'))->toBe('lead_scoring')
         ->and($svc->featureForRoute('admin.contacts.persons.index'))->toBe('contacts')
         ->and($svc->featureForRoute('admin.products.index'))->toBe('products')
         ->and($svc->featureForRoute('admin.mail.index'))->toBe('mail')
@@ -89,6 +93,8 @@ it('registers ACL keys that match the Settings card menu keys', function () {
     expect($acl)->toContain('settings.other_settings.assignment')
         ->and($acl)->toContain('settings.other_settings.booking')
         ->and($acl)->toContain('settings.other_settings.consent')
+        ->and($acl)->toContain('settings.other_settings.notifications')
+        ->and($acl)->toContain('settings.other_settings.lead_scoring')
         ->and($acl)->toContain('sales_reports')
         ->and($acl)->toContain('quotes.quotes')
         ->and($acl)->toContain('quotes.approvals');

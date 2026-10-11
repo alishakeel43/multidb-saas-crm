@@ -26,12 +26,21 @@
                 </p>
             </div>
 
-            <a
-                href="{{ route('admin.settings.booking.index') }}"
-                class="secondary-button"
-            >
-                @lang('booking::app.index.open-settings')
-            </a>
+            <div class="flex items-center gap-2">
+                <a
+                    href="{{ route('bookings.public.show') }}"
+                    target="_blank"
+                    class="transparent-button"
+                >
+                    @lang('booking::app.index.public-link')
+                </a>
+                <a
+                    href="{{ route('admin.settings.booking.index') }}"
+                    class="secondary-button"
+                >
+                    @lang('booking::app.index.open-settings')
+                </a>
+            </div>
         </div>
 
         <div class="grid items-start gap-4 xl:grid-cols-12">
@@ -215,6 +224,19 @@
 
                                 @if (! $booking->status->equals(\Webkul\Booking\States\Cancelled::class)
                                     && ! $booking->status->equals(\Webkul\Booking\States\Completed::class))
+                                    <form method="POST" action="{{ route('admin.bookings.reschedule', $booking->id) }}" class="flex items-center gap-1">
+                                        @csrf
+                                        <input
+                                            type="datetime-local"
+                                            name="starts_at"
+                                            required
+                                            class="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950"
+                                            value="{{ $booking->starts_at?->format('Y-m-d\\TH:i') }}"
+                                        >
+                                        <button class="secondary-button !px-3 !py-1.5" type="submit">
+                                            @lang('booking::app.index.reschedule')
+                                        </button>
+                                    </form>
                                     <form method="POST" action="{{ route('admin.bookings.cancel', $booking->id) }}">
                                         @csrf
                                         <button

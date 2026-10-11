@@ -44,6 +44,19 @@ class QuoteApprovalController extends Controller
         return $this->act($quoteId, fn ($quote) => $this->approvals->reject($quote, $request->input('notes')));
     }
 
+    public function deliver(int $quoteId): RedirectResponse
+    {
+        return $this->act($quoteId, fn ($quote) => $this->approvals->markDelivered($quote));
+    }
+
+    public function convert(Request $request, int $quoteId): RedirectResponse
+    {
+        return $this->act(
+            $quoteId,
+            fn ($quote) => $this->approvals->convertToOrder($quote, $request->input('order_reference'))
+        );
+    }
+
     private function act(int $quoteId, callable $callback): RedirectResponse
     {
         try {

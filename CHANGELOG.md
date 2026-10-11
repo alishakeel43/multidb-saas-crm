@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add in-app CRM Notifications (header bell + inbox) for assignment alerts, upcoming follow-ups, overdue activities, and lead close-date deadlines (`notifications:dispatch-due --all`).
+- Add rules-based Lead scoring (Settings → Lead scoring) with persisted `leads.score`.
+- Add public booking page (`/book`) and admin reschedule action for appointments.
+- Expand Sales reports with win rate, lost leads, converted quotes, average score, and leads-by-source breakdown.
+- Add quote delivery + convert-to-order fulfillment on Quote Approvals.
+- Surface possible lead duplicates on Create Lead via live duplicate-check banner.
 - Add Sales reports CRM page (metrics snapshot + CSV export) gated by `sales_reports` entitlement.
 - Add appointment reminder emails (`bookings:send-reminders --all`, scheduled every 15 minutes) with `reminder_sent_at` tracking.
 - Harden Super Admin Playwright operator-flow selectors for Filament “Label *” spacing and Audit log heading variants.

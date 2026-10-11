@@ -18,6 +18,12 @@ class QuoteApproval extends Model implements QuoteApprovalContract
 
     public const STATUS_REJECTED = 'rejected';
 
+    public const DELIVERY_NONE = 'none';
+
+    public const DELIVERY_SENT = 'sent';
+
+    public const DELIVERY_CONVERTED = 'converted';
+
     protected $fillable = [
         'quote_id',
         'status',
@@ -26,6 +32,9 @@ class QuoteApproval extends Model implements QuoteApprovalContract
         'requested_at',
         'reviewed_at',
         'notes',
+        'delivery_status',
+        'order_reference',
+        'converted_at',
     ];
 
     protected function casts(): array
@@ -33,6 +42,7 @@ class QuoteApproval extends Model implements QuoteApprovalContract
         return [
             'requested_at' => 'datetime',
             'reviewed_at' => 'datetime',
+            'converted_at' => 'datetime',
         ];
     }
 

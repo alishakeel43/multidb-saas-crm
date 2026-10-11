@@ -15,24 +15,26 @@ class SalesReportController extends Controller
 
     public function index(): View
     {
+        $metrics = $this->reports->snapshot();
+
         return view('sales-reports.index', [
-            'metrics' => $this->reports->snapshot(),
+            'metrics' => $metrics,
+            'sources' => $metrics['leads_by_source'] ?? [],
             'generatedAt' => now(),
         ]);
     }
 
     public function export(): StreamedResponse
     {
-        $metrics = $this->reports->snapshot();
+        $rows = $this->reports->exportRows();
         $filename = 'sales-metrics-'.now()->format('Y-m-d-His').'.csv';
 
-        return response()->streamDownload(function () use ($metrics) {
+        return response()->streamDownload(function () use ($rows) {
             $handle = fopen('php://output', 'w');
-
             fputcsv($handle, ['metric', 'value']);
 
-            foreach ($metrics as $key => $value) {
-                fputcsv($handle, [$key, $value]);
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
             }
 
             fclose($handle);

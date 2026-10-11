@@ -100,6 +100,45 @@ class BookingServiceManager
         });
     }
 
+    public function reschedule(Booking $booking, string $startsAt): Booking
+    {
+        if ($booking->status->equals(Cancelled::class)) {
+            throw new InvalidArgumentException(trans('booking::app.messages.transition-failed'));
+        }
+
+        $service = $booking->service ?? $this->bookingServiceRepository->findOrFail($booking->booking_service_id);
+        $userId = (int) $booking->user_id;
+        $start = Carbon::parse($startsAt);
+        $end = (clone $start)->addMinutes((int) $service->duration_minutes);
+        $blockedUntil = (clone $end)->addMinutes((int) ($service->buffer_minutes ?? 0));
+
+        $availabilityReason = $this->availabilityFailureReason($userId, $start, $end);
+
+        if ($availabilityReason !== null) {
+            throw new InvalidArgumentException($availabilityReason);
+        }
+
+        $overlap = Booking::query()
+            ->where('user_id', $userId)
+            ->whereKeyNot($booking->id)
+            ->where('status', '!=', Cancelled::getMorphClass())
+            ->where('starts_at', '<', $blockedUntil)
+            ->where('ends_at', '>', $start)
+            ->exists();
+
+        if ($overlap) {
+            throw new InvalidArgumentException(trans('booking::app.messages.slot-overlap'));
+        }
+
+        $this->bookingRepository->update([
+            'starts_at' => $start,
+            'ends_at' => $end,
+            'reminder_sent_at' => null,
+        ], $booking->id);
+
+        return $booking->fresh(['service', 'user']);
+    }
+
     public function isSlotAvailable(int $userId, Carbon $startsAt, Carbon $endsAt, int $bufferMinutes = 0): bool
     {
         if ($userId <= 0) {

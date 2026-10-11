@@ -3,6 +3,7 @@
 namespace Webkul\Assignment\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 use Webkul\Assignment\Services\LeadAssignmentService;
@@ -25,6 +26,12 @@ class EventServiceProvider extends ServiceProvider
                     'lead_id' => $lead->id ?? null,
                     'error' => $exception->getMessage(),
                 ]);
+            }
+        });
+
+        Event::listen('admin.leads.create.form.after', function ($viewRenderManager) {
+            if (is_object($viewRenderManager) && method_exists($viewRenderManager, 'addTemplate')) {
+                $viewRenderManager->addTemplate('assignment::leads.duplicate-check');
             }
         });
     }

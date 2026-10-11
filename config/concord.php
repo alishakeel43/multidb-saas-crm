@@ -13,6 +13,8 @@ use Webkul\DataTransfer\Providers\ModuleServiceProvider as DataTransferModuleSer
 use Webkul\Email\Providers\ModuleServiceProvider as EmailModuleServiceProvider;
 use Webkul\EmailTemplate\Providers\ModuleServiceProvider as EmailTemplateModuleServiceProvider;
 use Webkul\Lead\Providers\ModuleServiceProvider as LeadModuleServiceProvider;
+use Webkul\LeadScoring\Providers\ModuleServiceProvider as LeadScoringModuleServiceProvider;
+use Webkul\Notification\Providers\ModuleServiceProvider as NotificationModuleServiceProvider;
 use Webkul\Product\Providers\ModuleServiceProvider as ProductModuleServiceProvider;
 use Webkul\Quote\Providers\ModuleServiceProvider as QuoteModuleServiceProvider;
 use Webkul\QuoteApproval\Providers\ModuleServiceProvider as QuoteApprovalModuleServiceProvider;
@@ -36,6 +38,8 @@ return [
         EmailTemplateModuleServiceProvider::class,
         EmailModuleServiceProvider::class,
         LeadModuleServiceProvider::class,
+        LeadScoringModuleServiceProvider::class,
+        NotificationModuleServiceProvider::class,
         ProductModuleServiceProvider::class,
         QuoteModuleServiceProvider::class,
         QuoteApprovalModuleServiceProvider::class,

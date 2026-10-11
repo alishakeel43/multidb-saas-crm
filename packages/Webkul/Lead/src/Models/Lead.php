@@ -30,6 +30,7 @@ class Lead extends Model implements LeadContract
         'title',
         'description',
         'lead_value',
+        'score',
         'status',
         'lost_reason',
         'expected_close_date',

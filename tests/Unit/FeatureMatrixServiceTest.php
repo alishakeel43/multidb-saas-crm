@@ -38,7 +38,9 @@ it('groups features into configured categories', function () {
         ->and($grouped['sales']['features'])->toHaveKey('products')
         ->and($grouped['sales']['features'])->toHaveKey('assignment')
         ->and($grouped['sales']['features'])->toHaveKey('sales_reports')
+        ->and($grouped['sales']['features'])->toHaveKey('lead_scoring')
         ->and($grouped['sales']['features'])->toHaveKey('quote_approvals')
+        ->and($grouped['administration']['features'])->toHaveKey('notifications')
         ->and($grouped['marketing']['features'])->toHaveKey('consent')
         ->and($grouped['automation']['features'])->toHaveKey('workflows');
 });

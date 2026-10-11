@@ -23,9 +23,15 @@
                 <div class="flex flex-wrap items-center justify-between gap-2 rounded border p-3 dark:border-gray-700">
                     <div>
                         <div class="font-medium">#{{ $approval->quote_id }} {{ $approval->quote?->subject }}</div>
-                        <div class="text-gray-500">Status: {{ $approval->status }}</div>
+                        <div class="text-gray-500">
+                            Status: {{ $approval->status }}
+                            · Delivery: {{ $approval->delivery_status ?? 'none' }}
+                            @if ($approval->order_reference)
+                                · Order: {{ $approval->order_reference }}
+                            @endif
+                        </div>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
                         @if ($approval->status === 'draft' || $approval->status === 'rejected')
                             <form method="POST" action="{{ route('admin.quotes.approvals.submit', $approval->quote_id) }}">
                                 @csrf
@@ -40,6 +46,24 @@
                             <form method="POST" action="{{ route('admin.quotes.approvals.reject', $approval->quote_id) }}">
                                 @csrf
                                 <button class="transparent-button" type="submit">Reject</button>
+                            </form>
+                        @endif
+                        @if ($approval->status === 'approved' && ($approval->delivery_status ?? 'none') === 'none')
+                            <form method="POST" action="{{ route('admin.quotes.approvals.deliver', $approval->quote_id) }}">
+                                @csrf
+                                <button class="secondary-button" type="submit">Mark delivered</button>
+                            </form>
+                        @endif
+                        @if ($approval->status === 'approved' && ($approval->delivery_status ?? 'none') !== 'converted')
+                            <form method="POST" action="{{ route('admin.quotes.approvals.convert', $approval->quote_id) }}" class="flex items-center gap-1">
+                                @csrf
+                                <input
+                                    type="text"
+                                    name="order_reference"
+                                    placeholder="Order ref (optional)"
+                                    class="rounded border px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950"
+                                >
+                                <button class="primary-button" type="submit">Convert to order</button>
                             </form>
                         @endif
                     </div>
