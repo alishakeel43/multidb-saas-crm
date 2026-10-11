@@ -19,6 +19,7 @@ use Webkul\Product\Providers\ModuleServiceProvider as ProductModuleServiceProvid
 use Webkul\Quote\Providers\ModuleServiceProvider as QuoteModuleServiceProvider;
 use Webkul\QuoteApproval\Providers\ModuleServiceProvider as QuoteApprovalModuleServiceProvider;
 use Webkul\Tag\Providers\ModuleServiceProvider as TagModuleServiceProvider;
+use Webkul\UnifiedInbox\Providers\ModuleServiceProvider as UnifiedInboxModuleServiceProvider;
 use Webkul\User\Providers\ModuleServiceProvider as UserModuleServiceProvider;
 use Webkul\Warehouse\Providers\ModuleServiceProvider as WarehouseModuleServiceProvider;
 use Webkul\WebForm\Providers\ModuleServiceProvider as WebFormModuleServiceProvider;
@@ -47,6 +48,7 @@ return [
         UserModuleServiceProvider::class,
         WarehouseModuleServiceProvider::class,
         WebFormModuleServiceProvider::class,
+        UnifiedInboxModuleServiceProvider::class,
     ],
 
     'register_route_models' => true,

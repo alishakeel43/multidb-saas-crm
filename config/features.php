@@ -358,4 +358,21 @@ return [
         'route_prefixes' => ['admin.help.'],
         'menu_keys' => ['help'],
     ],
+    'unified_inbox' => [
+        'label' => 'Unified Inbox',
+        'description' => 'WhatsApp, Messenger, and Instagram messaging inbox',
+        'category' => 'crm',
+        'default_enabled' => true,
+        'route_prefixes' => [
+            'admin.unified_inbox.',
+        ],
+        'menu_keys' => [
+            'unified_inbox',
+            'settings.other_settings.unified_inbox_channels',
+        ],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.unified_inbox.channels.index',
+        ],
+    ],
 ];

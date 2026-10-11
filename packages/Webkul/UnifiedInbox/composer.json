@@ -1,0 +1,17 @@
+{
+    "name": "webkul/unified-inbox",
+    "description": "Unified Inbox with Meta Embedded Signup for WhatsApp, Messenger, and Instagram",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Webkul\\UnifiedInbox\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\UnifiedInbox\\Providers\\UnifiedInboxServiceProvider"
+            ]
+        }
+    }
+}

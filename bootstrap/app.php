@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin/mail/inbound-parse',
             'admin/web-forms/forms/*',
             'stripe/webhook',
+            'unified-inbox/meta/webhook',
         ]);
 
         $middleware->api(prepend: [
