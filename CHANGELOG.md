@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Document the Attributes-vs-package-schema decision rule for agents (`crm-attributes-vs-schema` skill + `AGENTS.md`): features use migrations/tables; CRM form fields use Attributes/EAV.
 - Add client P0 CRM packages following Krayin Concord package flow (Contract / Model / Proxy / Repository / `ModuleServiceProvider` + `config/concord.php`): lead assignment (round-robin / workload / first-available via `Webkul/Assignment`), appointment booking with Spatie model-states (`Webkul/Booking`), person consent/suppression (`Webkul/Consent`), and quote approval workflow (`Webkul/QuoteApproval`), plus lead-duplicate checks and a `SalesReportService` metrics snapshot; gate them through SaaS feature entitlements.
 - Fix Quotes sidebar after Quote Approvals: keep a Quotes list child (Contacts-style) so Create Quote stays reachable when Approvals nests under Quotes.
 - Fix empty Settings cards for Assignment/Booking/Consent by nesting them under Other Settings (Krayin Settings index only renders grandchildren as clickable tiles).

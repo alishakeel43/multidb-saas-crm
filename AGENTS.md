@@ -26,6 +26,7 @@ See [.github/skills/README.md](.github/skills/README.md) for the standard.
 
 | Skill | Use when |
 |-------|----------|
+| `crm-attributes-vs-schema` | Choosing Attributes (EAV form fields) vs package migrations/tables for new data. |
 | `crm-package-development` | Creating a new CRM package/module or extending CRM functionality without touching core. |
 | `pest-testing` | Writing or debugging unit/feature tests with Pest. |
 
@@ -38,6 +39,12 @@ skill content here — keep details in the skills.
 
 - **Never modify core Krayin files** unless explicitly required. Extend behavior
   through a package under `packages/Webkul/`.
+- **Attributes vs schema (prefer Attributes when possible):** if a Lead/Person/Org/
+  Product/Quote field can work via existing Attributes/EAV without new columns or
+  tables, add it as an Attribute so tenants can change labels in Settings without
+  code. Use package **migrations only when schema is required** (relationships,
+  constraints, feature tables, indexes, security flags). Follow
+  `crm-attributes-vs-schema` before adding fields or migrations.
 - **All schema changes go through migrations** — never edit the database directly.
 - **Follow the existing module layout** (Providers, Models, Contracts,
   Repositories, Http/Controllers, Routes, Database/Migrations, Resources/views,
