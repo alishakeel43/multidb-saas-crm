@@ -4,6 +4,8 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\MfaChallenge;
+use App\Filament\Pages\ManagePlanFeatures;
+use App\Filament\Pages\ManageTenantFeatures;
 use App\Filament\Pages\ManageTwoFactorAuthentication;
 use App\Filament\Pages\PlatformSettings;
 use App\Filament\Pages\SuperAdminDashboard;
@@ -82,6 +84,8 @@ class SuperAdminPanelProvider extends PanelProvider
                 SystemHealth::class,
                 PlatformSettings::class,
                 TenantBackups::class,
+                ManagePlanFeatures::class,
+                ManageTenantFeatures::class,
                 ManageTwoFactorAuthentication::class,
             ])
             ->routes(function (): void {

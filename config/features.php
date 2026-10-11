@@ -3,18 +3,21 @@
 return [
     'dashboard' => [
         'label' => 'Dashboard',
+        'category' => 'crm',
         'default_enabled' => true,
         'route_prefixes' => ['admin.dashboard.'],
         'menu_keys' => ['dashboard'],
     ],
     'settings' => [
         'label' => 'Settings',
+        'category' => 'administration',
         'default_enabled' => true,
         'route_names' => ['admin.settings.index', 'admin.settings.search'],
         'menu_keys' => ['settings'],
     ],
     'leads' => [
         'label' => 'Leads',
+        'category' => 'crm',
         'default_enabled' => true,
         'route_prefixes' => [
             'admin.leads.',
@@ -30,31 +33,52 @@ return [
             'settings.lead.types',
         ],
     ],
+    /*
+     * Krayin “Contacts” sidebar parent contains Persons + Organizations.
+     * Keep both under one entitlement so tenant menus cannot show one without the other.
+     */
     'contacts' => [
         'label' => 'Contacts',
+        'description' => 'Persons and Organizations',
+        'includes' => ['Persons', 'Organizations'],
+        'category' => 'crm',
         'default_enabled' => true,
-        'route_prefixes' => ['admin.contacts.persons.'],
-        'menu_keys' => ['contacts.persons'],
+        'route_prefixes' => [
+            'admin.contacts.persons.',
+            'admin.contacts.organizations.',
+        ],
+        'menu_keys' => [
+            'contacts.persons',
+            'contacts.organizations',
+        ],
         'menu_any_keys' => ['contacts'],
         'menu_any_routes' => ['contacts' => 'admin.contacts.persons.index'],
     ],
+    /*
+     * Legacy key kept for existing plan/tenant feature rows.
+     * Resolves as an alias of `contacts` and is hidden from the Super Admin matrix.
+     */
     'organizations' => [
         'label' => 'Organizations',
+        'description' => 'Legacy alias of Contacts',
+        'category' => 'crm',
         'default_enabled' => true,
+        'matrix' => false,
+        'legacy_alias_of' => 'contacts',
         'depends_on' => ['contacts'],
-        'route_prefixes' => ['admin.contacts.organizations.'],
-        'menu_keys' => ['contacts.organizations'],
-        'menu_any_keys' => ['contacts'],
-        'menu_any_routes' => ['contacts' => 'admin.contacts.organizations.index'],
+        'route_prefixes' => [],
+        'menu_keys' => [],
     ],
     'products' => [
         'label' => 'Products',
+        'category' => 'sales',
         'default_enabled' => true,
         'route_prefixes' => ['admin.products.'],
         'menu_keys' => ['products'],
     ],
     'quotes' => [
         'label' => 'Quotes',
+        'category' => 'sales',
         'default_enabled' => true,
         'depends_on' => ['leads', 'products'],
         'route_prefixes' => ['admin.quotes.', 'admin.leads.quotes.'],
@@ -62,6 +86,7 @@ return [
     ],
     'mail' => [
         'label' => 'Mail',
+        'category' => 'communication',
         'default_enabled' => true,
         'route_prefixes' => ['admin.mail.'],
         'menu_keys' => [
@@ -75,12 +100,14 @@ return [
     ],
     'activities' => [
         'label' => 'Activities',
+        'category' => 'crm',
         'default_enabled' => true,
         'route_prefixes' => ['admin.activities.'],
         'menu_keys' => ['activities'],
     ],
     'user_management' => [
         'label' => 'User management',
+        'category' => 'administration',
         'default_enabled' => true,
         'route_prefixes' => [
             'admin.settings.groups.',
@@ -96,6 +123,7 @@ return [
     ],
     'inventory' => [
         'label' => 'Inventory',
+        'category' => 'inventory',
         'default_enabled' => true,
         'route_prefixes' => [
             'admin.settings.warehouses.',
@@ -106,10 +134,12 @@ return [
     ],
     'automation' => [
         'label' => 'Automation',
+        'category' => 'automation',
         'default_enabled' => true,
     ],
     'attributes' => [
         'label' => 'Custom attributes',
+        'category' => 'automation',
         'default_enabled' => true,
         'depends_on' => ['automation'],
         'route_prefixes' => ['admin.settings.attributes.'],
@@ -121,6 +151,7 @@ return [
     ],
     'email_templates' => [
         'label' => 'Email templates',
+        'category' => 'automation',
         'default_enabled' => true,
         'depends_on' => ['automation'],
         'route_prefixes' => ['admin.settings.email_templates.'],
@@ -132,11 +163,13 @@ return [
     ],
     'marketing' => [
         'label' => 'Marketing',
+        'category' => 'marketing',
         'default_enabled' => true,
         'depends_on' => ['automation'],
     ],
     'marketing_events' => [
         'label' => 'Marketing events',
+        'category' => 'marketing',
         'default_enabled' => true,
         'depends_on' => ['marketing'],
         'route_prefixes' => ['admin.settings.marketing.events.'],
@@ -148,6 +181,7 @@ return [
     ],
     'marketing_campaigns' => [
         'label' => 'Marketing campaigns',
+        'category' => 'marketing',
         'default_enabled' => true,
         'depends_on' => ['marketing', 'marketing_events'],
         'route_prefixes' => ['admin.settings.marketing.campaigns.'],
@@ -159,6 +193,7 @@ return [
     ],
     'webhooks' => [
         'label' => 'Webhooks',
+        'category' => 'automation',
         'default_enabled' => true,
         'depends_on' => ['automation'],
         'route_prefixes' => ['admin.settings.webhooks.'],
@@ -170,6 +205,7 @@ return [
     ],
     'workflows' => [
         'label' => 'Workflows',
+        'category' => 'automation',
         'default_enabled' => true,
         'depends_on' => ['automation'],
         'route_prefixes' => ['admin.settings.workflows.'],
@@ -181,6 +217,7 @@ return [
     ],
     'data_transfer' => [
         'label' => 'Data import/export',
+        'category' => 'automation',
         'default_enabled' => true,
         'depends_on' => ['automation'],
         'route_prefixes' => ['admin.settings.data_transfer.'],
@@ -192,6 +229,7 @@ return [
     ],
     'webforms' => [
         'label' => 'Web Forms',
+        'category' => 'integrations',
         'default_enabled' => true,
         'depends_on' => ['leads'],
         'route_prefixes' => ['admin.settings.web_forms.'],
@@ -203,6 +241,7 @@ return [
     ],
     'tags' => [
         'label' => 'Tags',
+        'category' => 'integrations',
         'default_enabled' => true,
         'route_prefixes' => ['admin.settings.tags.'],
         'menu_keys' => ['settings.other_settings.tags'],
@@ -213,6 +252,7 @@ return [
     ],
     'google_contacts' => [
         'label' => 'Google Contacts integration',
+        'category' => 'integrations',
         'default_enabled' => true,
         'route_prefixes' => ['admin.settings.google_contacts.'],
         'menu_keys' => ['settings.other_settings.google_contacts'],
@@ -223,12 +263,14 @@ return [
     ],
     'configuration' => [
         'label' => 'Configuration',
+        'category' => 'administration',
         'default_enabled' => true,
         'route_prefixes' => ['admin.configuration.'],
         'menu_keys' => ['configuration'],
     ],
     'help' => [
         'label' => 'Help',
+        'category' => 'administration',
         'default_enabled' => true,
         'route_prefixes' => ['admin.help.'],
         'menu_keys' => ['help'],

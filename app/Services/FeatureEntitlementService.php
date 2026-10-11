@@ -23,6 +23,12 @@ class FeatureEntitlementService
             return false;
         }
 
+        $definition = config("features.{$featureKey}");
+
+        if (is_array($definition) && filled($definition['legacy_alias_of'] ?? null)) {
+            return $this->isEnabled((string) $definition['legacy_alias_of'], $tenant);
+        }
+
         $features = Cache::remember(
             $this->tenantCacheKey($tenant->getKey()),
             now()->addMinutes(self::CACHE_TTL_MINUTES),

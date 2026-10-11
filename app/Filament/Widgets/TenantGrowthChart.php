@@ -10,6 +10,8 @@ class TenantGrowthChart extends ChartWidget
 {
     protected static ?int $sort = -2;
 
+    protected static bool $isLazy = false;
+
     protected static ?string $heading = 'Tenant growth';
 
     protected static ?string $description = 'New workspaces created over the last six months.';

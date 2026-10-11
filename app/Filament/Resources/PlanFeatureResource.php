@@ -21,7 +21,11 @@ class PlanFeatureResource extends Resource
 
     protected static ?string $navigationGroup = 'Tenants & billing';
 
-    protected static ?string $navigationLabel = 'Plan features';
+    protected static ?string $navigationLabel = 'Plan features (legacy)';
+
+    protected static ?string $slug = 'plan-feature-records';
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {

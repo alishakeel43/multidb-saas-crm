@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\InvoiceResource\Pages;
+use App\Filament\Support\RelatedRecordSelect;
 use App\Models\Invoice;
 use App\Services\BillingService;
 use App\Services\StripeCheckoutService;
@@ -35,7 +36,7 @@ class InvoiceResource extends Resource
             Section::make('Invoice')
                 ->columns(2)
                 ->schema([
-                    Select::make('tenant_id')->relationship('tenant', 'name')->searchable()->preload()->required(),
+                    RelatedRecordSelect::tenant(),
                     Select::make('subscription_id')->relationship('subscription', 'id')->searchable()->preload(),
                     TextInput::make('number')->disabled()->dehydrated(false),
                     Select::make('status')->options([

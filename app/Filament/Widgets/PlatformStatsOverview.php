@@ -14,14 +14,16 @@ class PlatformStatsOverview extends StatsOverviewWidget
 {
     protected static ?int $sort = -3;
 
+    protected static bool $isLazy = false;
+
+    protected int|string|array $columnSpan = 'full';
+
     protected function getStats(): array
     {
         $totalTenants = Tenant::query()->count();
         $activeTenants = Tenant::query()->where('status', 'active')->count();
         $trialSubscriptions = Subscription::query()->where('status', 'trial')->count();
-        $openInvoices = Schema::connection('landlord')->hasTable('invoices')
-            ? Invoice::query()->where('status', 'open')->count()
-            : 0;
+        $openInvoices = $this->openInvoiceCount();
         $activeDomains = Domain::query()->where('is_active', true)->count();
 
         return [
@@ -43,6 +45,19 @@ class PlatformStatsOverview extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-globe-alt')
                 ->color('info'),
         ];
+    }
+
+    private function openInvoiceCount(): int
+    {
+        try {
+            if (! Schema::connection('landlord')->hasTable('invoices')) {
+                return 0;
+            }
+
+            return Invoice::query()->where('status', 'open')->count();
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 
     /**

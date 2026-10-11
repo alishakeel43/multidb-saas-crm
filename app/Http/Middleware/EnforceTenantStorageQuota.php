@@ -19,7 +19,7 @@ class EnforceTenantStorageQuota
     {
         $tenant = Tenant::current();
 
-        if (! $tenant || ! $request->hasFile()) {
+        if (! $tenant || $request->allFiles() === []) {
             return $next($request);
         }
 

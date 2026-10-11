@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
+use App\Filament\Resources\TenantResource;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Services\BillingService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Actions\Action as FormAction;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -27,7 +29,17 @@ class ListInvoices extends ListRecords
                         ->options(fn () => Tenant::query()->orderBy('name')->pluck('name', 'id'))
                         ->searchable()
                         ->required()
-                        ->reactive(),
+                        ->reactive()
+                        ->helperText(fn (): string => Tenant::query()->exists()
+                            ? 'Need a workspace that is not listed? Create a new tenant (opens in a new tab), then refresh this list.'
+                            : 'No tenants yet. Create a new tenant, then come back and select it here.')
+                        ->hintAction(
+                            FormAction::make('createTenant')
+                                ->label('Create new tenant')
+                                ->icon('heroicon-m-plus')
+                                ->url(fn (): string => TenantResource::getUrl('create'))
+                                ->openUrlInNewTab()
+                        ),
                     Select::make('subscription_id')
                         ->label('Subscription')
                         ->options(function (callable $get) {

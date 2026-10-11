@@ -3,9 +3,9 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\TenantSupportUserResource\Pages;
+use App\Filament\Support\RelatedRecordSelect;
 use App\Models\TenantSupportUser;
 use App\Services\TenantSupportAccountService;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
@@ -34,12 +34,7 @@ class TenantSupportUserResource extends Resource
     {
         return $form
             ->schema([
-                Select::make('tenant_id')
-                    ->relationship('tenant', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->required()
-                    ->disabledOn('edit'),
+                RelatedRecordSelect::tenant()->disabledOn('edit'),
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255),

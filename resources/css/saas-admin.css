@@ -304,3 +304,167 @@
     width: 180px;
     height: 180px;
 }
+
+/*
+ * Filament only shows pagination overview ("Showing X to Y of Z") and page-number
+ * links when the pagination container is at least 56rem wide. With the Super Admin
+ * sidebar open, listing tables often sit just under that threshold, so operators only
+ * see a compact Next control. Lower the container breakpoint for this panel.
+ */
+@supports (container-type: inline-size) {
+    @container (min-width: 36rem) {
+        .fi-pagination:not(.fi-simple) > .fi-pagination-previous-btn {
+            display: none;
+        }
+
+        .fi-pagination-overview {
+            display: inline;
+        }
+
+        .fi-pagination:not(.fi-simple) > .fi-pagination-next-btn {
+            display: none;
+        }
+
+        .fi-pagination-items {
+            display: flex;
+        }
+    }
+}
+
+@supports not (container-type: inline-size) {
+    @media (min-width: 640px) {
+        .fi-pagination:not(.fi-simple) > .fi-pagination-previous-btn {
+            display: none;
+        }
+
+        .fi-pagination-overview {
+            display: inline;
+        }
+
+        .fi-pagination:not(.fi-simple) > .fi-pagination-next-btn {
+            display: none;
+        }
+
+        .fi-pagination-items {
+            display: flex;
+        }
+    }
+}
+
+/* Feature / module matrix (role-permissions style) */
+.saas-feature-category {
+    border: 1px solid rgb(226 232 240 / 0.95);
+    border-radius: 0.9rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    overflow: hidden;
+}
+
+.dark .saas-feature-category {
+    border-color: rgb(255 255 255 / 0.08);
+    background: rgb(17 24 39 / 0.7);
+}
+
+.saas-feature-category__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid #f1f5f9;
+    background: #f8fafc;
+}
+
+.dark .saas-feature-category__header {
+    border-bottom-color: rgb(255 255 255 / 0.06);
+    background: rgb(255 255 255 / 0.03);
+}
+
+.saas-feature-category__meta {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.dark .saas-feature-category__meta {
+    color: #94a3b8;
+}
+
+.saas-feature-grid {
+    display: grid;
+    gap: 0.35rem 1rem;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    padding: 0.85rem 1.1rem 1.1rem;
+}
+
+@media (min-width: 768px) {
+    .saas-feature-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .saas-feature-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.saas-feature-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.55rem 0.35rem;
+    border-radius: 0.55rem;
+    cursor: pointer;
+    color: #0f172a;
+}
+
+.dark .saas-feature-check {
+    color: #e2e8f0;
+}
+
+.saas-feature-check:hover {
+    background: rgb(15 118 110 / 0.06);
+}
+
+.dark .saas-feature-check:hover {
+    background: rgb(45 212 191 / 0.08);
+}
+
+.saas-feature-check--category {
+    font-weight: 700;
+    padding: 0;
+}
+
+.saas-feature-check--category:hover {
+    background: transparent;
+}
+
+.saas-feature-check input[type='checkbox'] {
+    margin-top: 0.15rem;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    accent-color: #0f766e;
+    cursor: pointer;
+}
+
+.saas-feature-check__label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.saas-feature-check__hint {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.dark .saas-feature-check__hint {
+    color: #94a3b8;
+}

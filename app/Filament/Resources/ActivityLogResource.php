@@ -10,6 +10,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 
 class ActivityLogResource extends Resource
 {
@@ -38,7 +39,13 @@ class ActivityLogResource extends Resource
                 TextColumn::make('description')->searchable()->wrap(),
                 TextColumn::make('event')->badge()->sortable(),
                 TextColumn::make('causer.email')->label('Actor')->placeholder('system'),
-                TextColumn::make('properties.tenant_id')->label('Tenant ID'),
+                TextColumn::make('tenant_id')
+                    ->label('Tenant ID')
+                    ->placeholder('—')
+                    ->getStateUsing(fn (Activity $record): ?string => static::tenantIdFromProperties($record))
+                    ->tooltip(fn (?string $state): ?string => $state === null
+                        ? 'Platform-level event (not tied to a tenant workspace)'
+                        : null),
             ])
             ->defaultSort('id', 'desc')
             ->filters([
@@ -62,6 +69,25 @@ class ActivityLogResource extends Resource
             'index' => Pages\ListActivityLogs::route('/'),
             'view' => Pages\ViewActivityLog::route('/{record}'),
         ];
+    }
+
+    public static function tenantIdFromProperties(Activity $record): ?string
+    {
+        $properties = $record->properties;
+
+        if ($properties instanceof Collection) {
+            $tenantId = $properties->get('tenant_id');
+        } elseif (is_array($properties)) {
+            $tenantId = $properties['tenant_id'] ?? null;
+        } else {
+            $tenantId = null;
+        }
+
+        if ($tenantId === null || $tenantId === '') {
+            return null;
+        }
+
+        return (string) $tenantId;
     }
 
     public static function canCreate(): bool

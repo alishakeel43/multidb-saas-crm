@@ -3,8 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DomainResource\Pages;
+use App\Filament\Support\RelatedRecordSelect;
 use App\Models\Domain;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
@@ -28,11 +28,7 @@ class DomainResource extends Resource
     {
         return $form
             ->schema([
-                Select::make('tenant_id')
-                    ->relationship('tenant', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->required(),
+                RelatedRecordSelect::tenant(),
                 TextInput::make('domain')
                     ->required()
                     ->maxLength(255)

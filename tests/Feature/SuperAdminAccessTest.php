@@ -82,13 +82,23 @@ it('shows a platform overview instead of the default framework information card'
         ->get('/super-admin')
         ->assertOk()
         ->assertSee('Operations overview')
+        ->assertSee('Tenant workspaces')
+        ->assertSee('Tenant growth')
+        ->assertSee('Recent workspaces')
         ->assertDontSee('filament v');
 
     $panel = Filament::getPanel('super-admin');
+    $dashboard = app(SuperAdminDashboard::class);
 
     expect($panel->getPages())->toContain(SuperAdminDashboard::class)
         ->and($panel->getWidgets())
-        ->toContain(PlatformStatsOverview::class, TenantGrowthChart::class, RecentTenantsTable::class);
+        ->toContain(PlatformStatsOverview::class, TenantGrowthChart::class, RecentTenantsTable::class)
+        ->and($dashboard->getWidgets())
+        ->toBe([
+            PlatformStatsOverview::class,
+            TenantGrowthChart::class,
+            RecentTenantsTable::class,
+        ]);
 
     $recentTenants = app(RecentTenantsTable::class);
     $recentTenants->bootedInteractsWithTable();

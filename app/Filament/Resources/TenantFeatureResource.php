@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\TenantFeatureResource\Pages;
+use App\Filament\Support\RelatedRecordSelect;
 use App\Models\TenantFeature;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
@@ -21,13 +22,17 @@ class TenantFeatureResource extends Resource
 
     protected static ?string $navigationGroup = 'Tenants & billing';
 
-    protected static ?string $navigationLabel = 'Feature overrides';
+    protected static ?string $navigationLabel = 'Feature overrides (legacy)';
+
+    protected static ?string $slug = 'tenant-feature-records';
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Select::make('tenant_id')->relationship('tenant', 'name')->searchable()->preload()->required(),
+                RelatedRecordSelect::tenant(),
                 Select::make('feature_key')
                     ->options(collect(config('features', []))->mapWithKeys(fn (array $feature, string $key): array => [
                         $key => $feature['label'] ?? $key,

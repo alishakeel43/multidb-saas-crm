@@ -165,28 +165,43 @@ it('disables dependent features when a required feature is disabled, including e
         ->and($entitlements->isEnabled('marketing', $this->tenant))->toBeFalse();
 });
 
-it('prefers the most specific route prefix and filters menu items independently', function () {
+it('prefers the most specific route prefix and keeps contacts persons + organizations together', function () {
     $entitlements = app(FeatureEntitlementService::class);
 
     expect($entitlements->featureForRoute('admin.leads.quotes.index'))->toBe('quotes')
-        ->and($entitlements->featureForRoute('admin.leads.index'))->toBe('leads');
+        ->and($entitlements->featureForRoute('admin.leads.index'))->toBe('leads')
+        ->and($entitlements->featureForRoute('admin.contacts.persons.index'))->toBe('contacts')
+        ->and($entitlements->featureForRoute('admin.contacts.organizations.index'))->toBe('contacts');
 
-    $this->plan->features()->createMany([
-        ['feature_key' => 'contacts', 'is_enabled' => true],
-        ['feature_key' => 'organizations', 'is_enabled' => false],
+    $this->plan->features()->create([
+        'feature_key' => 'contacts',
+        'is_enabled' => false,
     ]);
 
     $menu = [
         ['key' => 'contacts', 'route' => 'admin.contacts.persons.index'],
         ['key' => 'contacts.persons', 'route' => 'admin.contacts.persons.index'],
         ['key' => 'contacts.organizations', 'route' => 'admin.contacts.organizations.index'],
+        ['key' => 'leads', 'route' => 'admin.leads.index'],
     ];
+
+    expect($entitlements->filterMenuItems($menu, $this->tenant))
+        ->toBe([
+            ['key' => 'leads', 'route' => 'admin.leads.index'],
+        ])
+        ->and($entitlements->isEnabled('organizations', $this->tenant))->toBeFalse();
+
+    $this->plan->features()->where('feature_key', 'contacts')->update(['is_enabled' => true]);
+    $entitlements->forgetTenantCache($this->tenant->id);
 
     expect($entitlements->filterMenuItems($menu, $this->tenant))
         ->toBe([
             ['key' => 'contacts', 'route' => 'admin.contacts.persons.index'],
             ['key' => 'contacts.persons', 'route' => 'admin.contacts.persons.index'],
-        ]);
+            ['key' => 'contacts.organizations', 'route' => 'admin.contacts.organizations.index'],
+            ['key' => 'leads', 'route' => 'admin.leads.index'],
+        ])
+        ->and($entitlements->isEnabled('organizations', $this->tenant))->toBeTrue();
 });
 
 it('maps all stock admin menu modules to feature entitlements', function () {
@@ -200,8 +215,9 @@ it('maps all stock admin menu modules to feature entitlements', function () {
         ->unique()
         ->all();
 
-    $unmappedMenuKeys = collect(config('menu.admin', []))
-        ->pluck('key')
+    $adminMenuKeys = collect(config('menu.admin', []))->pluck('key');
+
+    $unmappedMenuKeys = $adminMenuKeys
         ->diff($mappedMenuKeys)
         ->values()
         ->all();
@@ -225,6 +241,18 @@ it('maps all stock admin menu modules to feature entitlements', function () {
         ->and($entitlements->featureForRoute('admin.configuration.index'))->toBe('configuration')
         ->and($entitlements->featureForRoute('admin.help.index'))->toBe('help')
         ->and($entitlements->featureForRoute('admin.settings.marketing.campaigns.index'))->toBe('marketing_campaigns');
+});
+
+it('keeps every default-enabled admin menu item visible for a fully entitled tenant', function () {
+    $entitlements = app(FeatureEntitlementService::class);
+    $menu = config('menu.admin', []);
+
+    $filteredKeys = collect($entitlements->filterMenuItems($menu, $this->tenant))->pluck('key')->all();
+    $allKeys = collect($menu)->pluck('key')->all();
+
+    expect($filteredKeys)->toBe($allKeys)
+        ->and(collect(config('features'))->get('contacts')['menu_keys'] ?? [])
+        ->toContain('contacts.persons', 'contacts.organizations');
 });
 
 it('returns HTTP 403 for a disabled feature route', function () {

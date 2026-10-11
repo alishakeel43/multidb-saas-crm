@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SubscriptionResource\Pages;
+use App\Filament\Support\RelatedRecordSelect;
 use App\Models\Subscription;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -24,8 +25,8 @@ class SubscriptionResource extends Resource
     {
         return $form
             ->schema([
-                Select::make('tenant_id')->relationship('tenant', 'name')->searchable()->preload()->required(),
-                Select::make('plan_id')->relationship('plan', 'name')->searchable()->preload()->required(),
+                RelatedRecordSelect::tenant(),
+                RelatedRecordSelect::plan(),
                 Select::make('status')->options([
                     'trial' => 'Trial',
                     'active' => 'Active',

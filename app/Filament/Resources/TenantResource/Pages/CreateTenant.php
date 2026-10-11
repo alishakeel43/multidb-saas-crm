@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 class CreateTenant extends CreateRecord
 {
@@ -19,13 +20,11 @@ class CreateTenant extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $adminPassword = $data['admin_password'];
-        unset($data['admin_password']);
-        $this->data = [];
         $baseDomain = config('multitenancy.tenant_base_domain', 'localhost');
         $domain = $data['domain'] ?? ($data['slug'].'.'.$baseDomain);
 
         try {
-            return app(TenantProvisioningService::class)->provision(
+            $tenant = app(TenantProvisioningService::class)->provision(
                 name: $data['name'],
                 slug: $data['slug'],
                 domain: $domain,
@@ -35,8 +34,30 @@ class CreateTenant extends CreateRecord
             );
         } catch (InvalidArgumentException|RuntimeException $exception) {
             throw ValidationException::withMessages([
-                'data.slug' => $exception->getMessage(),
+                $this->fieldForProvisioningException($exception) => $exception->getMessage(),
             ]);
         }
+
+        // Drop the one-time password from Livewire state only after a successful provision.
+        $this->data = [];
+
+        return $tenant;
+    }
+
+    private function fieldForProvisioningException(Throwable $exception): string
+    {
+        $message = strtolower($exception->getMessage());
+
+        return match (true) {
+            str_contains($message, 'administrator email') => 'data.admin_email',
+            str_contains($message, 'administrator name') => 'data.admin_name',
+            str_contains($message, 'administrator password') => 'data.admin_password',
+            str_contains($message, 'tenant name') => 'data.name',
+            str_contains($message, 'domain') => 'data.slug',
+            str_contains($message, 'slug'),
+            str_contains($message, 'database'),
+            str_contains($message, 'storage') => 'data.slug',
+            default => 'data.name',
+        };
     }
 }
