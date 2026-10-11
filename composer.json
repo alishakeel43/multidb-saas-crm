@@ -32,6 +32,7 @@
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-backup": "^10.3",
         "spatie/laravel-health": "^1.40",
+        "spatie/laravel-model-states": "^2.12",
         "spatie/laravel-multitenancy": "^4.0",
         "stripe/stripe-php": "^22.0",
         "webklex/laravel-imap": "^6.0"
@@ -75,6 +76,7 @@
             "Database\\Seeders\\": "database/seeders/",
             "Webkul\\Activity\\": "packages/Webkul/Activity/src",
             "Webkul\\Admin\\": "packages/Webkul/Admin/src",
+            "Webkul\\Booking\\": "packages/Webkul/Booking/src",
             "Webkul\\Attribute\\": "packages/Webkul/Attribute/src",
             "Webkul\\Contact\\": "packages/Webkul/Contact/src",
             "Webkul\\Core\\": "packages/Webkul/Core/src",

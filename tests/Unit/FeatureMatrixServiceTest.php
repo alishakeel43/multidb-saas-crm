@@ -33,6 +33,7 @@ it('groups features into configured categories', function () {
     expect($grouped)->toHaveKey('crm')
         ->and($grouped['crm']['features'])->toHaveKey('leads')
         ->and($grouped['crm']['features'])->toHaveKey('contacts')
+        ->and($grouped['crm']['features'])->toHaveKey('bookings')
         ->and($grouped['crm']['features'])->not->toHaveKey('organizations')
         ->and($grouped['sales']['features'])->toHaveKey('products')
         ->and($grouped['automation']['features'])->toHaveKey('workflows');

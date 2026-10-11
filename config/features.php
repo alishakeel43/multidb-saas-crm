@@ -105,6 +105,14 @@ return [
         'route_prefixes' => ['admin.activities.'],
         'menu_keys' => ['activities'],
     ],
+    'bookings' => [
+        'label' => 'Appointment booking',
+        'category' => 'crm',
+        'default_enabled' => true,
+        'depends_on' => ['activities'],
+        'route_prefixes' => ['admin.bookings.', 'admin.settings.booking.'],
+        'menu_keys' => ['bookings', 'settings.booking'],
+    ],
     'user_management' => [
         'label' => 'User management',
         'category' => 'administration',

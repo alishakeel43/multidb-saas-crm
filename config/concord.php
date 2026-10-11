@@ -1,6 +1,7 @@
 <?php
 
 use Webkul\Admin\Providers\ModuleServiceProvider as AdminModuleServiceProvider;
+use Webkul\Booking\Providers\ModuleServiceProvider as BookingModuleServiceProvider;
 use Webkul\Attribute\Providers\ModuleServiceProvider as AttributeModuleServiceProvider;
 use Webkul\Automation\Providers\ModuleServiceProvider as AutomationModuleServiceProvider;
 use Webkul\Contact\Providers\ModuleServiceProvider as ContactModuleServiceProvider;
@@ -21,6 +22,7 @@ return [
     'modules' => [
         DataTransferModuleServiceProvider::class,
         AdminModuleServiceProvider::class,
+        BookingModuleServiceProvider::class,
         AttributeModuleServiceProvider::class,
         AutomationModuleServiceProvider::class,
         ContactModuleServiceProvider::class,
