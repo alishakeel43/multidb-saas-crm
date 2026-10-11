@@ -293,3 +293,21 @@ it('ensures central webhook URL always targets the root platform domain and stri
     expect($strippedUrl)->toBe('http://krayinsaas.localhost:8888/unified-inbox/meta/webhook')
         ->and($strippedUrl)->not->toContain('demo.');
 });
+
+it('can view a specific conversation using the show route', function () {
+    $conversation = Conversation::create([
+        'channel' => 'whatsapp',
+        'account_id' => 'PHONE_123',
+        'external_id' => '15550001111',
+        'customer_name' => 'Jim Halpert',
+        'status' => 'open',
+    ]);
+
+    $response = $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.show', $conversation->id));
+
+    $response->assertSuccessful()
+        ->assertSee('Jim Halpert')
+        ->assertSee('Overview')
+        ->assertSee('CRM Links');
+});

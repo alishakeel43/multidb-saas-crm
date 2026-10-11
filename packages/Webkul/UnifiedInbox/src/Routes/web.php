@@ -33,6 +33,7 @@ Route::middleware(['web', 'admin_locale', 'user'])
     ->group(function () {
         // Main Unified Inbox view
         Route::get('unified-inbox', [InboxController::class, 'index'])->name('index');
+        Route::get('unified-inbox/{id}', [InboxController::class, 'show'])->whereNumber('id')->name('show');
 
         // Conversation actions
         Route::prefix('unified-inbox/conversations/{id}')->name('conversations.')->group(function () {

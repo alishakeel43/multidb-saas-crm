@@ -90,11 +90,26 @@ class InboxController extends Controller
             'users' => $users,
             'pipelines' => $pipelines,
             'connections' => $connections,
+            'channels' => config('unified-inbox.channels', [
+                'whatsapp' => ['label' => 'WhatsApp'],
+                'messenger' => ['label' => 'Messenger'],
+                'instagram' => ['label' => 'Instagram'],
+            ]),
             'centralWebhookUrl' => $this->router->getCentralWebhookUrl(),
             'channelFilter' => $channelFilter,
             'statusFilter' => $statusFilter,
             'search' => $search,
         ]);
+    }
+
+    /**
+     * Show a specific conversation.
+     */
+    public function show(int $id, Request $request): View
+    {
+        $request->merge(['conversation_id' => $id]);
+
+        return $this->index($request);
     }
 
     /**
