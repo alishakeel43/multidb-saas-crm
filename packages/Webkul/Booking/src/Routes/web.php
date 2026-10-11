@@ -22,5 +22,6 @@ Route::middleware(['web', 'admin_locale', 'user'])
                 Route::get('', 'index')->name('index');
                 Route::post('services', 'storeService')->name('services.store');
                 Route::post('availability', 'storeAvailability')->name('availability.store');
+                Route::post('availability/defaults', 'seedDefaultAvailability')->name('availability.defaults');
             });
     });

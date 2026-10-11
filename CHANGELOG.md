@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix appointment booking end-to-end: require staff, soft Mon–Fri 09:00–17:00 defaults when no custom availability exists, clearer overlap/outside-hours errors, settings quick-add for default week hours, and empty-state guidance on the Bookings page.
 - Add `{%` typeahead for email-template placeholders (Subject + TinyMCE Content): typing `{%l` suggests entities like `leads`, then `{%leads.t` suggests matching Attributes (e.g. title) so templates can be built without memorizing codes.
 - Document the Attributes-vs-package-schema decision rule for agents (`crm-attributes-vs-schema` skill + `AGENTS.md`): features use migrations/tables; CRM form fields use Attributes/EAV.
 - Add client P0 CRM packages following Krayin Concord package flow (Contract / Model / Proxy / Repository / `ModuleServiceProvider` + `config/concord.php`): lead assignment (round-robin / workload / first-available via `Webkul/Assignment`), appointment booking with Spatie model-states (`Webkul/Booking`), person consent/suppression (`Webkul/Consent`), and quote approval workflow (`Webkul/QuoteApproval`), plus lead-duplicate checks and a `SalesReportService` metrics snapshot; gate them through SaaS feature entitlements.

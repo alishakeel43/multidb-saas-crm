@@ -52,7 +52,7 @@ class BookingController extends Controller
     {
         $data = $request->validate([
             'booking_service_id' => 'required|integer',
-            'user_id' => 'nullable|integer',
+            'user_id' => 'required|integer',
             'person_id' => 'nullable|integer',
             'lead_id' => 'nullable|integer',
             'guest_name' => 'nullable|string|max:255',
@@ -62,6 +62,8 @@ class BookingController extends Controller
             'notes' => 'nullable|string',
             'auto_confirm' => 'sometimes|boolean',
         ]);
+
+        $data['auto_confirm'] = $request->boolean('auto_confirm');
 
         try {
             $this->bookings->book($data);
@@ -75,18 +77,26 @@ class BookingController extends Controller
 
     public function confirm(int $id): RedirectResponse
     {
-        $booking = Booking::query()->findOrFail($id);
-        $booking->status->transitionTo(Confirmed::class);
-        session()->flash('success', trans('booking::app.messages.confirmed'));
+        try {
+            $booking = Booking::query()->findOrFail($id);
+            $booking->status->transitionTo(Confirmed::class);
+            session()->flash('success', trans('booking::app.messages.confirmed'));
+        } catch (Throwable) {
+            session()->flash('error', trans('booking::app.messages.transition-failed'));
+        }
 
         return redirect()->route('admin.bookings.index');
     }
 
     public function cancel(int $id): RedirectResponse
     {
-        $booking = Booking::query()->findOrFail($id);
-        $booking->status->transitionTo(Cancelled::class);
-        session()->flash('success', trans('booking::app.messages.cancelled'));
+        try {
+            $booking = Booking::query()->findOrFail($id);
+            $booking->status->transitionTo(Cancelled::class);
+            session()->flash('success', trans('booking::app.messages.cancelled'));
+        } catch (Throwable) {
+            session()->flash('error', trans('booking::app.messages.transition-failed'));
+        }
 
         return redirect()->route('admin.bookings.index');
     }

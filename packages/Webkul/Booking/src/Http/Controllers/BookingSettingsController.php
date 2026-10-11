@@ -10,11 +10,15 @@ use Illuminate\View\View;
 use Webkul\Admin\Http\Controllers\Controller;
 use Webkul\Booking\Models\BookingAvailability;
 use Webkul\Booking\Models\BookingService;
+use Webkul\Booking\Services\BookingServiceManager;
 use Webkul\User\Repositories\UserRepository;
 
 class BookingSettingsController extends Controller
 {
-    public function __construct(protected UserRepository $userRepository) {}
+    public function __construct(
+        protected UserRepository $userRepository,
+        protected BookingServiceManager $bookingServiceManager,
+    ) {}
 
     public function index(): View
     {
@@ -67,7 +71,7 @@ class BookingSettingsController extends Controller
             'user_id' => 'required|integer',
             'weekday' => 'required|integer|min:0|max:6',
             'starts_at' => 'required',
-            'ends_at' => 'required',
+            'ends_at' => 'required|after:starts_at',
         ]);
 
         BookingAvailability::query()->create([
@@ -76,6 +80,24 @@ class BookingSettingsController extends Controller
         ]);
 
         session()->flash('success', trans('booking::app.messages.availability-created'));
+
+        return redirect()->route('admin.settings.booking.index');
+    }
+
+    public function seedDefaultAvailability(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'user_id' => 'required|integer',
+        ]);
+
+        $created = $this->bookingServiceManager->seedDefaultWeek((int) $data['user_id']);
+
+        session()->flash(
+            'success',
+            $created > 0
+                ? trans('booking::app.messages.defaults-seeded')
+                : trans('booking::app.messages.defaults-already')
+        );
 
         return redirect()->route('admin.settings.booking.index');
     }
