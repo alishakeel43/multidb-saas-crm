@@ -1,0 +1,17 @@
+{
+    "name": "webkul/quote-approval",
+    "description": "Quote approval workflow for Krayin CRM",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Webkul\\QuoteApproval\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\QuoteApproval\\Providers\\QuoteApprovalServiceProvider"
+            ]
+        }
+    }
+}

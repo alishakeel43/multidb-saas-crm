@@ -7,8 +7,11 @@ use Konekt\Concord\ConcordServiceProvider;
 use Prettus\Repository\Providers\RepositoryServiceProvider;
 use Webkul\Activity\Providers\ActivityServiceProvider;
 use Webkul\Admin\Providers\AdminServiceProvider;
+use Webkul\Assignment\Providers\AssignmentServiceProvider;
 use Webkul\Attribute\Providers\AttributeServiceProvider;
 use Webkul\Automation\Providers\WorkflowServiceProvider;
+use Webkul\Booking\Providers\BookingServiceProvider;
+use Webkul\Consent\Providers\ConsentServiceProvider;
 use Webkul\Contact\Providers\ContactServiceProvider;
 use Webkul\Core\Providers\CoreServiceProvider;
 use Webkul\DataGrid\Providers\DataGridServiceProvider;
@@ -21,6 +24,7 @@ use Webkul\Lead\Providers\LeadServiceProvider;
 use Webkul\Marketing\Providers\MarketingServiceProvider;
 use Webkul\Product\Providers\ProductServiceProvider;
 use Webkul\Quote\Providers\QuoteServiceProvider;
+use Webkul\QuoteApproval\Providers\QuoteApprovalServiceProvider;
 use Webkul\Tag\Providers\TagServiceProvider;
 use Webkul\User\Providers\UserServiceProvider;
 use Webkul\Warehouse\Providers\WarehouseServiceProvider;
@@ -45,7 +49,10 @@ return [
      */
     ActivityServiceProvider::class,
     AdminServiceProvider::class,
+    AssignmentServiceProvider::class,
     AttributeServiceProvider::class,
+    BookingServiceProvider::class,
+    ConsentServiceProvider::class,
     WorkflowServiceProvider::class,
     ContactServiceProvider::class,
     CoreServiceProvider::class,
@@ -59,6 +66,7 @@ return [
     LeadServiceProvider::class,
     ProductServiceProvider::class,
     QuoteServiceProvider::class,
+    QuoteApprovalServiceProvider::class,
     TagServiceProvider::class,
     UserServiceProvider::class,
     WarehouseServiceProvider::class,

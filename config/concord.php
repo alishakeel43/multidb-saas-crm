@@ -1,8 +1,11 @@
 <?php
 
 use Webkul\Admin\Providers\ModuleServiceProvider as AdminModuleServiceProvider;
+use Webkul\Assignment\Providers\ModuleServiceProvider as AssignmentModuleServiceProvider;
 use Webkul\Attribute\Providers\ModuleServiceProvider as AttributeModuleServiceProvider;
 use Webkul\Automation\Providers\ModuleServiceProvider as AutomationModuleServiceProvider;
+use Webkul\Booking\Providers\ModuleServiceProvider as BookingModuleServiceProvider;
+use Webkul\Consent\Providers\ModuleServiceProvider as ConsentModuleServiceProvider;
 use Webkul\Contact\Providers\ModuleServiceProvider as ContactModuleServiceProvider;
 use Webkul\Core\Providers\ModuleServiceProvider as CoreModuleServiceProvider;
 use Webkul\DataGrid\Providers\ModuleServiceProvider as DataGridModuleServiceProvider;
@@ -12,6 +15,7 @@ use Webkul\EmailTemplate\Providers\ModuleServiceProvider as EmailTemplateModuleS
 use Webkul\Lead\Providers\ModuleServiceProvider as LeadModuleServiceProvider;
 use Webkul\Product\Providers\ModuleServiceProvider as ProductModuleServiceProvider;
 use Webkul\Quote\Providers\ModuleServiceProvider as QuoteModuleServiceProvider;
+use Webkul\QuoteApproval\Providers\ModuleServiceProvider as QuoteApprovalModuleServiceProvider;
 use Webkul\Tag\Providers\ModuleServiceProvider as TagModuleServiceProvider;
 use Webkul\User\Providers\ModuleServiceProvider as UserModuleServiceProvider;
 use Webkul\Warehouse\Providers\ModuleServiceProvider as WarehouseModuleServiceProvider;
@@ -21,8 +25,11 @@ return [
     'modules' => [
         DataTransferModuleServiceProvider::class,
         AdminModuleServiceProvider::class,
+        AssignmentModuleServiceProvider::class,
         AttributeModuleServiceProvider::class,
         AutomationModuleServiceProvider::class,
+        BookingModuleServiceProvider::class,
+        ConsentModuleServiceProvider::class,
         ContactModuleServiceProvider::class,
         CoreModuleServiceProvider::class,
         DataGridModuleServiceProvider::class,
@@ -31,6 +38,7 @@ return [
         LeadModuleServiceProvider::class,
         ProductModuleServiceProvider::class,
         QuoteModuleServiceProvider::class,
+        QuoteApprovalModuleServiceProvider::class,
         TagModuleServiceProvider::class,
         UserModuleServiceProvider::class,
         WarehouseModuleServiceProvider::class,
