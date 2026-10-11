@@ -24,6 +24,9 @@ test.describe("ZARIS Super Admin operator flows", () => {
             { path: "super-admin/platform-settings", heading: /platform settings/i },
             { path: "super-admin/manage-two-factor-authentication", heading: /two-factor authentication/i },
             { path: "super-admin/activity-logs", heading: /audit events|audit log/i },
+            { path: "super-admin/tenant-seeders", heading: /tenant seeders/i },
+            { path: "super-admin/tenant-backups", heading: /tenant backups/i },
+            { path: "super-admin/system-health", heading: /system health|health/i },
         ]) {
             await page.goto(item.path);
             await expect(page).not.toHaveURL(/super-admin\/login/);
@@ -162,6 +165,17 @@ test.describe("ZARIS Super Admin operator flows", () => {
 
         await expect(page.getByText(/tenant/i).first()).toBeVisible();
         await expect(page.getByText(/subscription/i).first()).toBeVisible();
+    });
+
+    test("tenant seeders page exposes baseline and demo actions", async ({ superAdminPage }) => {
+        const page = superAdminPage;
+
+        await page.goto("super-admin/tenant-seeders");
+        await expect(page.getByRole("heading", { name: /tenant seeders/i }).first()).toBeVisible();
+        await expect(page.getByRole("button", { name: /seed all \(baseline\)/i })).toBeVisible();
+        await expect(page.getByRole("button", { name: /seed all \(demo \+ p0\)/i })).toBeVisible();
+        await expect(page.getByText(/baseline/i).first()).toBeVisible();
+        await expect(page.getByRole("button", { name: /^demo \+ p0$/i }).first()).toBeVisible();
     });
 
     test("audit log list and view open without crashing", async ({ superAdminPage }) => {
