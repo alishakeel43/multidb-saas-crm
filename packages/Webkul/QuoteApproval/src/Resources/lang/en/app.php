@@ -2,6 +2,7 @@
 
 return [
     'menu' => [
+        'quotes' => 'Quotes',
         'approvals' => 'Approvals',
     ],
     'acl' => [

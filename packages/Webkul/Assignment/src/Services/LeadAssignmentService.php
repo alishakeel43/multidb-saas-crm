@@ -4,6 +4,7 @@ namespace Webkul\Assignment\Services;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Webkul\Assignment\Models\AssignmentCursor;
 use Webkul\Assignment\Models\AssignmentRule;
 use Webkul\Assignment\Repositories\AssignmentRuleRepository;
@@ -73,12 +74,17 @@ class LeadAssignmentService
      */
     private function activeCandidates(AssignmentRule $rule): Collection
     {
-        return $rule->users()
+        $query = $rule->users()
             ->where('users.status', 1)
             ->wherePivot('is_active', true)
             ->orderByPivot('sort_order')
-            ->orderBy('users.id')
-            ->get();
+            ->orderBy('users.id');
+
+        if (Schema::hasColumn('users', 'is_support_account')) {
+            $query->where('users.is_support_account', false);
+        }
+
+        return $query->get();
     }
 
     private function pickRoundRobin(AssignmentRule $rule, Collection $candidates): User

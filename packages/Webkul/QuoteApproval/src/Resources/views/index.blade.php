@@ -1,7 +1,21 @@
 <x-admin::layouts>
     <x-slot:title>Quote approvals</x-slot>
 
-    <p class="mb-4 text-2xl font-semibold dark:text-white">Quote approvals</p>
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p class="text-2xl font-semibold dark:text-white">Quote approvals</p>
+
+        <div class="flex items-center gap-2">
+            <a href="{{ route('admin.quotes.index') }}" class="secondary-button">
+                @lang('quote_approval::app.menu.quotes')
+            </a>
+
+            @if (bouncer()->hasPermission('quotes.create'))
+                <a href="{{ route('admin.quotes.create') }}" class="primary-button">
+                    @lang('admin::app.quotes.index.create-btn')
+                </a>
+            @endif
+        </div>
+    </div>
 
     <div class="box-shadow rounded-lg bg-white p-4 dark:bg-gray-900">
         <div class="space-y-3 text-sm dark:text-white">
@@ -31,7 +45,13 @@
                     </div>
                 </div>
             @empty
-                <p class="text-gray-500">No quote approvals yet. Create a quote to start the workflow.</p>
+                <p class="text-gray-500">
+                    No quote approvals yet.
+                    @if (bouncer()->hasPermission('quotes.create'))
+                        <a class="text-brandColor underline" href="{{ route('admin.quotes.create') }}">Create a quote</a>
+                        to start the workflow.
+                    @endif
+                </p>
             @endforelse
         </div>
     </div>

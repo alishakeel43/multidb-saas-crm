@@ -9,11 +9,11 @@ return [
         'icon-class' => 'icon-calendar',
     ],
     [
-        'key' => 'settings.booking',
+        'key' => 'settings.other_settings.booking',
         'name' => 'booking::app.menu.settings',
         'info' => 'booking::app.menu.settings-info',
         'route' => 'admin.settings.booking.index',
-        'sort' => 6,
+        'sort' => 11,
         'icon-class' => 'icon-calendar',
     ],
 ];

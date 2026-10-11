@@ -4,6 +4,8 @@ namespace Webkul\Assignment\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Webkul\Admin\Http\Controllers\Controller;
 use Webkul\Assignment\Repositories\AssignmentRuleRepository;
@@ -26,7 +28,7 @@ class AssignmentRuleController extends Controller
             ->orderBy('id')
             ->get();
 
-        $users = $this->userRepository->findWhere(['status' => 1]);
+        $users = $this->assignableUsers();
 
         return view('assignment::settings.index', compact('rules', 'users'));
     }
@@ -42,6 +44,14 @@ class AssignmentRuleController extends Controller
             'user_ids.*' => 'integer',
         ]);
 
+        $userIds = $this->filterAssignableUserIds($data['user_ids']);
+
+        if ($userIds === []) {
+            session()->flash('error', trans('assignment::app.messages.no-assignable-users'));
+
+            return redirect()->route('admin.settings.assignment.index');
+        }
+
         $rule = $this->assignmentRuleRepository->create([
             'name' => $data['name'],
             'entity_type' => 'leads',
@@ -52,7 +62,7 @@ class AssignmentRuleController extends Controller
         ]);
 
         $sync = [];
-        foreach (array_values($data['user_ids']) as $index => $userId) {
+        foreach (array_values($userIds) as $index => $userId) {
             $sync[$userId] = ['sort_order' => $index, 'is_active' => true];
         }
         $rule->users()->sync($sync);
@@ -76,6 +86,14 @@ class AssignmentRuleController extends Controller
             'user_ids.*' => 'integer',
         ]);
 
+        $userIds = $this->filterAssignableUserIds($data['user_ids']);
+
+        if ($userIds === []) {
+            session()->flash('error', trans('assignment::app.messages.no-assignable-users'));
+
+            return redirect()->route('admin.settings.assignment.index');
+        }
+
         $this->assignmentRuleRepository->update([
             'name' => $data['name'],
             'strategy' => $data['strategy'],
@@ -87,7 +105,7 @@ class AssignmentRuleController extends Controller
         $rule = $this->assignmentRuleRepository->findOrFail($id);
 
         $sync = [];
-        foreach (array_values($data['user_ids']) as $index => $userId) {
+        foreach (array_values($userIds) as $index => $userId) {
             $sync[$userId] = ['sort_order' => $index, 'is_active' => true];
         }
         $rule->users()->sync($sync);
@@ -104,5 +122,32 @@ class AssignmentRuleController extends Controller
         session()->flash('success', trans('assignment::app.messages.deleted'));
 
         return redirect()->route('admin.settings.assignment.index');
+    }
+
+    /**
+     * Active tenant users excluding platform support/debug accounts.
+     */
+    private function assignableUsers(): Collection
+    {
+        $repository = $this->userRepository;
+
+        if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
+            $repository = $repository->scopeQuery(
+                fn ($query) => $query->where('is_support_account', false)
+            );
+        }
+
+        return $repository->findWhere(['status' => 1]);
+    }
+
+    /**
+     * @param  list<int|string>  $userIds
+     * @return list<int>
+     */
+    private function filterAssignableUserIds(array $userIds): array
+    {
+        $allowed = $this->assignableUsers()->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        return array_values(array_intersect(array_map('intval', $userIds), $allowed));
     }
 }

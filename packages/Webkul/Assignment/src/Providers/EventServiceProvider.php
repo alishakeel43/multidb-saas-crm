@@ -3,17 +3,12 @@
 namespace Webkul\Assignment\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 use Webkul\Assignment\Services\LeadAssignmentService;
 
 class EventServiceProvider extends ServiceProvider
 {
-    /**
-     * The event handler mappings for the application.
-     *
-     * @var array<string, array<int, string|callable>>
-     */
-    protected $listen = [];
-
     /**
      * Register any events for your application.
      */
@@ -22,7 +17,15 @@ class EventServiceProvider extends ServiceProvider
         parent::boot();
 
         $this->app['events']->listen('lead.create.after', function ($lead): void {
-            app(LeadAssignmentService::class)->assignIfNeeded($lead);
+            try {
+                app(LeadAssignmentService::class)->assignIfNeeded($lead);
+            } catch (Throwable $exception) {
+                // Never block core lead creation if assignment tables/rules are unavailable.
+                Log::warning('assignment.lead_create_hook_failed', [
+                    'lead_id' => $lead->id ?? null,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         });
     }
 }

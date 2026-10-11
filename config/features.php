@@ -82,7 +82,10 @@ return [
         'default_enabled' => true,
         'depends_on' => ['leads', 'products'],
         'route_prefixes' => ['admin.quotes.', 'admin.leads.quotes.'],
-        'menu_keys' => ['quotes'],
+        // Parent `quotes` stays visible via menu_any; list child carries Create Quote UI.
+        'menu_keys' => ['quotes.quotes'],
+        'menu_any_keys' => ['quotes'],
+        'menu_any_routes' => ['quotes' => 'admin.quotes.index'],
     ],
     'quote_approvals' => [
         'label' => 'Quote approvals',
@@ -103,7 +106,11 @@ return [
             'admin.settings.assignment.',
             'admin.leads.duplicates.',
         ],
-        'menu_keys' => ['settings.assignment'],
+        'menu_keys' => ['settings.other_settings.assignment'],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.settings.tags.index',
+        ],
     ],
     'bookings' => [
         'label' => 'Appointment booking',
@@ -111,7 +118,11 @@ return [
         'default_enabled' => true,
         'depends_on' => ['activities'],
         'route_prefixes' => ['admin.bookings.', 'admin.settings.booking.'],
-        'menu_keys' => ['bookings', 'settings.booking'],
+        'menu_keys' => ['bookings', 'settings.other_settings.booking'],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.settings.tags.index',
+        ],
     ],
     'consent' => [
         'label' => 'Consent management',
@@ -119,7 +130,11 @@ return [
         'default_enabled' => true,
         'depends_on' => ['contacts'],
         'route_prefixes' => ['admin.settings.consent.'],
-        'menu_keys' => ['settings.consent'],
+        'menu_keys' => ['settings.other_settings.consent'],
+        'menu_any_keys' => ['settings.other_settings'],
+        'menu_any_routes' => [
+            'settings.other_settings' => 'admin.settings.tags.index',
+        ],
     ],
     'mail' => [
         'label' => 'Mail',

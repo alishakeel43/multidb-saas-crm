@@ -27,5 +27,6 @@ return [
         'created' => 'Assignment rule created successfully.',
         'updated' => 'Assignment rule updated successfully.',
         'deleted' => 'Assignment rule deleted successfully.',
+        'no-assignable-users' => 'Select at least one tenant staff user. Support/debug accounts cannot be assignees.',
     ],
 ];

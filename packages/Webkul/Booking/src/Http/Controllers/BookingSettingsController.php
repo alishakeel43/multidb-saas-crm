@@ -4,6 +4,8 @@ namespace Webkul\Booking\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Webkul\Admin\Http\Controllers\Controller;
 use Webkul\Booking\Models\BookingAvailability;
@@ -19,8 +21,24 @@ class BookingSettingsController extends Controller
         return view('booking::settings', [
             'services' => BookingService::query()->orderBy('name')->get(),
             'availabilities' => BookingAvailability::query()->with('user')->orderBy('user_id')->orderBy('weekday')->get(),
-            'users' => $this->userRepository->findWhere(['status' => 1]),
+            'users' => $this->staffUsers(),
         ]);
+    }
+
+    /**
+     * Active staff users excluding platform support/debug accounts.
+     */
+    private function staffUsers(): Collection
+    {
+        $repository = $this->userRepository;
+
+        if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
+            $repository = $repository->scopeQuery(
+                fn ($query) => $query->where('is_support_account', false)
+            );
+        }
+
+        return $repository->findWhere(['status' => 1]);
     }
 
     public function storeService(Request $request): RedirectResponse

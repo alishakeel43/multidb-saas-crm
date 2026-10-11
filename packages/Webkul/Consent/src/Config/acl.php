@@ -2,9 +2,9 @@
 
 return [
     [
-        'key' => 'settings.consent',
+        'key' => 'settings.other_settings.consent',
         'name' => 'consent::app.acl.consent',
         'route' => 'admin.settings.consent.index',
-        'sort' => 7,
+        'sort' => 12,
     ],
 ];

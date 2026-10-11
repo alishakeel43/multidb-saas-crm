@@ -3,6 +3,11 @@
 ## Unreleased
 
 - Add client P0 CRM packages following Krayin Concord package flow (Contract / Model / Proxy / Repository / `ModuleServiceProvider` + `config/concord.php`): lead assignment (round-robin / workload / first-available via `Webkul/Assignment`), appointment booking with Spatie model-states (`Webkul/Booking`), person consent/suppression (`Webkul/Consent`), and quote approval workflow (`Webkul/QuoteApproval`), plus lead-duplicate checks and a `SalesReportService` metrics snapshot; gate them through SaaS feature entitlements.
+- Fix Quotes sidebar after Quote Approvals: keep a Quotes list child (Contacts-style) so Create Quote stays reachable when Approvals nests under Quotes.
+- Fix empty Settings cards for Assignment/Booking/Consent by nesting them under Other Settings (Krayin Settings index only renders grandchildren as clickable tiles).
+- Exclude tenant support/debug users (`is_support_account`) from lead-assignment assignees and booking staff pickers.
+
+- Harden P0 lead/quote create hooks so assignment/approval failures cannot block core CRM create flows; add menu/route regression tests so nested menus cannot silently hide Create pages again.
 - Add composite/lookup indexes on P0 CRM package tables for hot paths (assignment rule resolution, booking overlap/availability, consent channel lookups, quote approval queues).
 - Add idempotent tenant migrations to backfill P0 CRM performance indexes on existing tenant databases (`php artisan tenants:migrate --all`).
 - Add `spatie/laravel-model-states` for professional booking status transitions (pending → confirmed/cancelled/completed/no-show).
