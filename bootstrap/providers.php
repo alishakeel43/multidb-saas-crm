@@ -2,6 +2,7 @@
 
 use App\Providers\AppServiceProvider;
 use App\Providers\Filament\SuperAdminPanelProvider;
+use App\Providers\SalesReportServiceProvider;
 use Barryvdh\DomPDF\ServiceProvider;
 use Konekt\Concord\ConcordServiceProvider;
 use Prettus\Repository\Providers\RepositoryServiceProvider;
@@ -42,6 +43,7 @@ return [
      * Application Service Providers...
      */
     AppServiceProvider::class,
+    SalesReportServiceProvider::class,
     SuperAdminPanelProvider::class,
 
     /*

@@ -2,3 +2,5 @@
 !.gitignore
 !filament/
 !filament/**
+!sales-reports/
+!sales-reports/**

@@ -92,3 +92,27 @@ PHP 8.5.7 emits non-fatal deprecation warnings from stock `config/database.php` 
 - After both operations, `zaristech_saas` remained at nine tables and `tenant_bootstrap` at 60 tables. All pre-existing MySQL schema names were unchanged; only the intended successful `tenant_demo` was added.
 - `tenant_demo` is retained as the local verification tenant. `tenant_demo_rollback` does not exist.
 - Focused Phase 4 Pest tests passed (99 assertions); full suite completed with zero failures (196 assertions). Its 77 deprecated cases are the existing PHP 8.5 `PDO::MYSQL_ATTR_SSL_CA` deprecation from upstream configuration. Pint, PHP syntax checks, and command registration passed.
+
+## Stripe go-live checklist
+
+Billing code (`StripeCheckoutService`, webhook controller, invoice Checkout actions) is already in the app. Live collection stays off until secrets are configured. Never commit secrets.
+
+Required `.env` keys (local ignored file only):
+
+```bash
+STRIPE_KEY=pk_live_or_test_...
+STRIPE_SECRET=sk_live_or_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+Operator steps before declaring Stripe live:
+
+1. Create a Stripe account / switch to the correct mode (test first).
+2. Set the three env keys above and clear config cache (`php artisan config:clear`).
+3. Point Stripe webhook to `https://{platform-host}/stripe/webhook` for `checkout.session.completed` (and any events the controller already handles).
+4. Confirm Super Admin → System health shows Stripe as OK (`StripeConfiguredCheck`), not the “manual invoicing only” warning.
+5. Create an open invoice for a trial/active tenant and run **Collect with Stripe** from the Invoices table; complete Checkout in test mode.
+6. Verify the invoice flips to paid, a `payments` row is written, and an audit event is logged.
+7. Keep `BillingDemoSeeder` for UI QA when Stripe keys are absent; do not rely on it in production.
+
+Until step 5 succeeds in the target environment, treat billing as demo/manual only.

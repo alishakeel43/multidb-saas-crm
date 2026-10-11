@@ -29,6 +29,7 @@ class Booking extends Model implements BookingContract
         'ends_at',
         'status',
         'notes',
+        'reminder_sent_at',
     ];
 
     protected function casts(): array
@@ -36,6 +37,7 @@ class Booking extends Model implements BookingContract
         return [
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'reminder_sent_at' => 'datetime',
             'status' => BookingStatus::class,
         ];
     }

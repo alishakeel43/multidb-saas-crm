@@ -112,6 +112,14 @@ return [
             'settings.other_settings' => 'admin.settings.tags.index',
         ],
     ],
+    'sales_reports' => [
+        'label' => 'Sales reports',
+        'category' => 'sales',
+        'default_enabled' => true,
+        'depends_on' => ['leads'],
+        'route_prefixes' => ['admin.sales-reports.'],
+        'menu_keys' => ['sales_reports'],
+    ],
     'bookings' => [
         'label' => 'Appointment booking',
         'category' => 'crm',

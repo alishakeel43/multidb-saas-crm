@@ -50,18 +50,19 @@ export class SuperAdminPage {
         adminEmail: string;
         adminPassword: string;
     }): Promise<void> {
-        await this.page.getByRole("textbox", { name: "Name*", exact: true }).fill(input.name);
-        await this.page.getByRole("textbox", { name: "Slug*" }).fill(input.slug);
-        await this.page.getByRole("textbox", { name: "Tenant administrator name*" }).fill(input.adminName);
-        await this.page.getByRole("textbox", { name: "Tenant administrator email*" }).fill(input.adminEmail);
+        await this.page.getByRole("textbox", { name: /^Name/i }).fill(input.name);
+        await this.page.getByRole("textbox", { name: /^Slug/i }).fill(input.slug);
+        await this.page.getByRole("textbox", { name: /Tenant administrator name/i }).fill(input.adminName);
+        await this.page.getByRole("textbox", { name: /Tenant administrator email/i }).fill(input.adminEmail);
         await this.page.getByRole("textbox", { name: /Initial tenant administrator/i }).fill(input.adminPassword);
     }
 
     async expectFeatureMatrix(): Promise<void> {
-        await expect(this.page.getByRole("checkbox", { name: /^Contacts$/i }).first()).toBeVisible();
+        // Accessible names include helper text, e.g. "Contacts Persons and Organizations".
+        await expect(this.page.getByRole("checkbox", { name: /^Contacts/i }).first()).toBeVisible();
         await expect(this.page.getByText(/persons and organizations/i).first()).toBeVisible();
-        await expect(this.page.getByRole("checkbox", { name: /Leads/i }).first()).toBeVisible();
-        await expect(this.page.getByRole("checkbox", { name: /Quotes/i }).first()).toBeVisible();
+        await expect(this.page.getByRole("checkbox", { name: /^Leads$/i }).first()).toBeVisible();
+        await expect(this.page.getByRole("checkbox", { name: /^Quotes/i }).first()).toBeVisible();
         await expect(this.page.getByRole("checkbox", { name: /^Organizations$/i })).toHaveCount(0);
     }
 }

@@ -74,6 +74,7 @@ it('maps P0 and core admin routes to the intended feature entitlements', functio
         ->and($svc->featureForRoute('admin.leads.duplicates.check'))->toBe('assignment')
         ->and($svc->featureForRoute('admin.activities.index'))->toBe('activities')
         ->and($svc->featureForRoute('admin.bookings.index'))->toBe('bookings')
+        ->and($svc->featureForRoute('admin.sales-reports.index'))->toBe('sales_reports')
         ->and($svc->featureForRoute('admin.contacts.persons.index'))->toBe('contacts')
         ->and($svc->featureForRoute('admin.products.index'))->toBe('products')
         ->and($svc->featureForRoute('admin.mail.index'))->toBe('mail')
@@ -88,6 +89,14 @@ it('registers ACL keys that match the Settings card menu keys', function () {
     expect($acl)->toContain('settings.other_settings.assignment')
         ->and($acl)->toContain('settings.other_settings.booking')
         ->and($acl)->toContain('settings.other_settings.consent')
+        ->and($acl)->toContain('sales_reports')
         ->and($acl)->toContain('quotes.quotes')
         ->and($acl)->toContain('quotes.approvals');
+});
+
+it('registers Sales reports as a top-level clickable menu', function () {
+    $item = collect(config('menu.admin'))->firstWhere('key', 'sales_reports');
+
+    expect($item)->not->toBeNull()
+        ->and($item['route'] ?? null)->toBe('admin.sales-reports.index');
 });

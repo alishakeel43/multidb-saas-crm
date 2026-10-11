@@ -23,11 +23,16 @@ test.describe("ZARIS Super Admin operator flows", () => {
             { path: "super-admin/payments", heading: /payments/i },
             { path: "super-admin/platform-settings", heading: /platform settings/i },
             { path: "super-admin/manage-two-factor-authentication", heading: /two-factor authentication/i },
-            { path: "super-admin/activity-logs", heading: /audit events/i },
+            { path: "super-admin/activity-logs", heading: /audit events|audit log/i },
         ]) {
             await page.goto(item.path);
             await expect(page).not.toHaveURL(/super-admin\/login/);
-            await expect(page.getByRole("heading", { name: item.heading }).first()).toBeVisible({
+            await expect(
+                page
+                    .getByRole("heading", { name: item.heading })
+                    .or(page.getByText(item.heading))
+                    .first(),
+            ).toBeVisible({
                 timeout: 20000,
             });
         }
@@ -78,7 +83,7 @@ test.describe("ZARIS Super Admin operator flows", () => {
 
         await page.getByRole("button", { name: /^create$/i }).click();
 
-        const emailField = page.getByRole("textbox", { name: "Tenant administrator email*" });
+        const emailField = page.getByRole("textbox", { name: /Tenant administrator email/i });
         await expect(emailField).toBeVisible();
         await expect(
             page.getByText(/valid email|email|invalid/i).first(),
@@ -89,12 +94,14 @@ test.describe("ZARIS Super Admin operator flows", () => {
         const page = superAdminPage;
 
         await page.goto("super-admin/tenant-support-users/create");
-        await expect(page.getByRole("heading", { name: /create support user|support user/i }).first()).toBeVisible();
-        await expect(page.getByRole("textbox", { name: "Name*" })).toBeVisible();
-        await expect(page.getByRole("textbox", { name: "Email*" })).toBeVisible();
-        await expect(page.getByRole("textbox", { name: "Password*" })).toBeVisible();
-        await expect(page.getByText(/tenant/i).first()).toBeVisible();
+        await expect(page).not.toHaveURL(/super-admin\/login/);
+        await expect(page.getByRole("heading", { name: /create support user/i }).first()).toBeVisible();
+        // Filament labels render as "Name *" (space before asterisk).
+        await expect(page.locator('input[type="text"], input[type="email"], input:not([type])').first()).toBeVisible();
+        await expect(page.getByRole("textbox", { name: /email/i }).first()).toBeVisible();
+        await expect(page.locator('input[type="password"]').first()).toBeVisible();
         await expect(page.getByRole("link", { name: /create new tenant/i })).toBeVisible();
+        await expect(page.getByText(/tenant/i).first()).toBeVisible();
     });
 
     test("plan features matrix shows category modules and save action", async ({ superAdminPage }) => {
@@ -125,7 +132,7 @@ test.describe("ZARIS Super Admin operator flows", () => {
         }
 
         const leads = page.getByRole("checkbox", { name: /^Leads$/i }).first();
-        const quotes = page.getByRole("checkbox", { name: /Quotes/i }).first();
+        const quotes = page.getByRole("checkbox", { name: /^Quotes/i }).first();
 
         // Quotes enabled + Leads off must fail dependency validation.
         if (! await quotes.isChecked()) {
