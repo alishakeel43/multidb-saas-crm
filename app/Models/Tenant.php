@@ -15,12 +15,15 @@ class Tenant extends SpatieTenant
         'plan_id',
         'status',
         'trial_ends_at',
+        'storage_quota_mb',
+        'stripe_customer_id',
     ];
 
     protected function casts(): array
     {
         return [
             'trial_ends_at' => 'datetime',
+            'storage_quota_mb' => 'integer',
         ];
     }
 
@@ -47,5 +50,20 @@ class Tenant extends SpatieTenant
     public function supportUsers(): HasMany
     {
         return $this->hasMany(TenantSupportUser::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function latestSubscription(): ?Subscription
+    {
+        return $this->subscriptions()->latest('starts_at')->first();
     }
 }

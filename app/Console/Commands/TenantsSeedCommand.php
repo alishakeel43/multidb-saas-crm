@@ -3,12 +3,13 @@
 namespace App\Console\Commands;
 
 use Database\Seeders\TenantCrmSeeder;
+use Database\Seeders\TenantDemoSeeder;
 
 class TenantsSeedCommand extends TenantMaintenanceCommand
 {
-    protected $signature = 'tenants:seed {tenant? : Tenant slug or ID} {--all : Seed every tenant}';
+    protected $signature = 'tenants:seed {tenant? : Tenant slug or ID} {--all : Seed every tenant} {--demo : Also add repeatable demo CRM records}';
 
-    protected $description = 'Seed safe Krayin CRM baseline data for one tenant or all tenants';
+    protected $description = 'Seed Krayin CRM baseline data and optional demo records for tenant(s)';
 
     protected function tenantCommand(): string
     {
@@ -17,6 +18,10 @@ class TenantsSeedCommand extends TenantMaintenanceCommand
 
     protected function tenantCommandArguments(): array
     {
-        return ['--class' => TenantCrmSeeder::class];
+        return [
+            '--class' => $this->option('demo')
+                ? TenantDemoSeeder::class
+                : TenantCrmSeeder::class,
+        ];
     }
 }

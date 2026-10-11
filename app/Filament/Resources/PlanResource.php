@@ -34,6 +34,8 @@ class PlanResource extends Resource
                 TextInput::make('monthly_price')->numeric()->minValue(0)->required(),
                 TextInput::make('currency')->length(3)->required(),
                 TextInput::make('sort_order')->numeric()->minValue(0)->required(),
+                TextInput::make('storage_quota_mb')->label('Storage quota (MB)')->numeric()->minValue(0),
+                TextInput::make('stripe_price_id')->label('Stripe price ID')->maxLength(255),
                 Toggle::make('is_active')->required(),
             ]);
     }

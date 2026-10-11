@@ -14,7 +14,7 @@ class RecentTenantsTable extends TableWidget
 {
     protected static ?int $sort = -1;
 
-    protected int|string|array $columnSpan = 1;
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -30,8 +30,8 @@ class RecentTenantsTable extends TableWidget
                     ->latest()
                     ->limit(5)
             )
-            ->heading('Recent tenants')
-            ->description('Latest workspaces with their primary administrator and CRM seat usage.')
+            ->heading('Recent workspaces')
+            ->description('Newest tenant workspaces with administrator, seat count, and CRM database status.')
             ->columns([
                 TextColumn::make('name')
                     ->label('Workspace')

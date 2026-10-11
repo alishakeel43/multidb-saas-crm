@@ -44,9 +44,13 @@ class TenantGrowthChart extends ChartWidget
                         ->all(),
                     'fill' => 'start',
                     'tension' => 0.35,
+                    'borderColor' => '#0f766e',
+                    'backgroundColor' => 'rgba(15, 118, 110, 0.12)',
+                    'pointBackgroundColor' => '#0f766e',
+                    'pointBorderColor' => '#0f766e',
                 ],
             ],
-            'labels' => $months->map(fn (Carbon $month): string => $month->format('M'))->all(),
+            'labels' => $months->map(fn (Carbon $month): string => $month->format('M Y'))->all(),
         ];
     }
 

@@ -100,6 +100,57 @@ In order to do that, run the command below:
 Open the specified entry point in your hosts file in your browser or make an entry in hosts file if not done.
 ```
 
+### SaaS platform ops
+
+Landlord schema (plans, tenants, invoices, activity log, health history):
+
+```bash
+php artisan migrate --database=landlord --path=database/migrations/landlord --force
+```
+
+Super Admin panel: `/super-admin` (create a platform user with `php artisan platform-admin:create`).
+
+Optional Stripe billing (manual invoices always work):
+
+```env
+STRIPE_KEY=pk_test_...
+STRIPE_SECRET=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+Webhook endpoint: `POST /stripe/webhook`
+
+Useful commands:
+
+```bash
+php artisan saas:subscriptions:tick
+php artisan saas:tenants:backup --all
+php artisan saas:tenants:restore {slug} {timestamp} --force
+php artisan backup:run
+php artisan health:check
+```
+
+Set `SAAS_ENFORCE_SUBSCRIPTION=true` to block tenant CRM access when a subscription is expired/canceled. Enable MFA from Super Admin → Two-factor auth.
+
+### Tenant CRM demo data
+
+Run tenant seed commands from the project root. They target registered tenant
+databases, not the landlord database:
+
+```bash
+# Apply pending CRM migrations and add standard lookup data
+php artisan tenants:migrate demo
+php artisan tenants:seed demo
+
+# Also add sample organizations, contacts, leads, and an activity
+php artisan tenants:seed demo --demo
+```
+
+Use `--all` instead of `demo` to target every registered tenant. The `--demo`
+option is repeatable: sample records are clearly marked and are not duplicated
+when the command is run again. It requires a provisioned tenant with an existing
+CRM user and baseline lookup data; it does not create users or delete records.
+
 ##### On local:
 
 ```

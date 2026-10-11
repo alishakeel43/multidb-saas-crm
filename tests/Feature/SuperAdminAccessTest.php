@@ -81,7 +81,7 @@ it('shows a platform overview instead of the default framework information card'
     $response = $this->actingAs($activeUser, 'platform')
         ->get('/super-admin')
         ->assertOk()
-        ->assertSee('Platform overview')
+        ->assertSee('Operations overview')
         ->assertDontSee('filament v');
 
     $panel = Filament::getPanel('super-admin');

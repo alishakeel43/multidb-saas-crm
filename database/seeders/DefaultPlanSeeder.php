@@ -19,6 +19,7 @@ class DefaultPlanSeeder extends Seeder
                 'currency' => 'USD',
                 'is_active' => true,
                 'sort_order' => 0,
+                'storage_quota_mb' => 1024,
             ],
         );
 

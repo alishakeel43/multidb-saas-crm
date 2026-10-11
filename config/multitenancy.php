@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Tenant as AppTenant;
+use App\Multitenancy\Tasks\SwitchTenantStorageTask;
 use App\Multitenancy\TenantFinder\DomainTenantFinder;
 use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Events\CallQueuedListener;
@@ -27,6 +28,13 @@ return [
     'tenant_finder' => DomainTenantFinder::class,
 
     /*
+     * The base domain used to build tenant subdomains automatically.
+     * Tenants are provisioned at {slug}.{tenant_base_domain}.
+     * Override in .env with TENANT_BASE_DOMAIN.
+     */
+    'tenant_base_domain' => env('TENANT_BASE_DOMAIN', 'localhost'),
+
+    /*
      * These fields are used by tenant:artisan command to match one or more tenant.
      */
     'tenant_artisan_search_fields' => [
@@ -40,7 +48,7 @@ return [
      */
     'switch_tenant_tasks' => [
         // \Spatie\Multitenancy\Tasks\PrefixCacheTask::class,
-        \App\Multitenancy\Tasks\SwitchTenantStorageTask::class,
+        SwitchTenantStorageTask::class,
         SwitchTenantDatabaseTask::class,
         // \Spatie\Multitenancy\Tasks\SwitchRouteCacheTask::class,
     ],

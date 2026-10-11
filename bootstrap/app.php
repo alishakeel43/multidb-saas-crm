@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnforceTenantStorageQuota;
+use App\Http\Middleware\EnsureTenantSubscriptionActive;
 use App\Http\Middleware\FeatureEntitlementMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->append(CanInstall::class);
         $middleware->appendToGroup('web', FeatureEntitlementMiddleware::class);
+        $middleware->appendToGroup('web', EnsureTenantSubscriptionActive::class);
+        $middleware->appendToGroup('web', EnforceTenantStorageQuota::class);
 
         $middleware->encryptCookies(except: [
             'dark_mode',
@@ -28,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'admin/mail/inbound-parse',
             'admin/web-forms/forms/*',
+            'stripe/webhook',
         ]);
 
         $middleware->api(prepend: [

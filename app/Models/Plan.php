@@ -18,6 +18,8 @@ class Plan extends Model
         'currency',
         'is_active',
         'sort_order',
+        'storage_quota_mb',
+        'stripe_price_id',
     ];
 
     protected function casts(): array
@@ -26,6 +28,7 @@ class Plan extends Model
             'monthly_price' => 'decimal:2',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'storage_quota_mb' => 'integer',
         ];
     }
 

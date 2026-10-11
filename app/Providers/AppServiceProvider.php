@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Health\Checks\StripeConfiguredCheck;
 use App\Models\PlanFeature;
 use App\Models\Tenant;
 use App\Models\TenantFeature;
@@ -9,6 +10,11 @@ use App\Observers\RejectSupportUserOwnership;
 use App\Services\FeatureEntitlementService;
 use App\Services\TenantOverviewService;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Health\Checks\Checks\DatabaseCheck;
+use Spatie\Health\Checks\Checks\DebugModeCheck;
+use Spatie\Health\Checks\Checks\EnvironmentCheck;
+use Spatie\Health\Checks\Checks\UsedDiskSpaceCheck;
+use Spatie\Health\Facades\Health;
 use Webkul\Activity\Models\Activity;
 use Webkul\Activity\Models\Participant;
 use Webkul\Contact\Models\Organization;
@@ -32,6 +38,14 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(database_path('migrations/tenant'));
+
+        Health::checks([
+            DatabaseCheck::new()->connectionName('landlord')->name('Landlord database'),
+            UsedDiskSpaceCheck::new(),
+            DebugModeCheck::new(),
+            EnvironmentCheck::new(),
+            StripeConfiguredCheck::new(),
+        ]);
 
         foreach ([Activity::class, Participant::class, Organization::class, Person::class, Lead::class, Quote::class] as $model) {
             $model::observe(RejectSupportUserOwnership::class);

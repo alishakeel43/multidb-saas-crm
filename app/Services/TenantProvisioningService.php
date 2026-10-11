@@ -147,6 +147,13 @@ class TenantProvisioningService
 
         $this->restoreTenant($previousTenant);
 
+        audit('tenant.provisioned', [
+            'tenant_id' => $tenant->id,
+            'slug' => $tenant->slug,
+            'domain' => $domain,
+            'plan_id' => $tenant->plan_id,
+        ], $tenant, 'provisioned');
+
         return $tenant->refresh();
     }
 

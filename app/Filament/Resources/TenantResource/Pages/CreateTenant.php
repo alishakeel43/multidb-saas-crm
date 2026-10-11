@@ -21,12 +21,14 @@ class CreateTenant extends CreateRecord
         $adminPassword = $data['admin_password'];
         unset($data['admin_password']);
         $this->data = [];
+        $baseDomain = config('multitenancy.tenant_base_domain', 'localhost');
+        $domain = $data['domain'] ?? ($data['slug'].'.'.$baseDomain);
 
         try {
             return app(TenantProvisioningService::class)->provision(
                 name: $data['name'],
                 slug: $data['slug'],
-                domain: $data['domain'],
+                domain: $domain,
                 adminName: $data['admin_name'],
                 adminEmail: $data['admin_email'],
                 adminPassword: $adminPassword,

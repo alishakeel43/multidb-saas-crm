@@ -20,3 +20,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('inbound-emails:process')->everyFiveMinutes();
+Schedule::command('saas:subscriptions:tick')->daily();
+Schedule::command('saas:tenants:backup --all')->dailyAt('02:15');
+Schedule::command('backup:run')->dailyAt('02:30');
+Schedule::command('health:check')->everyFiveMinutes();

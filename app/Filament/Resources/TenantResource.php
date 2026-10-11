@@ -5,11 +5,15 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\TenantResource\Pages;
 use App\Models\Domain;
 use App\Models\Tenant;
+use App\Services\StorageQuotaService;
 use App\Services\TenantOverviewService;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
@@ -41,13 +45,36 @@ class TenantResource extends Resource
                     ->required()
                     ->maxLength(100)
                     ->unique(ignoreRecord: true)
-                    ->visibleOn('create'),
+                    ->visibleOn('create')
+                    ->live(debounce: 400)
+                    ->afterStateUpdated(function (string $state, Set $set) {
+                        $baseDomain = config('multitenancy.tenant_base_domain', 'localhost');
+                        $slug = strtolower(trim($state));
+
+                        if ($slug !== '') {
+                            $set('domain', "{$slug}.{$baseDomain}");
+                        }
+                    }),
+                // Hidden — carries computed domain value on form submit
                 TextInput::make('domain')
-                    ->label('Primary domain')
                     ->required()
                     ->maxLength(255)
                     ->unique(Domain::class, 'domain')
+                    ->hidden()
                     ->visibleOn('create'),
+
+                // Visual read-only span shown below the slug field
+                Placeholder::make('domain_preview')
+                    ->label('Primary domain')
+                    ->content(function (Get $get, ?Tenant $record): string {
+                        if ($record !== null) {
+                            return $record->domains->first()?->domain ?? '—';
+                        }
+
+                        return $get('domain') ?: 'Type a slug above';
+                    })
+                    ->visibleOn(['create', 'edit']),
+
                 TextInput::make('admin_name')
                     ->label('Tenant administrator name')
                     ->required()
@@ -81,6 +108,28 @@ class TenantResource extends Resource
                     ->preload()
                     ->visibleOn('edit'),
                 DateTimePicker::make('trial_ends_at')
+                    ->visibleOn('edit'),
+                TextInput::make('storage_quota_mb')
+                    ->label('Storage quota override (MB)')
+                    ->numeric()
+                    ->minValue(0)
+                    ->visibleOn('edit'),
+                Placeholder::make('storage_usage')
+                    ->label('Storage usage')
+                    ->content(function (?Tenant $record): string {
+                        if (! $record) {
+                            return '—';
+                        }
+
+                        $summary = app(StorageQuotaService::class)->summary($record);
+
+                        return "{$summary['used_mb']} MB / {$summary['quota_mb']} MB ({$summary['percent']}%)";
+                    })
+                    ->visibleOn('edit'),
+                TextInput::make('stripe_customer_id')
+                    ->label('Stripe customer ID')
+                    ->disabled()
+                    ->dehydrated(false)
                     ->visibleOn('edit'),
             ]);
     }
