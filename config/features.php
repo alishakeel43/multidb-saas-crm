@@ -84,6 +84,16 @@ return [
         'route_prefixes' => ['admin.quotes.', 'admin.leads.quotes.'],
         'menu_keys' => ['quotes'],
     ],
+    'quote_approvals' => [
+        'label' => 'Quote approvals',
+        'category' => 'sales',
+        'default_enabled' => true,
+        'depends_on' => ['quotes'],
+        'route_prefixes' => ['admin.quotes.approvals.'],
+        'menu_keys' => ['quotes.approvals'],
+        'menu_any_keys' => ['quotes'],
+        'menu_any_routes' => ['quotes' => 'admin.quotes.index'],
+    ],
     'mail' => [
         'label' => 'Mail',
         'category' => 'communication',

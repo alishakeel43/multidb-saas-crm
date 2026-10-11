@@ -35,6 +35,7 @@ it('groups features into configured categories', function () {
         ->and($grouped['crm']['features'])->toHaveKey('contacts')
         ->and($grouped['crm']['features'])->not->toHaveKey('organizations')
         ->and($grouped['sales']['features'])->toHaveKey('products')
+        ->and($grouped['sales']['features'])->toHaveKey('quote_approvals')
         ->and($grouped['automation']['features'])->toHaveKey('workflows');
 });
 
@@ -72,6 +73,7 @@ it('syncs plan feature checkboxes into landlord plan_features rows', function ()
     $enabled = $matrix->enabledMapForPlan($plan);
     $enabled['products'] = false;
     $enabled['quotes'] = false;
+    $enabled['quote_approvals'] = false;
 
     $matrix->syncPlan($plan, $enabled);
 
