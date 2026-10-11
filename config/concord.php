@@ -3,6 +3,7 @@
 use Webkul\Admin\Providers\ModuleServiceProvider as AdminModuleServiceProvider;
 use Webkul\Attribute\Providers\ModuleServiceProvider as AttributeModuleServiceProvider;
 use Webkul\Automation\Providers\ModuleServiceProvider as AutomationModuleServiceProvider;
+use Webkul\Consent\Providers\ModuleServiceProvider as ConsentModuleServiceProvider;
 use Webkul\Contact\Providers\ModuleServiceProvider as ContactModuleServiceProvider;
 use Webkul\Core\Providers\ModuleServiceProvider as CoreModuleServiceProvider;
 use Webkul\DataGrid\Providers\ModuleServiceProvider as DataGridModuleServiceProvider;
@@ -23,6 +24,7 @@ return [
         AdminModuleServiceProvider::class,
         AttributeModuleServiceProvider::class,
         AutomationModuleServiceProvider::class,
+        ConsentModuleServiceProvider::class,
         ContactModuleServiceProvider::class,
         CoreModuleServiceProvider::class,
         DataGridModuleServiceProvider::class,

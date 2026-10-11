@@ -161,6 +161,14 @@ return [
             'settings.automation' => 'admin.settings.email_templates.index',
         ],
     ],
+    'consent' => [
+        'label' => 'Consent management',
+        'category' => 'marketing',
+        'default_enabled' => true,
+        'depends_on' => ['contacts'],
+        'route_prefixes' => ['admin.settings.consent.'],
+        'menu_keys' => ['settings.consent'],
+    ],
     'marketing' => [
         'label' => 'Marketing',
         'category' => 'marketing',

@@ -35,6 +35,7 @@ it('groups features into configured categories', function () {
         ->and($grouped['crm']['features'])->toHaveKey('contacts')
         ->and($grouped['crm']['features'])->not->toHaveKey('organizations')
         ->and($grouped['sales']['features'])->toHaveKey('products')
+        ->and($grouped['marketing']['features'])->toHaveKey('consent')
         ->and($grouped['automation']['features'])->toHaveKey('workflows');
 });
 
@@ -150,6 +151,7 @@ it('keeps the legacy organizations alias locked to contacts when syncing', funct
     $enabled = $matrix->enabledMapForPlan($plan);
     $enabled['contacts'] = false;
     $enabled['organizations'] = true;
+    $enabled['consent'] = false;
 
     $matrix->syncPlan($plan, $enabled);
 
