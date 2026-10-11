@@ -1,0 +1,17 @@
+{
+    "name": "webkul/consent",
+    "description": "Marketing consent and suppression lists for Krayin CRM",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Webkul\\Consent\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\Consent\\Providers\\ConsentServiceProvider"
+            ]
+        }
+    }
+}

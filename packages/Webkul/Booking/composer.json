@@ -1,0 +1,17 @@
+{
+    "name": "webkul/booking",
+    "description": "Appointment booking for Krayin CRM",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Webkul\\Booking\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\Booking\\Providers\\BookingServiceProvider"
+            ]
+        }
+    }
+}

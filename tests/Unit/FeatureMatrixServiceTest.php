@@ -33,8 +33,12 @@ it('groups features into configured categories', function () {
     expect($grouped)->toHaveKey('crm')
         ->and($grouped['crm']['features'])->toHaveKey('leads')
         ->and($grouped['crm']['features'])->toHaveKey('contacts')
+        ->and($grouped['crm']['features'])->toHaveKey('bookings')
         ->and($grouped['crm']['features'])->not->toHaveKey('organizations')
         ->and($grouped['sales']['features'])->toHaveKey('products')
+        ->and($grouped['sales']['features'])->toHaveKey('assignment')
+        ->and($grouped['sales']['features'])->toHaveKey('quote_approvals')
+        ->and($grouped['marketing']['features'])->toHaveKey('consent')
         ->and($grouped['automation']['features'])->toHaveKey('workflows');
 });
 
@@ -72,6 +76,7 @@ it('syncs plan feature checkboxes into landlord plan_features rows', function ()
     $enabled = $matrix->enabledMapForPlan($plan);
     $enabled['products'] = false;
     $enabled['quotes'] = false;
+    $enabled['quote_approvals'] = false;
 
     $matrix->syncPlan($plan, $enabled);
 
@@ -150,6 +155,7 @@ it('keeps the legacy organizations alias locked to contacts when syncing', funct
     $enabled = $matrix->enabledMapForPlan($plan);
     $enabled['contacts'] = false;
     $enabled['organizations'] = true;
+    $enabled['consent'] = false;
 
     $matrix->syncPlan($plan, $enabled);
 
