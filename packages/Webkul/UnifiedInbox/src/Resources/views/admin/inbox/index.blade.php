@@ -9,42 +9,75 @@
         $waConn = $connections->firstWhere('channel', 'whatsapp');
         $msgConn = $connections->firstWhere('channel', 'messenger');
         $igConn = $connections->firstWhere('channel', 'instagram');
+
+        // "Linked" = a ChannelConnection row for this tenant with status 'connected'
+        $uiLinked = $connections->where('status', 'connected')->pluck('channel')->unique()->values();
+        $uiTab = request('channel');
+        $uiTabLinked = $uiTab ? $uiLinked->contains($uiTab) : $uiLinked->isNotEmpty();
+
+        // Never show threads/rows from unlinked channels
+        if ($activeConversation && ! $uiLinked->contains($activeConversation->channel)) {
+            $activeConversation = null;
+        }
     @endphp
 
     <!-- Master Unified Inbox Workspace (Reference Design) -->
     <div class="ui-workspace {{ $activeConversation ? 'ui-detail' : 'ui-index' }}" v-pre>
         @include('unified_inbox::partials.header')
 
+        @if (! $uiTabLinked)
+        <section class="ui-connect-gate">
+            @if ($uiTab)
+                <span class="ui-channel ui-channel-{{ $uiTab }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $uiTab])</span>
+                <h2>{{ $channels[$uiTab]['label'] ?? ucfirst($uiTab) }} is not connected</h2>
+                <p class="ui-muted">Connect this channel to see and reply to its conversations here.</p>
+            @else
+                <span class="ui-channel" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => 'all'])</span>
+                <h2>No channels connected</h2>
+                <p class="ui-muted">Connect WhatsApp, Messenger or Instagram to start receiving conversations.</p>
+            @endif
+            <a class="primary-button" href="{{ route('admin.unified_inbox.channels.index') }}">@lang('unified_inbox::app.inbox.connect-channels')</a>
+        </section>
+        @else
         <div class="ui-columns">
             @include('unified_inbox::partials.list')
 
             @if ($activeConversation)
                 <div class="ui-chat-layout">
                     <!-- Center Chat Column -->
-                    <section class="ui-chat">
+                    <section class="ui-chat ui-thread ui-thread-{{ $activeConversation->channel }}">
                         <header class="ui-chat-header">
-                            <a class="secondary-button" href="{{ route('admin.unified_inbox.index', request()->except('conversation_id')) }}" aria-label="Back">←</a>
-                            @php
-                                $displayName = $activeConversation->customer_name;
-                            @endphp
+                            <a class="secondary-button ui-icon-btn ui-back" href="{{ route('admin.unified_inbox.index', request()->except('conversation_id')) }}" aria-label="Back">←</a>
+                            @php $displayName = $activeConversation->customer_name; @endphp
                             <span class="ui-avatar">{{ mb_strtoupper(mb_substr($displayName, 0, 1)) }}</span>
-                            <div style="flex:1;min-width:0">
+                            <div class="ui-chat-title">
                                 <h1 class="truncate">{{ $displayName }}</h1>
-                                <p class="ui-muted ui-channel-label">
-                                    <span class="ui-channel ui-channel-{{ $activeConversation->channel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $activeConversation->channel])</span>
-                                    {{ ucfirst($activeConversation->channel) }} · <span class="capitalize">{{ $activeConversation->status }}</span> · <span class="font-mono text-xs">{{ $activeConversation->external_id }}</span>
+                                <p class="ui-chat-sub">
+                                    <span class="ui-pill ui-pill-{{ $activeConversation->channel }}">
+                                        <span class="ui-channel ui-channel-{{ $activeConversation->channel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $activeConversation->channel])</span>
+                                        {{ $channels[$activeConversation->channel]['label'] ?? ucfirst($activeConversation->channel) }}
+                                    </span>
+                                    <span class="font-mono">{{ $activeConversation->external_id }}</span>
+                                    <span class="ui-pill ui-pill-status-{{ $activeConversation->status }}">{{ ucfirst($activeConversation->status) }}</span>
                                 </p>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="ui-chat-actions">
+                                <div class="ui-assignee">
+                                    <span class="ui-muted">Assigned to</span>
+                                    <strong>{{ $activeConversation->user?->name ?? 'Unassigned' }}</strong>
+                                </div>
                                 <select
                                     id="status-selector"
+                                    aria-label="Conversation status"
                                     onchange="updateConversationStatus({{ $activeConversation->id }}, this.value)"
-                                    class="secondary-button text-xs py-1 px-2"
                                 >
-                                    <option value="open" @selected($activeConversation->status === 'open')>🟢 Open</option>
-                                    <option value="pending" @selected($activeConversation->status === 'pending')>🟡 Pending</option>
-                                    <option value="closed" @selected($activeConversation->status === 'closed')>⚪ Closed</option>
+                                    <option value="open" @selected($activeConversation->status === 'open')>Open</option>
+                                    <option value="pending" @selected($activeConversation->status === 'pending')>Pending</option>
+                                    <option value="closed" @selected($activeConversation->status === 'closed')>Closed</option>
                                 </select>
+                                @if ($activeConversation->status !== 'closed')
+                                    <button type="button" class="secondary-button ui-icon-btn" title="Mark as closed" aria-label="Mark as closed" onclick="updateConversationStatus({{ $activeConversation->id }}, 'closed')">✓</button>
+                                @endif
                             </div>
                         </header>
 
@@ -56,52 +89,51 @@
                                 </div>
                             @endif
 
+                            @php $uiLastDay = null; @endphp
                             @forelse ($activeMessages as $message)
+                                @php $uiDay = $message->occurred_at?->format('D, d M Y'); @endphp
+                                @if ($uiDay && $uiDay !== $uiLastDay)
+                                    <div class="ui-day"><span>{{ $uiDay }}</span></div>
+                                    @php $uiLastDay = $uiDay; @endphp
+                                @endif
                                 <article class="ui-message ui-message-{{ $message->direction }}">
+                                    <p v-pre class="whitespace-pre-wrap break-words">{{ $message->body }}</p>
                                     <div class="ui-message-meta">
-                                        <strong>{{ ucfirst($message->direction) }}</strong>
-                                        <span>{{ $message->occurred_at ? $message->occurred_at->format('M d, H:i') : '' }} · {{ ucfirst($message->status) }}</span>
+                                        <span>{{ $message->occurred_at?->format('H:i') }}</span>
+                                        @if ($message->direction === 'outbound')
+                                            <span class="ui-msg-status ui-msg-status-{{ $message->status }}" title="{{ ucfirst($message->status) }}">{{ in_array($message->status, ['read', 'delivered']) ? '✓✓' : ($message->status === 'failed' ? '!' : '✓') }}</span>
+                                        @endif
                                     </div>
-                                    <p v-pre class="mt-1 whitespace-pre-wrap break-words leading-relaxed">{{ $message->body }}</p>
                                 </article>
                             @empty
-                                <div class="p-8 text-center text-slate-400">
-                                    <span class="ui-avatar mx-auto mb-2" aria-hidden="true">👋</span>
-                                    <p class="font-semibold text-xs">Start the conversation</p>
-                                    <p class="ui-muted text-xs">Type a message below or use a quick reply.</p>
+                                <div class="ui-history-empty">
+                                    <p class="ui-history-empty-title">No messages yet</p>
+                                    <p class="ui-muted">Send the first reply below.</p>
                                 </div>
                             @endforelse
                         </div>
 
                         <!-- Chat Composer -->
                         <div class="ui-composer">
-                            <!-- Quick Replies Canned Suggestions -->
-                            <div class="mb-3 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar">
-                                <span class="ui-muted text-xs font-bold">⚡ Quick:</span>
-                                <button type="button" onclick="insertCanned('Hello! Thank you for contacting us. How can I assist you today?')" class="secondary-button text-xs py-1 px-2.5 whitespace-nowrap">
-                                    👋 Greeting
-                                </button>
-                                <button type="button" onclick="insertCanned('We have received your requirement. A team member will follow up shortly.')" class="secondary-button text-xs py-1 px-2.5 whitespace-nowrap">
-                                    📋 Request Received
-                                </button>
-                                <button type="button" onclick="insertCanned('Could you please share your requirements so we can prepare a tailored quote?')" class="secondary-button text-xs py-1 px-2.5 whitespace-nowrap">
-                                    💼 Quote Inquiry
-                                </button>
+                            <div class="ui-composer-tabs" role="tablist">
+                                <span class="ui-composer-tab" role="tab" aria-selected="true">Reply</span>
+                                <span class="ui-composer-tab" role="tab" aria-disabled="true" title="Internal notes are not available yet">Internal Note <small>Soon</small></span>
                             </div>
-
-                            <form id="message-form" onsubmit="event.preventDefault(); sendMessage({{ $activeConversation->id }});" class="flex flex-col gap-2">
+                            <div class="ui-quick">
+                                <button type="button" onclick="insertCanned('Hello! Thank you for contacting us. How can I assist you today?')" class="ui-chip">Greeting</button>
+                                <button type="button" onclick="insertCanned('We have received your requirement. A team member will follow up shortly.')" class="ui-chip">Request received</button>
+                                <button type="button" onclick="insertCanned('Could you please share your requirements so we can prepare a tailored quote?')" class="ui-chip">Quote inquiry</button>
+                            </div>
+                            <form id="message-form" onsubmit="event.preventDefault(); sendMessage({{ $activeConversation->id }});">
                                 <textarea
                                     id="message-input"
-                                    rows="3"
+                                    rows="2"
                                     placeholder="@lang('unified_inbox::app.inbox.type-message')"
                                     onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage({{ $activeConversation->id }}); }"
-                                    class="w-full"
                                 ></textarea>
-                                <div class="flex items-center justify-between">
-                                    <span class="ui-muted text-xs">Press Enter to send</span>
-                                    <button type="submit" id="send-button" class="primary-button text-xs px-5 py-2">
-                                        <span>Send Reply</span>
-                                    </button>
+                                <div class="ui-composer-bar">
+                                    <span class="ui-muted">Enter to send · Shift+Enter for new line</span>
+                                    <button type="submit" id="send-button" class="primary-button"><span>Send</span></button>
                                 </div>
                             </form>
                         </div>
@@ -114,102 +146,100 @@
                         data-ui-side-tabs
                         data-conversation-id="{{ $activeConversation->id }}"
                     >
-                        <div class="ui-profile-head">
-                            <span class="ui-avatar">{{ mb_strtoupper(mb_substr($activeConversation->customer_name, 0, 1)) }}</span>
-                            <div class="ui-profile-head-copy">
-                                <h2>{{ $activeConversation->customer_name }}</h2>
-                                <p class="ui-muted">{{ ucfirst($activeConversation->channel) }} · <span class="capitalize">{{ $activeConversation->status }}</span></p>
-                            </div>
-                        </div>
-
                         <div class="ui-side-tabs-root">
-                            @php
-                                $sideTabGroup = 'ui-side-tabs-'.$activeConversation->id;
-                            @endphp
+                            @php $sideTabGroup = 'ui-side-tabs-'.$activeConversation->id; $c = $activeConversation; @endphp
                             <input type="radio" class="ui-side-radio" name="{{ $sideTabGroup }}" id="{{ $sideTabGroup }}-overview" data-side-tab="overview" checked>
                             <input type="radio" class="ui-side-radio" name="{{ $sideTabGroup }}" id="{{ $sideTabGroup }}-crm" data-side-tab="crm">
                             <input type="radio" class="ui-side-radio" name="{{ $sideTabGroup }}" id="{{ $sideTabGroup }}-work" data-side-tab="work">
 
                             <div class="ui-side-tablist" role="tablist">
-                                <label class="ui-side-tab" for="{{ $sideTabGroup }}-overview" data-side-tab="overview">Overview</label>
-                                <label class="ui-side-tab" for="{{ $sideTabGroup }}-crm" data-side-tab="crm">CRM Links</label>
-                                <label class="ui-side-tab" for="{{ $sideTabGroup }}-work" data-side-tab="work">Work</label>
+                                <label class="ui-side-tab" for="{{ $sideTabGroup }}-overview" data-side-tab="overview">Customer</label>
+                                <label class="ui-side-tab" for="{{ $sideTabGroup }}-crm" data-side-tab="crm">CRM Records</label>
+                                <label class="ui-side-tab" for="{{ $sideTabGroup }}-work" data-side-tab="work">Activity</label>
                             </div>
 
                             <div class="ui-side-panels">
-                                <!-- TAB 1: Overview -->
                                 <div class="ui-side-panel" role="tabpanel" data-side-panel="overview">
+                                    <section class="ui-profile-head">
+                                        <span class="ui-avatar ui-avatar-lg">{{ mb_strtoupper(mb_substr($c->customer_name, 0, 1)) }}</span>
+                                        <div class="ui-profile-head-copy">
+                                            <h2>{{ $c->customer_name }}</h2>
+                                            <span class="ui-pill ui-pill-{{ $c->channel }}">{{ $channels[$c->channel]['label'] ?? ucfirst($c->channel) }}</span>
+                                        </div>
+                                    </section>
                                     <section>
-                                        <h2>Conversation Info</h2>
-                                        <div class="ui-side-item">
-                                            <p class="ui-muted">Customer External ID</p>
-                                            <p class="font-mono text-xs">{{ $activeConversation->external_id }}</p>
+                                        <dl class="ui-dl">
+                                            <dt>{{ $c->channel === 'whatsapp' ? 'Phone' : 'External ID' }}</dt><dd class="font-mono">{{ $c->external_id }}</dd>
+                                            @if ($c->person?->emails)
+                                                <dt>Email</dt><dd>{{ collect($c->person->emails)->pluck('value')->filter()->first() ?? '—' }}</dd>
+                                            @endif
+                                            <dt>Last message</dt><dd>{{ $c->last_message_at?->format('d M Y, H:i') ?? '—' }}</dd>
+                                            <dt>Last inbound</dt><dd>{{ $c->last_incoming_at?->diffForHumans() ?? '—' }}</dd>
+                                        </dl>
+                                    </section>
+                                    <section>
+                                        <h2>Quick Actions</h2>
+                                        <div class="ui-quick-actions">
+                                            @if (! $c->person)
+                                                <button type="button" class="secondary-button" onclick="createPersonFromChat({{ $c->id }})">＋ Create Contact</button>
+                                            @endif
+                                            @if (! $c->lead)
+                                                <button type="button" class="secondary-button" onclick="createLeadFromChat({{ $c->id }})">＋ Create Lead</button>
+                                            @endif
+                                            <a class="secondary-button" href="{{ route('admin.activities.index') }}">Activities</a>
                                         </div>
-                                        <div class="ui-side-item">
-                                            <p class="ui-muted">Channel</p>
-                                            <p class="font-semibold text-xs">{{ ucfirst($activeConversation->channel) }}</p>
-                                        </div>
-                                        <div class="ui-side-item">
-                                            <p class="ui-muted">Assigned Agent</p>
-                                            <select
-                                                id="agent-selector"
-                                                onchange="assignConversationAgent({{ $activeConversation->id }}, this.value)"
-                                                class="w-full mt-1.5"
-                                            >
+                                    </section>
+                                    <section>
+                                        <h2>Conversation Status</h2>
+                                        <label class="ui-field">Assigned agent
+                                            <select id="agent-selector" onchange="assignConversationAgent({{ $c->id }}, this.value)">
                                                 <option value="">Unassigned</option>
                                                 @foreach ($users as $user)
-                                                    <option value="{{ $user->id }}" @selected($activeConversation->user_id === $user->id)>{{ $user->name }}</option>
+                                                    <option value="{{ $user->id }}" @selected($c->user_id === $user->id)>{{ $user->name }}</option>
                                                 @endforeach
                                             </select>
+                                        </label>
+                                        <label class="ui-field">Status
+                                            <select onchange="updateConversationStatus({{ $c->id }}, this.value)">
+                                                @foreach (['open', 'pending', 'closed'] as $st)
+                                                    <option value="{{ $st }}" @selected($c->status === $st)>{{ ucfirst($st) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                    </section>
+                                </div>
+
+                                <div class="ui-side-panel" role="tabpanel" data-side-panel="crm">
+                                    <section>
+                                        <h2>Linked CRM Records</h2>
+                                        <div class="ui-record">
+                                            <span class="ui-record-label">Contact</span>
+                                            @if ($c->person)
+                                                <span class="ui-record-value">{{ $c->person->name }}</span>
+                                                <a class="secondary-button" href="{{ route('admin.contacts.persons.edit', $c->person->id) }}">View</a>
+                                            @else
+                                                <span class="ui-record-value ui-muted">Not linked</span>
+                                                <button type="button" class="secondary-button" onclick="createPersonFromChat({{ $c->id }})">＋ Create</button>
+                                            @endif
+                                        </div>
+                                        <div class="ui-record">
+                                            <span class="ui-record-label">Lead</span>
+                                            @if ($c->lead)
+                                                <span class="ui-record-value">{{ $c->lead->title }}</span>
+                                                <a class="secondary-button" href="{{ route('admin.leads.view', $c->lead->id) }}">View</a>
+                                            @else
+                                                <span class="ui-record-value ui-muted">Not linked</span>
+                                                <button type="button" class="secondary-button" onclick="createLeadFromChat({{ $c->id }})">＋ Create</button>
+                                            @endif
                                         </div>
                                     </section>
                                 </div>
 
-                                <!-- TAB 2: CRM Links -->
-                                <div class="ui-side-panel" role="tabpanel" data-side-panel="crm">
-                                    <section>
-                                        <h2>CRM Contact (Person)</h2>
-                                        @if ($activeConversation->person)
-                                            <div class="ui-side-item">
-                                                <p class="font-semibold text-xs text-blue-600">{{ $activeConversation->person->name }}</p>
-                                                <a href="{{ route('admin.contacts.persons.edit', $activeConversation->person->id) }}" class="text-xs text-blue-500 hover:underline">
-                                                    View in CRM &rarr;
-                                                </a>
-                                            </div>
-                                        @else
-                                            <p class="ui-muted text-xs">No CRM Person linked yet.</p>
-                                            <button type="button" onclick="createPersonFromChat({{ $activeConversation->id }})" class="secondary-button text-xs mt-2 w-full">
-                                                ＋ Create Person
-                                            </button>
-                                        @endif
-                                    </section>
-
-                                    <section>
-                                        <h2>CRM Lead</h2>
-                                        @if ($activeConversation->lead)
-                                            <div class="ui-side-item">
-                                                <p class="font-semibold text-xs text-amber-600">{{ $activeConversation->lead->title }}</p>
-                                                <a href="{{ route('admin.leads.view', $activeConversation->lead->id) }}" class="text-xs text-blue-500 hover:underline">
-                                                    View Lead &rarr;
-                                                </a>
-                                            </div>
-                                        @else
-                                            <p class="ui-muted text-xs">No Lead converted yet.</p>
-                                            <button type="button" onclick="createLeadFromChat({{ $activeConversation->id }})" class="primary-button text-xs mt-2 w-full">
-                                                ＋ Convert to Lead
-                                            </button>
-                                        @endif
-                                    </section>
-                                </div>
-
-                                <!-- TAB 3: Work / Activities -->
                                 <div class="ui-side-panel" role="tabpanel" data-side-panel="work">
                                     <section>
                                         <h2>Tasks & Follow-ups</h2>
-                                        <p class="ui-muted text-xs mb-3">Schedule CRM activities directly from this customer chat.</p>
-                                        <a href="{{ route('admin.activities.index') }}" class="secondary-button text-xs text-center block">
-                                            Open Activities &rarr;
-                                        </a>
+                                        <p class="ui-muted">Schedule CRM activities for this customer.</p>
+                                        <a href="{{ route('admin.activities.index') }}" class="secondary-button">Open Activities →</a>
                                     </section>
                                 </div>
                             </div>
@@ -259,6 +289,7 @@
                 </section>
             @endif
         </div>
+        @endif
     </div>
 
     @pushOnce('scripts')

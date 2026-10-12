@@ -1,36 +1,81 @@
+@php
+    $uiBase = request()->only('search', 'channel');
+    $uiChip = function (array $set) use ($uiBase) {
+        return route('admin.unified_inbox.index', array_merge($uiBase, $set));
+    };
+    $uiStatus = request('status');
+    $uiUnread = request()->boolean('unread');
+@endphp
+
 <aside class="ui-list" aria-label="Conversations">
-    <div class="ui-list-heading">
-        <h2>Conversations</h2>
-        <span class="ui-muted">Latest</span>
+    <form method="GET" action="{{ route('admin.unified_inbox.index') }}" class="ui-list-search">
+        <input type="hidden" name="channel" value="{{ request('channel') }}">
+        <input type="hidden" name="status" value="{{ $uiStatus }}">
+        @if ($uiUnread)<input type="hidden" name="unread" value="1">@endif
+        <label class="ui-search">
+            <span class="sr-only">Search</span>
+            <input type="search" name="search" value="{{ request('search') }}" placeholder="Search conversations..." maxlength="200">
+        </label>
+    </form>
+
+    <div class="ui-chips" role="group" aria-label="Filters">
+        <a class="ui-chip" href="{{ $uiChip(array_filter(['status' => $uiStatus, 'unread' => $uiUnread ? null : 1])) }}" @if($uiUnread) aria-pressed="true" @endif>Unread</a>
+        @foreach (['open' => 'Open', 'pending' => 'Pending', 'closed' => 'Closed'] as $value => $label)
+            <a class="ui-chip" href="{{ $uiChip(array_filter(['status' => $uiStatus === $value ? null : $value, 'unread' => $uiUnread ? 1 : null])) }}" @if($uiStatus === $value) aria-pressed="true" @endif>{{ $label }}</a>
+        @endforeach
+        @if ($uiStatus || $uiUnread || request('search'))
+            <a class="ui-chip ui-chip-clear" href="{{ route('admin.unified_inbox.index', request()->only('channel')) }}">Clear</a>
+        @endif
     </div>
+
     <div class="ui-conversations">
-        @forelse ($conversations as $item)
+        @php $uiRows = $conversations->getCollection()->filter(fn ($c) => $uiLinked->contains($c->channel)); @endphp
+        @forelse ($uiRows as $item)
             <a class="ui-conversation" href="{{ route('admin.unified_inbox.index', array_merge(request()->query(), ['conversation_id' => $item->id])) }}" @if($activeConversation?->id === $item->id) aria-current="page" @endif>
-                <span class="ui-avatar" v-pre>{{ mb_strtoupper(mb_substr($item->customer_name, 0, 1)) }}</span>
+                <span class="ui-avatar-wrap">
+                    <span class="ui-avatar" v-pre>{{ mb_strtoupper(mb_substr($item->customer_name, 0, 1)) }}</span>
+                    <span class="ui-channel ui-channel-{{ $item->channel }} ui-avatar-badge" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $item->channel])</span>
+                </span>
                 <span class="ui-conversation-copy">
-                    <strong v-pre>{{ $item->customer_name }}</strong>
-                    <span class="ui-preview" v-pre>{{ $item->last_message_preview ?: 'No messages yet' }}</span>
-                    <span class="ui-preview ui-channel-label">
-                        <span class="ui-channel ui-channel-{{ $item->channel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $item->channel])</span>
-                        <span class="ui-channel-label-text">{{ $channels[$item->channel]['label'] ?? ucfirst($item->channel) }} · {{ $item->last_message_at?->diffForHumans(null, true) }}</span>
+                    <span class="ui-row-top">
+                        <strong v-pre>{{ $item->customer_name }}</strong>
+                        <time class="ui-time">{{ $item->last_message_at?->isToday() ? $item->last_message_at->format('H:i') : $item->last_message_at?->format('d M') }}</time>
+                    </span>
+                    <span class="ui-row-mid">
+                        <span class="ui-pill ui-pill-{{ $item->channel }}">{{ $channels[$item->channel]['label'] ?? ucfirst($item->channel) }}</span>
+                        @if ($item->status !== 'open')
+                            <span class="ui-pill ui-pill-status-{{ $item->status }}">{{ ucfirst($item->status) }}</span>
+                        @endif
+                    </span>
+                    <span class="ui-row-bottom">
+                        <span class="ui-preview" v-pre>{{ $item->last_message_preview ?: 'No messages yet' }}</span>
+                        @if ($item->unread_count > 0)
+                            <span class="ui-count">{{ $item->unread_count }}</span>
+                        @endif
                     </span>
                 </span>
-                @if ($item->unread_count > 0)
-                    <span><span class="ui-count">{{ $item->unread_count }}</span></span>
-                @endif
             </a>
         @empty
-            <div class="p-6 text-center">
-                <p class="ui-muted text-xs">No conversations found.</p>
-                <a href="{{ route('admin.unified_inbox.channels.index') }}" class="primary-button mt-3 inline-block text-xs">
-                    ＋ Connect Channels
+            <div class="ui-list-empty">
+                <p class="ui-muted">No conversations found.</p>
+                <a href="{{ route('admin.unified_inbox.channels.index') }}" class="secondary-button">
+                    @lang('unified_inbox::app.inbox.connect-channels')
                 </a>
             </div>
         @endforelse
     </div>
-    @if ($conversations->hasPages())
-        <div class="border-t border-slate-200 p-3 dark:border-slate-700">
-            {{ $conversations->links() }}
-        </div>
-    @endif
+
+    <div class="ui-list-footer">
+        <span class="ui-muted">
+            @if ($conversations->total())
+                {{ $conversations->firstItem() }}–{{ $conversations->lastItem() }} of {{ $conversations->total() }}
+            @endif
+        </span>
+        @if ($conversations->hasPages())
+            <span class="ui-pager">
+                <a class="secondary-button" href="{{ $conversations->previousPageUrl() ?? '#' }}" @if($conversations->onFirstPage()) aria-disabled="true" @endif aria-label="Previous">‹</a>
+                <a class="secondary-button" href="{{ $conversations->nextPageUrl() ?? '#' }}" @if(!$conversations->hasMorePages()) aria-disabled="true" @endif aria-label="Next">›</a>
+            </span>
+        @endif
+    </div>
 </aside>
