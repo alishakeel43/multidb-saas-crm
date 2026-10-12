@@ -41,9 +41,8 @@ class DataGridController extends Controller
 
         if (
             is_a($repositoryClass, UserRepository::class, true)
-            && Schema::connection('tenant')->hasColumn('users', 'is_support_account')
         ) {
-            $repository = $repository->where('is_support_account', false);
+            $repository = \Webkul\User\Models\User::applySupportExclusion($repository->where('users.id', '>', 0));
         }
 
         return $repository

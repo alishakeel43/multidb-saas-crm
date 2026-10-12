@@ -4,6 +4,7 @@ namespace Webkul\UnifiedInbox\Services;
 
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Webkul\UnifiedInbox\Exceptions\MetaGraphException;
 
 class MetaGraphClient
 {
@@ -25,8 +26,16 @@ class MetaGraphClient
         $payload = $response->json() ?? [];
 
         if ($response->failed() || isset($payload['error'])) {
-            $errorMsg = (string) ($payload['error']['message'] ?? 'Meta Graph request failed.');
-            throw new RuntimeException($errorMsg);
+            $error = is_array($payload['error'] ?? null) ? $payload['error'] : [];
+
+            throw new MetaGraphException(
+                (string) ($error['error_user_msg'] ?? $error['message'] ?? 'Meta Graph request failed.'),
+                isset($error['code']) ? (int) $error['code'] : null,
+                isset($error['error_subcode']) ? (int) $error['error_subcode'] : null,
+                isset($error['type']) ? (string) $error['type'] : null,
+                isset($error['fbtrace_id']) ? (string) $error['fbtrace_id'] : null,
+                $response->status(),
+            );
         }
 
         return is_array($payload) ? $payload : [];

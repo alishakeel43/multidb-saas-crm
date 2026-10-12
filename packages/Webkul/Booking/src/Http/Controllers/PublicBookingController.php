@@ -20,7 +20,7 @@ class PublicBookingController
     {
         return view('booking::public', [
             'services' => BookingService::query()->where('is_active', true)->orderBy('name')->get(),
-            'users' => User::query()->where('status', 1)->orderBy('name')->get(['id', 'name']),
+            'users' => User::query()->excludeSupport()->where('status', 1)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

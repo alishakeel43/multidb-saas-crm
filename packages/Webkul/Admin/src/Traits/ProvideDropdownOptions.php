@@ -105,9 +105,7 @@ trait ProvideDropdownOptions
     {
         $repository = app(UserRepository::class);
 
-        if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
-            $repository->scopeQuery(fn ($query) => $query->where('is_support_account', false));
-        }
+        $repository->scopeQuery(fn ($query) => \Webkul\User\Models\User::applySupportExclusion($query));
 
         $options = $repository
             ->get(['id as value', 'name as label'])

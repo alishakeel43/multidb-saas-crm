@@ -86,6 +86,7 @@ class SuperAdminPanelProvider extends PanelProvider
                 PlatformSettings::class,
                 TenantBackups::class,
                 TenantSeeders::class,
+                \App\Filament\Pages\MetaDeveloperSetup::class,
                 ManagePlanFeatures::class,
                 ManageTenantFeatures::class,
                 ManageTwoFactorAuthentication::class,

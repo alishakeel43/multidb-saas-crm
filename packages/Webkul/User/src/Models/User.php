@@ -102,4 +102,36 @@ class User extends Authenticatable implements UserContract
 
         return in_array($permission, $this->role->permissions);
     }
+
+    /**
+     * Hide platform support accounts from assign-to / owner / staff pickers.
+     * A user is "support" when users.is_support_account = 1 OR their role has
+     * roles.is_support_role = 1. Works per tenant (tenant connection schema).
+     * Accepts a Model, Builder or Relation; always use the returned value.
+     */
+    public function scopeExcludeSupport($query)
+    {
+        return static::applySupportExclusion($query);
+    }
+
+    public static function applySupportExclusion($query)
+    {
+        $schema = \Illuminate\Support\Facades\Schema::connection('tenant');
+
+        if ($schema->hasColumn('users', 'is_support_account')) {
+            $query = $query->where(function ($q) {
+                $q->where('users.is_support_account', false)->orWhereNull('users.is_support_account');
+            });
+        }
+
+        if ($schema->hasColumn('roles', 'is_support_role')) {
+            $query = $query->where(function ($q) {
+                $q->whereNull('users.role_id')->orWhereNotIn('users.role_id', function ($sub) {
+                    $sub->select('id')->from('roles')->where('is_support_role', true);
+                });
+            });
+        }
+
+        return $query;
+    }
 }

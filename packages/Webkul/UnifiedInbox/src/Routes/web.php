@@ -35,6 +35,8 @@ Route::middleware(['web', 'admin_locale', 'user'])
         Route::get('unified-inbox', [InboxController::class, 'index'])->name('index');
         Route::get('unified-inbox/{id}', [InboxController::class, 'show'])->whereNumber('id')->name('show');
 
+        Route::get('unified-inbox/crm-search', [InboxController::class, 'crmSearch'])->name('crm_search');
+
         // Conversation actions
         Route::prefix('unified-inbox/conversations/{id}')->name('conversations.')->group(function () {
             Route::get('messages', [InboxController::class, 'messages'])->name('messages');
@@ -43,6 +45,10 @@ Route::middleware(['web', 'admin_locale', 'user'])
             Route::post('assign', [InboxController::class, 'assign'])->name('assign');
             Route::post('link-lead', [InboxController::class, 'linkLead'])->name('link_lead');
             Route::post('link-person', [InboxController::class, 'linkPerson'])->name('link_person');
+            Route::post('link-record', [InboxController::class, 'linkRecord'])->name('link_record');
+            Route::post('organization', [InboxController::class, 'createOrganization'])->name('create_organization');
+            Route::post('notes', [InboxController::class, 'storeNote'])->name('notes');
+            Route::get('ai-suggestions', [InboxController::class, 'aiSuggestions'])->middleware('throttle:20,1')->name('ai_suggestions');
         });
 
         // Channel connections & Meta Embedded Signup

@@ -5,6 +5,9 @@ namespace Webkul\UnifiedInbox\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Webkul\Activity\Models\ActivityProxy;
+use Webkul\Contact\Models\OrganizationProxy;
 use Webkul\Contact\Models\PersonProxy;
 use Webkul\Lead\Models\LeadProxy;
 use Webkul\UnifiedInbox\Contracts\Conversation as ConversationContract;
@@ -27,6 +30,7 @@ class Conversation extends Model implements ConversationContract
         'last_incoming_at',
         'person_id',
         'lead_id',
+        'organization_id',
         'metadata',
     ];
 
@@ -57,5 +61,18 @@ class Conversation extends Model implements ConversationContract
     public function user(): BelongsTo
     {
         return $this->belongsTo(UserProxy::modelClass(), 'user_id');
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationProxy::modelClass(), 'organization_id');
+    }
+
+    /**
+     * Krayin activities (internal notes) written inside this conversation.
+     */
+    public function activities(): BelongsToMany
+    {
+        return $this->belongsToMany(ActivityProxy::modelClass(), 'unified_inbox_conversation_activities', 'conversation_id', 'activity_id');
     }
 }

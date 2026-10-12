@@ -82,9 +82,7 @@ class LeadAssignmentService
             ->orderByPivot('sort_order')
             ->orderBy('users.id');
 
-        if (Schema::hasColumn('users', 'is_support_account')) {
-            $query->where('users.is_support_account', false);
-        }
+        $query = \Webkul\User\Models\User::applySupportExclusion($query);
 
         return $query->get();
     }

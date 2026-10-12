@@ -36,11 +36,7 @@ class BookingSettingsController extends Controller
     {
         $repository = $this->userRepository;
 
-        if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
-            $repository = $repository->scopeQuery(
-                fn ($query) => $query->where('is_support_account', false)
-            );
-        }
+        $repository = $repository->scopeQuery(fn ($query) => \Webkul\User\Models\User::applySupportExclusion($query));
 
         return $repository->findWhere(['status' => 1]);
     }

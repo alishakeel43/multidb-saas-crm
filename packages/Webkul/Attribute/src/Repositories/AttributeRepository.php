@@ -136,9 +136,7 @@ class AttributeRepository extends Repository
         if (Str::contains($lookup['repository'], 'UserRepository')) {
             $userRepository = app($lookup['repository'])->where('status', 1);
 
-            if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
-                $userRepository->where('is_support_account', false);
-            }
+            $userRepository = \Webkul\User\Models\User::applySupportExclusion($userRepository);
 
             $currentUser = auth()->guard('user')->user();
 
@@ -184,9 +182,7 @@ class AttributeRepository extends Repository
         if (Str::contains($lookup['repository'], 'UserRepository')) {
             $query = app($lookup['repository']);
 
-            if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
-                $query = $query->where('is_support_account', false);
-            }
+            $query = \Webkul\User\Models\User::applySupportExclusion($query->where('status', '>=', 0));
 
             return is_array($entityId)
                 ? $query->whereIn('id', $entityId)->get($columns)

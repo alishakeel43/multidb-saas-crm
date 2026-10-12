@@ -289,9 +289,7 @@ class UserController extends Controller
     {
         $users = $this->userRepository;
 
-        if (Schema::connection('tenant')->hasColumn('users', 'is_support_account')) {
-            $users->scopeQuery(fn ($query) => $query->where('is_support_account', false));
-        }
+        $users->scopeQuery(fn ($query) => \Webkul\User\Models\User::applySupportExclusion($query));
 
         $users = $users->pushCriteria(app(RequestCriteria::class))->all();
 

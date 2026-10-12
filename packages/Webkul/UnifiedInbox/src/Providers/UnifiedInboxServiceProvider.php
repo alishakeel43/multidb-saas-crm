@@ -22,5 +22,11 @@ class UnifiedInboxServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/acl.php', 'acl');
 
         $this->app->singleton(MetaGraphClient::class);
+
+        // Resolved per call (not singleton) so tenant-specific Magic AI config is honoured.
+        $this->app->bind(
+            \Webkul\UnifiedInbox\Contracts\AiReplyProvider::class,
+            fn () => \Webkul\UnifiedInbox\Services\AI\AiProviderFactory::make()
+        );
     }
 }

@@ -1,7 +1,7 @@
 @php
-    $uiBase = request()->only('search', 'channel');
+    $uiBase = request()->only('search', 'channel', 'status', 'unread');
     $uiChip = function (array $set) use ($uiBase) {
-        return route('admin.unified_inbox.index', array_merge($uiBase, $set));
+        return route('admin.unified_inbox.index', array_filter(array_merge($uiBase, $set), fn ($v) => $v !== null && $v !== ''));
     };
     $uiStatus = request('status');
     $uiUnread = request()->boolean('unread');
@@ -19,9 +19,9 @@
     </form>
 
     <div class="ui-chips" role="group" aria-label="Filters">
-        <a class="ui-chip" href="{{ $uiChip(array_filter(['status' => $uiStatus, 'unread' => $uiUnread ? null : 1])) }}" @if($uiUnread) aria-pressed="true" @endif>Unread</a>
+        <a class="ui-chip" href="{{ $uiChip(['unread' => $uiUnread ? null : 1]) }}" @if($uiUnread) aria-pressed="true" @endif>Unread</a>
         @foreach (['open' => 'Open', 'pending' => 'Pending', 'closed' => 'Closed'] as $value => $label)
-            <a class="ui-chip" href="{{ $uiChip(array_filter(['status' => $uiStatus === $value ? null : $value, 'unread' => $uiUnread ? 1 : null])) }}" @if($uiStatus === $value) aria-pressed="true" @endif>{{ $label }}</a>
+            <a class="ui-chip" href="{{ $uiChip(['status' => $uiStatus === $value ? null : $value]) }}" @if($uiStatus === $value) aria-pressed="true" @endif>{{ $label }}</a>
         @endforeach
         @if ($uiStatus || $uiUnread || request('search'))
             <a class="ui-chip ui-chip-clear" href="{{ route('admin.unified_inbox.index', request()->only('channel')) }}">Clear</a>
@@ -56,11 +56,24 @@
                 </span>
             </a>
         @empty
+            @php
+                $uiFiltered = $uiStatus || $uiUnread || request('search');
+                $uiTabLabel = request('channel') ? ($channels[request('channel')]['label'] ?? ucfirst(request('channel'))) : null;
+            @endphp
             <div class="ui-list-empty">
-                <p class="ui-muted">No conversations found.</p>
-                <a href="{{ route('admin.unified_inbox.channels.index') }}" class="secondary-button">
-                    @lang('unified_inbox::app.inbox.connect-channels')
-                </a>
+                <p class="ui-list-empty-title">
+                    @if ($uiFiltered)
+                        No {{ $uiUnread ? 'unread ' : '' }}{{ $uiStatus ? $uiStatus.' ' : '' }}conversations{{ $uiTabLabel ? ' in '.$uiTabLabel : '' }}
+                    @else
+                        No conversations yet{{ $uiTabLabel ? ' in '.$uiTabLabel : '' }}
+                    @endif
+                </p>
+                <p class="ui-muted">
+                    {{ $uiFiltered ? 'Try another filter or clear filters to see all chats.' : 'New messages will appear here as soon as customers reach out.' }}
+                </p>
+                @if ($uiFiltered)
+                    <a href="{{ route('admin.unified_inbox.index', request()->only('channel')) }}" class="secondary-button">Clear filters</a>
+                @endif
             </div>
         @endforelse
     </div>

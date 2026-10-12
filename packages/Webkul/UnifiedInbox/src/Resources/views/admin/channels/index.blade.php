@@ -19,122 +19,51 @@
         </header>
 
         <div class="ui-channel-content">
-            <!-- 3 Channel Cards (WhatsApp, Messenger, Instagram) -->
-            <div class="ui-channel-cards">
-                @foreach ($channels as $key => $channel)
-                    @php
-                        $conn = $channel['connection'];
-                        $isConnected = $conn && $conn->status === 'connected';
-                    @endphp
-                    <section class="ui-card">
-                        <span class="ui-channel ui-channel-{{ $key }}" aria-hidden="true">
-                            @include('unified_inbox::partials.channel-icon', ['channel' => $key])
-                        </span>
-                        <div>
-                            <h2 class="font-bold text-base">{{ $channel['title'] }}</h2>
-                            <p class="ui-muted mt-1">{{ $channel['desc'] }}</p>
-                        </div>
-
-                        <div class="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800">
-                            @if ($isConnected)
-                                <div class="flex items-center justify-between">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                                        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                                        @lang('unified_inbox::app.channels.connected')
-                                    </span>
-                                    <form action="{{ route('admin.unified_inbox.channels.disconnect', $conn->id) }}" method="POST" onsubmit="return confirm('{{ trans('unified_inbox::app.channels.disconnect-confirm') }}')">
-                                        @csrf
-                                        <button type="submit" class="text-xs font-semibold text-red-500 hover:underline">
-                                            @lang('unified_inbox::app.channels.disconnect')
-                                        </button>
-                                    </form>
-                                </div>
-                            @else
-                                <button
-                                    type="button"
-                                    onclick="launchMetaEmbeddedSignup('{{ $key }}')"
-                                    class="primary-button w-full text-xs py-2"
-                                >
-                                    Connect {{ $channel['title'] }}
-                                </button>
-                            @endif
-                        </div>
-                    </section>
-                @endforeach
-            </div>
-
-            <!-- Connected Accounts List -->
-            <h2 class="font-bold text-base mb-3">Connected Channel Accounts</h2>
-            @php
-                $connectedList = collect($channels)->pluck('connection')->filter();
-            @endphp
-            @forelse ($connectedList as $conn)
-                <section class="ui-card ui-connection mb-3">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="font-semibold text-sm">
-                                <span class="ui-channel-label">
-                                    <span class="ui-channel ui-channel-{{ $conn->channel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $conn->channel])</span>
-                                    {{ $conn->name }} · {{ ucfirst($conn->channel) }}
-                                </span>
-                            </h3>
-                            <p class="ui-muted text-xs">External ID: <span class="font-mono">{{ $conn->external_id }}</span> · Connected {{ $conn->created_at->diffForHumans() }}</p>
-                        </div>
-                        <form action="{{ route('admin.unified_inbox.channels.disconnect', $conn->id) }}" method="POST" onsubmit="return confirm('{{ trans('unified_inbox::app.channels.disconnect-confirm') }}')">
-                            @csrf
-                            <button type="submit" class="secondary-button text-xs py-1.5 px-3 text-red-600">
-                                Disconnect
-                            </button>
-                        </form>
-                    </div>
-                </section>
-            @empty
-                <p class="ui-muted text-xs mb-4">No channels connected yet. Click any button above to connect with Meta.</p>
-            @endforelse
-
-            <!-- Centralized Webhook Multi-Tenant Routing Info -->
-            <details class="ui-setup" open>
-                <summary>Centralized Meta Developer Setup (Multi-Tenant Routing)</summary>
-                <p class="ui-muted">
-                    Configure this single central URL in your Meta App Dashboard. All tenant channels (WhatsApp, Messenger, Instagram) are automatically resolved and routed to their isolated tenant databases.
-                </p>
-
-                <div class="mt-3 flex flex-col gap-2">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <strong class="min-w-[120px] text-xs">Callback URL:</strong>
-                        <code class="rounded bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
-                            {{ $centralWebhookUrl }}
-                        </code>
-                        <button
-                            type="button"
-                            onclick="navigator.clipboard.writeText('{{ $centralWebhookUrl }}'); alert('Central Webhook URL copied!');"
-                            class="secondary-button text-xs py-0.5 px-2"
-                        >
-                            Copy
-                        </button>
-                    </div>
-
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <strong class="min-w-[120px] text-xs">Verify Token:</strong>
-                        <code class="rounded bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
-                            {{ config('unified-inbox.meta.verify_token') ?: 'Not configured' }}
-                        </code>
-                        @if (filled(config('unified-inbox.meta.verify_token')))
-                            <button
-                                type="button"
-                                onclick="navigator.clipboard.writeText(@js(config('unified-inbox.meta.verify_token'))); alert('Verify Token copied!');"
-                                class="secondary-button text-xs py-0.5 px-2"
-                            >
-                                Copy
-                            </button>
-                        @endif
-                    </div>
+            <div class="ui-channels">
+                <div class="ui-channels-head">
+                    <h2>Messaging channels</h2>
+                    <p>Connect one account per channel to receive and reply to messages in Unified Inbox.</p>
                 </div>
 
-                <p class="ui-muted text-xs mt-3">
-                    💡 <strong>Central Root Architecture:</strong> Incoming messages to WhatsApp, Messenger, and Instagram are securely received at this root URL and forwarded into the tenant database via landlord routing.
-                </p>
-            </details>
+                <div class="ui-channels-grid">
+                    @foreach ($channels as $key => $channel)
+                        @php
+                            $conn = $channel['connection'];
+                            $isConnected = $conn && $conn->status === 'connected';
+                        @endphp
+                        <section class="ui-channels-card {{ $isConnected ? 'is-connected' : '' }}">
+                            <div class="ui-channels-body">
+                                <div class="ui-channels-top">
+                                    <span class="ui-channel ui-channel-{{ $key }} ui-channels-icon" aria-hidden="true">
+                                        @include('unified_inbox::partials.channel-icon', ['channel' => $key])
+                                    </span>
+                                    <span class="ui-channels-badge {{ $isConnected ? 'is-on' : '' }}"><i></i>{{ $isConnected ? trans('unified_inbox::app.channels.connected') : 'Not connected' }}</span>
+                                </div>
+
+                                <h3 class="ui-channels-title">{{ $channel['title'] }}</h3>
+
+                                @if ($isConnected)
+                                    <p class="ui-channels-account" title="{{ $conn->external_id }}">{{ $conn->name ?: $conn->external_id }}</p>
+                                @endif
+
+                                <p class="ui-channels-desc">{{ $channel['desc'] }}</p>
+                            </div>
+
+                            <div class="ui-channels-foot">
+                                @if ($isConnected)
+                                    <form action="{{ route('admin.unified_inbox.channels.disconnect', $conn->id) }}" method="POST" onsubmit="return confirm('{{ trans('unified_inbox::app.channels.disconnect-confirm') }}')">
+                                        @csrf
+                                        <button type="submit" class="ui-channels-btn ui-channels-disconnect">@lang('unified_inbox::app.channels.disconnect')</button>
+                                    </form>
+                                @else
+                                    <button type="button" onclick="launchMetaEmbeddedSignup('{{ $key }}')" class="ui-channels-btn ui-channels-connect">Connect</button>
+                                @endif
+                            </div>
+                        </section>
+                    @endforeach
+                </div>
+            </div>
+
         </div>
     </div>
 
