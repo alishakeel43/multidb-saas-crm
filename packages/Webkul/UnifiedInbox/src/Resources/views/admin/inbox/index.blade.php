@@ -30,7 +30,10 @@
                             <span class="ui-avatar">{{ mb_strtoupper(mb_substr($displayName, 0, 1)) }}</span>
                             <div style="flex:1;min-width:0">
                                 <h1 class="truncate">{{ $displayName }}</h1>
-                                <p class="ui-muted">{{ ucfirst($activeConversation->channel) }} · <span class="capitalize">{{ $activeConversation->status }}</span> · <span class="font-mono text-xs">{{ $activeConversation->external_id }}</span></p>
+                                <p class="ui-muted ui-channel-label">
+                                    <span class="ui-channel ui-channel-{{ $activeConversation->channel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $activeConversation->channel])</span>
+                                    {{ ucfirst($activeConversation->channel) }} · <span class="capitalize">{{ $activeConversation->status }}</span> · <span class="font-mono text-xs">{{ $activeConversation->external_id }}</span>
+                                </p>
                             </div>
                             <div class="flex items-center gap-2">
                                 <select
@@ -47,6 +50,12 @@
 
                         <!-- Scrollable Message History -->
                         <div class="ui-history" id="chat-messages-container" aria-label="Messages">
+                            @if ($activeMessages->hasPages())
+                                <div class="mb-4">
+                                    {{ $activeMessages->links() }}
+                                </div>
+                            @endif
+
                             @forelse ($activeMessages as $message)
                                 <article class="ui-message ui-message-{{ $message->direction }}">
                                     <div class="ui-message-meta">
@@ -226,19 +235,19 @@
                         @endphp
 
                         <div class="ui-card p-3">
-                            <span class="ui-channel ui-channel-whatsapp mb-2">W</span>
+                            <span class="ui-channel ui-channel-whatsapp mb-2" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => 'whatsapp'])</span>
                             <h3 class="font-bold text-xs">WhatsApp</h3>
                             <p class="ui-muted text-[11px]">{{ $waConn ? 'Connected' : 'Not Connected' }}</p>
                         </div>
 
                         <div class="ui-card p-3">
-                            <span class="ui-channel ui-channel-messenger mb-2">M</span>
+                            <span class="ui-channel ui-channel-messenger mb-2" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => 'messenger'])</span>
                             <h3 class="font-bold text-xs">Messenger</h3>
                             <p class="ui-muted text-[11px]">{{ $msgConn ? 'Connected' : 'Not Connected' }}</p>
                         </div>
 
                         <div class="ui-card p-3">
-                            <span class="ui-channel ui-channel-instagram mb-2">I</span>
+                            <span class="ui-channel ui-channel-instagram mb-2" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => 'instagram'])</span>
                             <h3 class="font-bold text-xs">Instagram</h3>
                             <p class="ui-muted text-[11px]">{{ $igConn ? 'Connected' : 'Not Connected' }}</p>
                         </div>

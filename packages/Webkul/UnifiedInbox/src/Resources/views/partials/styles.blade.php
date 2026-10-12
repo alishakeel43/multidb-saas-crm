@@ -132,6 +132,16 @@
         font-weight:800;
         flex-shrink:0;
     }
+    .ui-channel-logo {
+        display:block;
+        width:18px;
+        height:18px;
+    }
+    .ui-channel-label {
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+    }
     .ui-channel-whatsapp {
         background:#dff7e9;
         color:#139c54;
@@ -200,6 +210,15 @@
         color:var(--ui-muted);
         font-size:13px;
         margin-top:6px;
+    }
+    .ui-preview.ui-channel-label {
+        display:flex;
+        align-items:center;
+    }
+    .ui-channel-label-text {
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
     }
     .ui-count {
         background:var(--ui-accent);
@@ -504,6 +523,10 @@
         width:44px;
         height:44px;
         font-size:18px;
+    }
+    .ui-card> .ui-channel .ui-channel-logo {
+        width:26px;
+        height:26px;
     }
     .ui-card p {
         color:var(--ui-muted);

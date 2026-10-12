@@ -4,9 +4,12 @@ namespace Webkul\UnifiedInbox\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Webkul\Contact\Models\PersonProxy;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
@@ -32,9 +35,9 @@ class WebhookController extends Controller
         $token = $request->query('hub_verify_token') ?: $request->query('hub.verify_token');
         $challenge = $request->query('hub_challenge') ?: $request->query('hub.challenge');
 
-        $configuredToken = config('unified-inbox.meta.verify_token');
+        $configuredToken = (string) config('unified-inbox.meta.verify_token', '');
 
-        if ($mode === 'subscribe' && ($token === $configuredToken || filled($challenge))) {
+        if ($configuredToken !== '' && $mode === 'subscribe' && hash_equals($configuredToken, (string) $token) && filled($challenge)) {
             return response((string) $challenge, 200)
                 ->header('Content-Type', 'text/plain');
         }
@@ -44,11 +47,21 @@ class WebhookController extends Controller
 
     /**
      * Centralized Inbound Meta webhook events processor (WhatsApp, Messenger, Instagram).
-     * Routes automatically across multiple tenants based on phone_number_id, WABA ID, or Page ID.
+     * Resolves each event using its exact channel account ID before entering tenant context.
      */
     public function handle(Request $request): JsonResponse
     {
-        $payload = $request->all();
+        $secret = (string) config('unified-inbox.meta.app_secret', '');
+        abort_if($secret === '', 503, 'Meta webhook signing is not configured.');
+        abort_if(strlen($request->getContent()) > 1_048_576, 413);
+
+        $signature = (string) $request->header('X-Hub-Signature-256', '');
+        $expectedSignature = 'sha256='.hash_hmac('sha256', $request->getContent(), $secret);
+
+        abort_unless(hash_equals($expectedSignature, $signature), 403);
+
+        $payload = json_decode($request->getContent(), true);
+        abort_unless(is_array($payload), 400);
 
         $object = (string) ($payload['object'] ?? '');
         $entries = (array) ($payload['entry'] ?? []);
@@ -76,7 +89,13 @@ class WebhookController extends Controller
         foreach ($changes as $change) {
             $value = (array) ($change['value'] ?? []);
             $phoneMetadata = (array) ($value['metadata'] ?? []);
-            $phoneId = (string) ($phoneMetadata['phone_number_id'] ?? $wabaId);
+            $phoneId = (string) ($phoneMetadata['phone_number_id'] ?? '');
+
+            if ($phoneId === '') {
+                Log::warning('Unified Inbox ignored WhatsApp webhook without a phone number ID.');
+
+                continue;
+            }
 
             $this->runInTenantContext(
                 channel: 'whatsapp',
@@ -105,25 +124,29 @@ class WebhookController extends Controller
      */
     protected function runInTenantContext(string $channel, string $externalId, ?string $wabaId, callable $callback): void
     {
-        $currentTenant = Tenant::current();
+        $targetTenant = $this->centralRouter->resolveTenant($channel, $externalId, $wabaId);
 
-        if ($currentTenant) {
-            $callback();
+        if (! $targetTenant) {
+            Log::warning("Unified Inbox webhook has no active tenant route for {$channel} account.");
 
             return;
         }
 
-        $targetTenant = $this->centralRouter->resolveTenant($channel, $externalId, $wabaId);
+        $targetTenant->execute(function () use ($channel, $externalId, $callback) {
+            $connection = $this->channelRepository->findOneWhere([
+                'channel' => $channel,
+                'external_id' => $externalId,
+                'status' => 'connected',
+            ]);
 
-        if (! $targetTenant && (app()->environment('testing') || app()->runningUnitTests())) {
-            $targetTenant = Tenant::first();
-        }
+            if (! $connection) {
+                Log::warning("Unified Inbox webhook route has no connected {$channel} account in its tenant database.");
 
-        if ($targetTenant) {
-            $targetTenant->execute($callback);
-        } else {
-            Log::warning("Central Webhook: No tenant mapped for {$channel} ID {$externalId}");
-        }
+                return;
+            }
+
+            $callback();
+        });
     }
 
     protected function handleWhatsAppEntryChanges(array $change, string $phoneId, string $wabaId): void
@@ -162,14 +185,21 @@ class WebhookController extends Controller
                     $messageBody = "[{$type}]";
                 }
 
+                $externalMessageId = (string) ($waMsg['id'] ?? '');
+
+                if ($externalMessageId === '') {
+                    continue;
+                }
+
                 $this->storeInboundMessage(
                     channel: 'whatsapp',
                     accountId: $phoneId ?: 'whatsapp',
                     externalSenderId: $senderWaId,
                     customerName: $senderName,
-                    externalMessageId: (string) ($waMsg['id'] ?? 'wa_msg_'.time().'_'.uniqid()),
+                    externalMessageId: $externalMessageId,
                     body: $messageBody,
-                    attachments: $attachments
+                    attachments: $attachments,
+                    occurredAt: $this->timestamp($waMsg['timestamp'] ?? null)
                 );
             }
         }
@@ -181,9 +211,16 @@ class WebhookController extends Controller
                 $status = (string) ($statusUpdate['status'] ?? '');
 
                 if ($msgId && in_array($status, ['delivered', 'read', 'failed', 'sent'])) {
-                    $msg = $this->messageRepository->findOneWhere(['external_id' => $msgId]);
+                    $msg = $this->messageRepository->getModel()->newQuery()
+                        ->where('external_id', $msgId)
+                        ->where('direction', 'outbound')
+                        ->whereHas('conversation', fn ($query) => $query
+                            ->where('channel', 'whatsapp')
+                            ->where('account_id', $phoneId))
+                        ->first();
+
                     if ($msg) {
-                        $msg->update(['status' => $status]);
+                        $this->applyDeliveryStatus($msg, $status);
                     }
                 }
             }
@@ -197,40 +234,61 @@ class WebhookController extends Controller
         $pageId = (string) ($entry['id'] ?? '');
 
         foreach ($messagingEvents as $event) {
-            if (empty($event['message'])) {
-                continue;
-            }
+            if (! empty($event['message'])) {
+                $senderId = (string) ($event['sender']['id'] ?? '');
 
-            $senderId = (string) ($event['sender']['id'] ?? '');
-            if (! $senderId || $senderId === $pageId) {
-                // Ignore echoes / self-messages
-                continue;
-            }
+                if ($senderId && $senderId !== $pageId && ! ($event['message']['is_echo'] ?? false)) {
+                    $messageData = (array) $event['message'];
+                    $messageId = (string) ($messageData['mid'] ?? '');
+                    $body = (string) ($messageData['text'] ?? '');
+                    $attachments = [];
 
-            $messageData = (array) $event['message'];
-            $body = (string) ($messageData['text'] ?? '');
-            $attachments = [];
+                    if (! empty($messageData['attachments'])) {
+                        foreach ($messageData['attachments'] as $att) {
+                            $attType = $att['type'] ?? 'file';
+                            $attUrl = $att['payload']['url'] ?? '';
+                            $attachments[] = ['type' => $attType, 'url' => $attUrl];
+                            if (! $body) {
+                                $body = "[{$attType}]";
+                            }
+                        }
+                    }
 
-            if (! empty($messageData['attachments'])) {
-                foreach ($messageData['attachments'] as $att) {
-                    $attType = $att['type'] ?? 'file';
-                    $attUrl = $att['payload']['url'] ?? '';
-                    $attachments[] = ['type' => $attType, 'url' => $attUrl];
-                    if (! $body) {
-                        $body = "[{$attType}]";
+                    if ($messageId !== '') {
+                        $this->storeInboundMessage(
+                            channel: $channel,
+                            accountId: $pageId,
+                            externalSenderId: $senderId,
+                            customerName: ucfirst($channel).' User',
+                            externalMessageId: $messageId,
+                            body: $body ?: 'New message',
+                            attachments: $attachments,
+                            occurredAt: $this->timestamp($event['timestamp'] ?? null, milliseconds: true)
+                        );
                     }
                 }
             }
 
-            $this->storeInboundMessage(
-                channel: $channel,
-                accountId: $pageId ?: $channel,
-                externalSenderId: $senderId,
-                customerName: ucfirst($channel).' User',
-                externalMessageId: (string) ($messageData['mid'] ?? 'msg_'.time().'_'.uniqid()),
-                body: $body ?: 'New message',
-                attachments: $attachments
-            );
+            $recipientId = (string) ($event['recipient']['id'] ?? '');
+
+            foreach ((array) data_get($event, 'delivery.mids', []) as $messageId) {
+                $this->updateDeliveryStatus($channel, $pageId, $recipientId, (string) $messageId, 'delivered');
+            }
+
+            $watermark = data_get($event, 'read.watermark');
+
+            if ($recipientId !== '' && is_numeric($watermark)) {
+                $readAt = $this->timestamp($watermark, milliseconds: true);
+                $this->messageRepository->getModel()->newQuery()
+                    ->where('direction', 'outbound')
+                    ->whereNotNull('external_id')
+                    ->where('occurred_at', '<=', $readAt)
+                    ->whereHas('conversation', fn ($query) => $query
+                        ->where('channel', $channel)
+                        ->where('account_id', $pageId)
+                        ->where('external_id', $recipientId))
+                    ->update(['status' => 'read']);
+            }
         }
     }
 
@@ -241,57 +299,112 @@ class WebhookController extends Controller
         string $customerName,
         string $externalMessageId,
         string $body,
-        array $attachments = []
+        array $attachments = [],
+        ?Carbon $occurredAt = null
     ): void {
-        $conversation = $this->conversationRepository->findOneWhere([
-            'channel' => $channel,
-            'external_id' => $externalSenderId,
-        ]);
+        $occurredAt ??= now();
 
-        if (! $conversation) {
-            // Attempt to find existing CRM Person
-            $personId = null;
-            if (is_numeric($externalSenderId) && class_exists(PersonProxy::class)) {
-                $existingPerson = PersonProxy::modelClass()::whereJsonContains('contact_numbers', ['value' => $externalSenderId])
-                    ->orWhere('name', $customerName)
-                    ->first();
+        DB::transaction(function () use ($channel, $accountId, $externalSenderId, $customerName, $externalMessageId, $body, $attachments, $occurredAt) {
+            $conversation = $this->conversationRepository->getModel()->newQuery()->firstOrCreate(
+                [
+                    'channel' => $channel,
+                    'account_id' => $accountId,
+                    'external_id' => $externalSenderId,
+                ],
+                [
+                    'customer_name' => $customerName,
+                    'status' => 'open',
+                ]
+            );
+            $conversation = $conversation->newQuery()
+                ->lockForUpdate()
+                ->findOrFail($conversation->id);
 
-                $personId = $existingPerson?->id;
+            if ($conversation->messages()->where('external_id', $externalMessageId)->exists()) {
+                return;
             }
 
-            $conversation = $this->conversationRepository->create([
-                'channel' => $channel,
-                'account_id' => $accountId,
-                'external_id' => $externalSenderId,
-                'customer_name' => $customerName,
-                'status' => 'open',
-                'unread_count' => 1,
-                'last_message_preview' => $body,
-                'last_message_at' => now(),
-                'last_incoming_at' => now(),
-                'person_id' => $personId,
-            ]);
-        } else {
-            $conversation->update([
-                'status' => 'open',
-                'unread_count' => $conversation->unread_count + 1,
-                'last_message_preview' => $body,
-                'last_message_at' => now(),
-                'last_incoming_at' => now(),
-                'customer_name' => $conversation->customer_name === 'WhatsApp User' ? $customerName : $conversation->customer_name,
-            ]);
-        }
+            $personId = null;
+            if ($channel === 'whatsapp' && preg_match('/^\+?\d+$/', $externalSenderId) && class_exists(PersonProxy::class)) {
+                $personId = PersonProxy::modelClass()::whereJsonContains('contact_numbers', ['value' => $externalSenderId])
+                    ->value('id');
+            }
 
-        // Store message idempotently
-        $this->messageRepository->updateOrCreate(
-            ['conversation_id' => $conversation->id, 'external_id' => $externalMessageId],
-            [
+            $this->messageRepository->create([
+                'conversation_id' => $conversation->id,
                 'direction' => 'inbound',
+                'external_id' => $externalMessageId,
                 'body' => $body,
                 'status' => 'received',
                 'attachments' => $attachments,
-                'occurred_at' => now(),
-            ]
-        );
+                'occurred_at' => $occurredAt,
+            ]);
+
+            $conversation->status = 'open';
+            $conversation->unread_count++;
+            $conversation->last_incoming_at = $conversation->last_incoming_at
+                ? $conversation->last_incoming_at->max($occurredAt)
+                : $occurredAt;
+            $conversation->person_id ??= $personId;
+
+            if (! $conversation->last_message_at || $occurredAt->gte($conversation->last_message_at)) {
+                $conversation->last_message_preview = $body;
+                $conversation->last_message_at = $occurredAt;
+            }
+
+            if ($conversation->customer_name === 'WhatsApp User') {
+                $conversation->customer_name = $customerName;
+            }
+
+            $conversation->save();
+        }, 3);
+    }
+
+    protected function updateDeliveryStatus(string $channel, string $accountId, string $recipientId, string $messageId, string $status): void
+    {
+        if ($recipientId === '' || $messageId === '') {
+            return;
+        }
+
+        $message = $this->messageRepository->getModel()->newQuery()
+            ->where('external_id', $messageId)
+            ->where('direction', 'outbound')
+            ->whereHas('conversation', fn ($query) => $query
+                ->where('channel', $channel)
+                ->where('account_id', $accountId)
+                ->where('external_id', $recipientId))
+            ->first();
+
+        if ($message) {
+            $this->applyDeliveryStatus($message, $status);
+        }
+    }
+
+    protected function applyDeliveryStatus(Model $message, string $status): void
+    {
+        $priority = [
+            'pending' => 0,
+            'unknown' => 1,
+            'sent' => 2,
+            'delivered' => 3,
+            'read' => 4,
+            'failed' => 5,
+        ];
+
+        if (($priority[$status] ?? -1) >= ($priority[$message->status] ?? -1)) {
+            $message->update(['status' => $status]);
+        }
+    }
+
+    protected function timestamp(mixed $value, bool $milliseconds = false): Carbon
+    {
+        if (! is_numeric($value)) {
+            return now();
+        }
+
+        $timestamp = (int) $value;
+        $timestamp = $milliseconds ? (int) floor($timestamp / 1000) : $timestamp;
+
+        return Carbon::createFromTimestampUTC($timestamp)->min(now());
     }
 }

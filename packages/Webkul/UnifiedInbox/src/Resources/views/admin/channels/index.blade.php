@@ -28,7 +28,7 @@
                     @endphp
                     <section class="ui-card">
                         <span class="ui-channel ui-channel-{{ $key }}" aria-hidden="true">
-                            {{ strtoupper(substr($channel['title'], 0, 1)) }}
+                            @include('unified_inbox::partials.channel-icon', ['channel' => $key])
                         </span>
                         <div>
                             <h2 class="font-bold text-base">{{ $channel['title'] }}</h2>
@@ -72,7 +72,12 @@
                 <section class="ui-card ui-connection mb-3">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h3 class="font-semibold text-sm">{{ $conn->name }} · {{ ucfirst($conn->channel) }}</h3>
+                            <h3 class="font-semibold text-sm">
+                                <span class="ui-channel-label">
+                                    <span class="ui-channel ui-channel-{{ $conn->channel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $conn->channel])</span>
+                                    {{ $conn->name }} · {{ ucfirst($conn->channel) }}
+                                </span>
+                            </h3>
                             <p class="ui-muted text-xs">External ID: <span class="font-mono">{{ $conn->external_id }}</span> · Connected {{ $conn->created_at->diffForHumans() }}</p>
                         </div>
                         <form action="{{ route('admin.unified_inbox.channels.disconnect', $conn->id) }}" method="POST" onsubmit="return confirm('{{ trans('unified_inbox::app.channels.disconnect-confirm') }}')">
@@ -112,15 +117,17 @@
                     <div class="flex items-center gap-2 flex-wrap">
                         <strong class="min-w-[120px] text-xs">Verify Token:</strong>
                         <code class="rounded bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
-                            {{ config('unified-inbox.meta.verify_token') ?: 'krayin_crm_unified_inbox' }}
+                            {{ config('unified-inbox.meta.verify_token') ?: 'Not configured' }}
                         </code>
-                        <button
-                            type="button"
-                            onclick="navigator.clipboard.writeText('{{ config('unified-inbox.meta.verify_token') ?: 'krayin_crm_unified_inbox' }}'); alert('Verify Token copied!');"
-                            class="secondary-button text-xs py-0.5 px-2"
-                        >
-                            Copy
-                        </button>
+                        @if (filled(config('unified-inbox.meta.verify_token')))
+                            <button
+                                type="button"
+                                onclick="navigator.clipboard.writeText(@js(config('unified-inbox.meta.verify_token'))); alert('Verify Token copied!');"
+                                class="secondary-button text-xs py-0.5 px-2"
+                            >
+                                Copy
+                            </button>
+                        @endif
                     </div>
                 </div>
 
@@ -137,6 +144,9 @@
         const metaVersion = "{{ config('unified-inbox.meta.version', 'v21.0') }}";
         const waConfigId = "{{ config('unified-inbox.meta.whatsapp_config_id') }}";
         const msgConfigId = "{{ config('unified-inbox.meta.messaging_config_id') }}";
+        const metaOAuthStates = @js($oauthStates);
+        const metaCallbackUrl = @js(route('admin.unified_inbox.channels.meta.callback'));
+        let activeMetaSignup = null;
 
         window.fbAsyncInit = function() {
             if (metaAppId && window.FB) {
@@ -157,6 +167,65 @@
             fjs.parentNode.insertBefore(js, fjs);
         }(document, 'script', 'facebook-jssdk'));
 
+        window.addEventListener('message', function(event) {
+            if (!activeMetaSignup || !['https://www.facebook.com', 'https://web.facebook.com'].includes(event.origin)) {
+                return;
+            }
+
+            let data;
+            try {
+                data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            } catch (error) {
+                return;
+            }
+
+            if (!data || data.type !== 'WA_EMBEDDED_SIGNUP') {
+                return;
+            }
+
+            if (data.event === 'CANCEL' || data.event === 'ERROR') {
+                activeMetaSignup = null;
+                alert('Meta signup was cancelled or could not be completed.');
+                return;
+            }
+
+            if (typeof data.event === 'string' && (data.event === 'FINISH' || data.event.startsWith('FINISH_'))) {
+                const signupData = data.data && typeof data.data === 'object' ? data.data : data;
+                const wabaId = signupData.waba_id || signupData.wabaId;
+                const phoneNumberId = signupData.phone_number_id || signupData.phoneNumberId;
+
+                if (wabaId && phoneNumberId) {
+                    activeMetaSignup.wabaId = String(wabaId);
+                    activeMetaSignup.phoneNumberId = String(phoneNumberId);
+                    finishMetaSignup();
+                }
+            }
+        });
+
+        function finishMetaSignup() {
+            if (!activeMetaSignup || activeMetaSignup.redirected || !activeMetaSignup.code) {
+                return;
+            }
+
+            if (activeMetaSignup.channel === 'whatsapp' && (!activeMetaSignup.wabaId || !activeMetaSignup.phoneNumberId)) {
+                return;
+            }
+
+            const params = new URLSearchParams({
+                code: activeMetaSignup.code,
+                channel: activeMetaSignup.channel,
+                state: activeMetaSignup.state
+            });
+
+            if (activeMetaSignup.wabaId) {
+                params.set('waba_id', activeMetaSignup.wabaId);
+                params.set('phone_number_id', activeMetaSignup.phoneNumberId);
+            }
+
+            activeMetaSignup.redirected = true;
+            window.location.assign(metaCallbackUrl + '?' + params.toString());
+        }
+
         function launchMetaEmbeddedSignup(channel) {
             const configId = (channel === 'whatsapp') ? waConfigId : msgConfigId;
 
@@ -165,10 +234,27 @@
                 return;
             }
 
+            if (!metaOAuthStates[channel]) {
+                alert('The Meta signup session expired. Reload this page and try again.');
+                return;
+            }
+
+            activeMetaSignup = {
+                channel: channel,
+                state: metaOAuthStates[channel],
+                code: null,
+                wabaId: null,
+                phoneNumberId: null,
+                redirected: false
+            };
+
             if (window.FB) {
                 FB.login(function(response) {
-                    if (response.authResponse && response.authResponse.code) {
-                        window.location.href = "{{ route('admin.unified_inbox.channels.meta.callback') }}?code=" + response.authResponse.code + "&channel=" + channel;
+                    if (response.authResponse && response.authResponse.code && activeMetaSignup) {
+                        activeMetaSignup.code = response.authResponse.code;
+                        finishMetaSignup();
+                    } else {
+                        activeMetaSignup = null;
                     }
                 }, {
                     config_id: configId,

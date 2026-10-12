@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Webkul\Contact\Repositories\PersonRepository;
 use Webkul\Lead\Repositories\LeadRepository;
@@ -35,6 +36,7 @@ class InboxController extends Controller
         $channelFilter = $request->input('channel');
         $statusFilter = $request->input('status');
         $search = $request->input('search');
+        $unreadFilter = $request->boolean('unread');
         $activeId = $request->input('conversation_id');
 
         $query = $this->conversationRepository->getModel()->newQuery()
@@ -57,12 +59,21 @@ class InboxController extends Controller
             });
         }
 
-        $conversations = $query->get();
+        if ($unreadFilter) {
+            $query->where('unread_count', '>', 0);
+        }
 
         $activeConversation = null;
         if ($activeId) {
-            $activeConversation = $conversations->firstWhere('id', (int) $activeId);
+            $activeConversation = (clone $query)->whereKey((int) $activeId)->first();
         }
+
+        $conversations = $query->paginate(25)->withQueryString();
+
+        if ($activeConversation) {
+            $activeConversation = $conversations->getCollection()->firstWhere('id', $activeConversation->id) ?? $activeConversation;
+        }
+
         if (! $activeConversation && $conversations->isNotEmpty()) {
             $activeConversation = $conversations->first();
         }
@@ -70,8 +81,10 @@ class InboxController extends Controller
         $activeMessages = collect();
         if ($activeConversation) {
             $activeMessages = $activeConversation->messages()
-                ->orderBy('occurred_at', 'asc')
-                ->get();
+                ->orderByDesc('occurred_at')
+                ->paginate(50, ['*'], 'messages_page')
+                ->withQueryString();
+            $activeMessages->setCollection($activeMessages->getCollection()->reverse()->values());
 
             // Mark unread as 0 when viewed
             if ($activeConversation->unread_count > 0) {
@@ -99,6 +112,7 @@ class InboxController extends Controller
             'channelFilter' => $channelFilter,
             'statusFilter' => $statusFilter,
             'search' => $search,
+            'unreadFilter' => $unreadFilter,
         ]);
     }
 
@@ -157,54 +171,73 @@ class InboxController extends Controller
         // Find connection for channel
         $connection = $this->channelRepository->findOneWhere([
             'channel' => $conversation->channel,
+            'external_id' => $conversation->account_id,
             'status' => 'connected',
         ]);
 
-        $externalMessageId = 'out_'.bin2hex(random_bytes(8));
-        $deliveryStatus = 'sent';
+        if (! $connection || ! $connection->usable()) {
+            return response()->json(['success' => false, 'error' => 'No active channel connection is available for this conversation.'], 422);
+        }
 
-        if ($connection) {
-            $credentials = $connection->credentials ?? [];
-            $token = (string) ($credentials['access_token'] ?? '');
+        $credentials = $connection->credentials ?? [];
+        $token = (string) ($credentials['access_token'] ?? '');
 
-            try {
-                if ($conversation->channel === 'whatsapp') {
-                    $phoneId = (string) ($credentials['phone_number_id'] ?? $connection->external_id);
-                    $result = $this->metaClient->sendWhatsAppMessage(
-                        $phoneId,
-                        $conversation->external_id,
-                        $body,
-                        $token
-                    );
-                    $externalMessageId = $result['messages'][0]['id'] ?? $externalMessageId;
-                } elseif (in_array($conversation->channel, ['messenger', 'instagram'])) {
-                    $targetId = (string) ($credentials['page_id'] ?? $credentials['instagram_id'] ?? $connection->external_id);
-                    $result = $this->metaClient->sendPageMessage(
-                        $targetId,
-                        $conversation->external_id,
-                        $body,
-                        $token
-                    );
-                    $externalMessageId = $result['message_id'] ?? $externalMessageId;
-                }
-            } catch (Exception $e) {
-                // If Meta request fails (e.g., test credentials or outside 24h window), log and mark failed or record error
-                $deliveryStatus = 'failed';
-            }
+        if ($token === '') {
+            return response()->json(['success' => false, 'error' => 'The channel connection has no access token.'], 422);
         }
 
         $message = $this->messageRepository->create([
             'conversation_id' => $conversation->id,
             'direction' => 'outbound',
-            'external_id' => $externalMessageId,
             'body' => $body,
-            'status' => $deliveryStatus,
+            'status' => 'pending',
             'occurred_at' => now(),
         ]);
 
+        try {
+            if ($conversation->channel === 'whatsapp') {
+                $result = $this->metaClient->sendWhatsAppMessage(
+                    (string) ($credentials['phone_number_id'] ?? $connection->external_id),
+                    $conversation->external_id,
+                    $body,
+                    $token
+                );
+                $externalMessageId = $result['messages'][0]['id'] ?? null;
+            } else {
+                $targetId = (string) ($credentials['page_id'] ?? $credentials['instagram_id'] ?? $connection->external_id);
+                $result = $this->metaClient->sendPageMessage(
+                    $targetId,
+                    $conversation->external_id,
+                    $body,
+                    $token
+                );
+                $externalMessageId = $result['message_id'] ?? null;
+            }
+
+            if (! is_string($externalMessageId) || $externalMessageId === '') {
+                throw new \RuntimeException('The messaging provider did not confirm the message ID.');
+            }
+        } catch (Exception) {
+            $message->update(['status' => 'unknown']);
+            Log::warning('Unified Inbox outbound delivery could not be confirmed.', [
+                'conversation_id' => $conversation->id,
+                'channel' => $conversation->channel,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Delivery could not be confirmed. Check the provider before retrying.',
+                'message' => $message->fresh(),
+            ], 502);
+        }
+
+        $message->update([
+            'external_id' => $externalMessageId,
+            'status' => 'sent',
+        ]);
         $conversation->update([
             'last_message_preview' => $body,
-            'last_message_at' => now(),
+            'last_message_at' => $message->occurred_at,
         ]);
 
         return response()->json([

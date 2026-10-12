@@ -3,6 +3,7 @@
 use App\Models\Tenant;
 use App\Services\FeatureEntitlementService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Http;
 use Webkul\Lead\Models\Lead;
 use Webkul\UnifiedInbox\Models\ChannelConnection;
 use Webkul\UnifiedInbox\Models\Conversation;
@@ -72,7 +73,38 @@ it('verifies Meta webhook challenge handshake', function () {
     expect($response->getContent())->toBe('CHALLENGE_ACCEPTED_999');
 });
 
+it('rejects Meta webhook verification with an incorrect verify token', function () {
+    config()->set('unified-inbox.meta.verify_token', 'test_meta_token_123');
+
+    $response = $this->get('/unified-inbox/meta/webhook?hub_mode=subscribe&hub_verify_token=wrong-token&hub_challenge=CHALLENGE_ACCEPTED_999');
+
+    $response->assertForbidden();
+});
+
+it('rejects unsigned Meta webhook payloads', function () {
+    config()->set('unified-inbox.meta.app_secret', 'test_meta_app_secret');
+
+    $response = $this->postJson('/unified-inbox/meta/webhook', ['object' => 'page', 'entry' => []]);
+
+    $response->assertForbidden();
+});
+
 it('receives an inbound WhatsApp message via Meta webhook and creates conversation and message', function () {
+    expect($this->tenant)->not->toBeNull();
+    config()->set('unified-inbox.meta.app_secret', 'test_meta_app_secret');
+
+    ChannelConnection::updateOrCreate(
+        ['channel' => 'whatsapp', 'external_id' => 'PHONE_ID_888'],
+        [
+            'name' => 'Support WhatsApp',
+            'status' => 'connected',
+            'credentials' => ['access_token' => 'test-access-token'],
+        ]
+    );
+
+    $router = app(CentralWebhookRouter::class);
+    $router->registerRoute($this->tenant->id, 'whatsapp', 'PHONE_ID_888', 'WABA_1029384756', 'Support WhatsApp');
+
     $payload = [
         'object' => 'whatsapp_business_account',
         'entry' => [
@@ -111,10 +143,22 @@ it('receives an inbound WhatsApp message via Meta webhook and creates conversati
         ],
     ];
 
-    $response = $this->postJson('/unified-inbox/meta/webhook', $payload);
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $signature = 'sha256='.hash_hmac('sha256', $body, 'test_meta_app_secret');
+
+    $response = $this->call('POST', '/unified-inbox/meta/webhook', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_HUB_SIGNATURE_256' => $signature,
+    ], $body);
+    $duplicateResponse = $this->call('POST', '/unified-inbox/meta/webhook', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_HUB_SIGNATURE_256' => $signature,
+    ], $body);
+    $router->removeRoute($this->tenant->id, 'whatsapp', 'PHONE_ID_888');
 
     $response->assertStatus(200)
         ->assertJson(['status' => 'EVENT_RECEIVED']);
+    $duplicateResponse->assertStatus(200);
 
     $conversation = Conversation::where('channel', 'whatsapp')
         ->where('external_id', '15559876543')
@@ -129,7 +173,97 @@ it('receives an inbound WhatsApp message via Meta webhook and creates conversati
     expect($message)->not->toBeNull()
         ->and($message->direction)->toBe('inbound')
         ->and($message->body)->toBe('Hi, I need a CRM demo for our team.')
-        ->and($message->status)->toBe('received');
+        ->and($message->status)->toBe('received')
+        ->and(Message::where('conversation_id', $conversation->id)->count())->toBe(1);
+});
+
+it('does not process an unmapped webhook in the request current tenant', function () {
+    expect($this->tenant)->not->toBeNull();
+    config()->set('unified-inbox.meta.app_secret', 'test_meta_app_secret');
+
+    $payload = [
+        'object' => 'whatsapp_business_account',
+        'entry' => [[
+            'id' => 'UNMAPPED_WABA',
+            'changes' => [[
+                'value' => [
+                    'metadata' => ['phone_number_id' => 'UNMAPPED_PHONE'],
+                    'messages' => [[
+                        'from' => '15550009999',
+                        'id' => 'wamid.unmapped',
+                        'type' => 'text',
+                        'text' => ['body' => 'Must not be written to the current tenant.'],
+                    ]],
+                ],
+            ]],
+        ]],
+    ];
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $signature = 'sha256='.hash_hmac('sha256', $body, 'test_meta_app_secret');
+
+    $response = $this->call('POST', '/unified-inbox/meta/webhook', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_HUB_SIGNATURE_256' => $signature,
+    ], $body);
+
+    $response->assertStatus(200);
+    expect(Conversation::where('external_id', '15550009999')->exists())->toBeFalse();
+});
+
+it('updates delivery status only for the routed messaging account and conversation', function () {
+    expect($this->tenant)->not->toBeNull();
+    config()->set('unified-inbox.meta.app_secret', 'test_meta_app_secret');
+
+    ChannelConnection::updateOrCreate(
+        ['channel' => 'messenger', 'external_id' => 'PAGE_STATUS_TEST'],
+        [
+            'name' => 'Status Test Page',
+            'status' => 'connected',
+            'credentials' => ['access_token' => 'test-access-token'],
+        ]
+    );
+
+    $conversation = Conversation::create([
+        'channel' => 'messenger',
+        'account_id' => 'PAGE_STATUS_TEST',
+        'external_id' => 'PSID_STATUS_TEST',
+        'customer_name' => 'Status Test Customer',
+        'status' => 'open',
+    ]);
+    $message = Message::create([
+        'conversation_id' => $conversation->id,
+        'direction' => 'outbound',
+        'external_id' => 'mid.status-test',
+        'body' => 'Hello',
+        'status' => 'sent',
+        'occurred_at' => now(),
+    ]);
+
+    $router = app(CentralWebhookRouter::class);
+    $router->registerRoute($this->tenant->id, 'messenger', 'PAGE_STATUS_TEST', null, 'Status Test Page');
+
+    $payload = [
+        'object' => 'page',
+        'entry' => [[
+            'id' => 'PAGE_STATUS_TEST',
+            'messaging' => [[
+                'sender' => ['id' => 'PAGE_STATUS_TEST'],
+                'recipient' => ['id' => 'PSID_STATUS_TEST'],
+                'delivery' => ['mids' => ['mid.status-test']],
+            ]],
+        ]],
+    ];
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $signature = 'sha256='.hash_hmac('sha256', $body, 'test_meta_app_secret');
+
+    $response = $this->call('POST', '/unified-inbox/meta/webhook', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_HUB_SIGNATURE_256' => $signature,
+    ], $body);
+    $router->removeRoute($this->tenant->id, 'messenger', 'PAGE_STATUS_TEST');
+
+    $response->assertStatus(200);
+    expect($message->fresh()->status)->toBe('delivered');
 });
 
 it('routes central webhook to specific tenant database via landlord channel route', function () {
@@ -146,16 +280,28 @@ it('routes central webhook to specific tenant database via landlord channel rout
     $router = app(CentralWebhookRouter::class);
     $router->registerRoute($tenant->id, 'whatsapp', 'PHONE_TENANT_ROUTE_99', 'WABA_99', 'Acme Support');
 
+    expect(fn () => $router->registerRoute($tenant->id + 1, 'whatsapp', 'PHONE_TENANT_ROUTE_99'))
+        ->toThrow(RuntimeException::class);
+
     $resolved = $router->resolveTenant('whatsapp', 'PHONE_TENANT_ROUTE_99', 'WABA_99');
 
     expect($resolved)->not->toBeNull()
         ->and($resolved->id)->toBe($tenant->id);
 
+    $router->removeRoute($tenant->id + 1, 'whatsapp', 'PHONE_TENANT_ROUTE_99');
+    expect($router->resolveTenant('whatsapp', 'PHONE_TENANT_ROUTE_99'))->not->toBeNull();
+
     // Clean up
-    $router->removeRoute('whatsapp', 'PHONE_TENANT_ROUTE_99');
+    $router->removeRoute($tenant->id, 'whatsapp', 'PHONE_TENANT_ROUTE_99');
 });
 
 it('renders unified inbox and can send an outbound message', function () {
+    Http::fake([
+        'https://graph.facebook.com/*' => Http::response([
+            'messages' => [['id' => 'wamid.outbound-test']],
+        ], 200),
+    ]);
+
     // 1. Create a channel connection
     ChannelConnection::updateOrCreate(
         ['channel' => 'whatsapp', 'external_id' => 'PHONE_ID_888'],
@@ -202,7 +348,38 @@ it('renders unified inbox and can send an outbound message', function () {
         ->first();
 
     expect($outbound)->not->toBeNull()
-        ->and($outbound->body)->toBe('Thanks for reaching out Alex! How many users in your team?');
+        ->and($outbound->body)->toBe('Thanks for reaching out Alex! How many users in your team?')
+        ->and($outbound->external_id)->toBe('wamid.outbound-test')
+        ->and($outbound->status)->toBe('sent');
+});
+
+it('filters unread conversations and paginates the conversation list', function () {
+    foreach (range(1, 26) as $number) {
+        Conversation::create([
+            'channel' => 'whatsapp',
+            'account_id' => 'PHONE_PAGINATION',
+            'external_id' => 'SENDER_'.$number,
+            'customer_name' => sprintf('Customer %02d', $number),
+            'status' => 'open',
+            'unread_count' => $number === 1 ? 1 : 0,
+            'last_message_at' => now()->addSeconds($number),
+        ]);
+    }
+
+    $pageResponse = $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.index'));
+
+    $pageResponse->assertSuccessful()
+        ->assertSee('Customer 26')
+        ->assertDontSee('Customer 01')
+        ->assertSee('Next');
+
+    $unreadResponse = $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.index', ['unread' => 1]));
+
+    $unreadResponse->assertSuccessful()
+        ->assertSee('Customer 01')
+        ->assertDontSee('Customer 26');
 });
 
 it('can update conversation status and assign to user', function () {
@@ -275,7 +452,8 @@ it('displays Connect Channels button and channel statuses in Unified Inbox view'
         ->assertSee('Omnichannel Hub')
         ->assertSee('WhatsApp')
         ->assertSee('Messenger')
-        ->assertSee('Instagram');
+        ->assertSee('Instagram')
+        ->assertSee('ui-channel-logo', false);
 });
 
 it('ensures central webhook URL always targets the root platform domain and strips tenant subdomains', function () {

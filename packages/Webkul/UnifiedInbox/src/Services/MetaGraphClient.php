@@ -88,6 +88,16 @@ class MetaGraphClient
     }
 
     /**
+     * Retrieve a WhatsApp phone number directly to verify the authorized account.
+     */
+    public function getWhatsAppPhoneNumber(string $phoneNumberId, string $token): array
+    {
+        return $this->request('get', $phoneNumberId, [
+            'fields' => 'id,display_phone_number,verified_name,quality_rating,code_verification_status',
+        ], $token);
+    }
+
+    /**
      * Subscribe app to WhatsApp Business Account webhooks.
      */
     public function subscribeWabaApps(string $wabaId, string $token): array
