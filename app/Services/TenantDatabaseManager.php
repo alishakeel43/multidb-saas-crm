@@ -11,16 +11,11 @@ class TenantDatabaseManager
 {
     private array $createdDatabases = [];
 
-    private const PROTECTED_DATABASES = [
-        'zaristech_saas',
-        'tenant_bootstrap',
-    ];
-
     public function databaseExists(string $slug): bool
     {
         $database = TenantIdentifier::databaseName($slug);
 
-        $this->assertMampConnection();
+        $this->assertProvisioningConnection();
 
         try {
             return DB::connection('landlord')
@@ -29,7 +24,7 @@ class TenantDatabaseManager
                 ->exists();
         } catch (Throwable $exception) {
             throw new RuntimeException(
-                "Unable to check tenant database [{$database}]. Verify MAMP MySQL connectivity and landlord database privileges: {$exception->getMessage()}",
+                "Unable to check tenant database [{$database}]. Verify database connectivity and landlord database privileges: {$exception->getMessage()}",
                 previous: $exception,
             );
         }
@@ -37,13 +32,21 @@ class TenantDatabaseManager
 
     public function isProtectedSlug(string $slug): bool
     {
-        return in_array(TenantIdentifier::databaseName($slug), self::PROTECTED_DATABASES, true);
+        $protectedDatabases = array_merge(
+            [
+                config('database.connections.landlord.database'),
+                config('database.connections.tenant.database'),
+            ],
+            config('tenant-provisioning.protected_databases', []),
+        );
+
+        return in_array(TenantIdentifier::databaseName($slug), array_filter($protectedDatabases), true);
     }
 
     public function createDatabase(string $slug): string
     {
         $database = TenantIdentifier::databaseName($slug);
-        $this->assertMampConnection();
+        $this->assertProvisioningConnection();
 
         if ($this->isProtectedSlug($slug)) {
             throw new RuntimeException("Refusing to create protected database [{$database}].");
@@ -59,7 +62,7 @@ class TenantDatabaseManager
             );
         } catch (Throwable $exception) {
             throw new RuntimeException(
-                "Unable to create tenant database [{$database}]. Verify MAMP MySQL connectivity and CREATE DATABASE privileges: {$exception->getMessage()}",
+                "Unable to create tenant database [{$database}]. Verify database connectivity and CREATE DATABASE privileges: {$exception->getMessage()}",
                 previous: $exception,
             );
         }
@@ -72,7 +75,7 @@ class TenantDatabaseManager
     public function dropDatabase(string $slug): void
     {
         $database = TenantIdentifier::databaseName($slug);
-        $this->assertMampConnection();
+        $this->assertProvisioningConnection();
 
         if ($this->isProtectedSlug($slug)) {
             throw new RuntimeException("Refusing to drop protected database [{$database}].");
@@ -87,7 +90,7 @@ class TenantDatabaseManager
                 DB::connection('landlord')->statement("DROP DATABASE `{$database}`");
             } catch (Throwable $exception) {
                 throw new RuntimeException(
-                    "Unable to remove tenant database [{$database}] during rollback. Verify MAMP MySQL connectivity and DROP DATABASE privileges: {$exception->getMessage()}",
+                    "Unable to remove tenant database [{$database}] during rollback. Verify database connectivity and DROP DATABASE privileges: {$exception->getMessage()}",
                     previous: $exception,
                 );
             }
@@ -96,22 +99,33 @@ class TenantDatabaseManager
         unset($this->createdDatabases[$slug]);
     }
 
-    public function assertMampConnection(): void
+    public function assertProvisioningConnection(): void
     {
+        $allowedHosts = config('tenant-provisioning.database_host_allowlist', []);
+        $allowedPorts = array_map('strval', config('tenant-provisioning.database_port_allowlist', []));
+        $targetHost = null;
+        $targetPort = null;
+
         foreach (['landlord', 'tenant'] as $connectionName) {
             $connection = config("database.connections.{$connectionName}");
 
-            if (
-                ! in_array($connection['driver'] ?? null, ['mysql', 'mariadb'], true)
-                || ($connection['host'] ?? null) !== '127.0.0.1'
-                || (string) ($connection['port'] ?? '') !== '8889'
-            ) {
-                throw new RuntimeException('Tenant database management is restricted to MAMP MySQL at 127.0.0.1:8889.');
+            if (! in_array($connection['driver'] ?? null, ['mysql', 'mariadb'], true)) {
+                throw new RuntimeException('Tenant database management requires MySQL or MariaDB connections.');
             }
-        }
 
-        if (config('database.connections.landlord.database') !== 'zaristech_saas') {
-            throw new RuntimeException('Tenant database management requires the configured zaristech_saas landlord connection.');
+            $host = $connection['host'] ?? null;
+            $port = (string) ($connection['port'] ?? '');
+
+            if (! in_array($host, $allowedHosts, true) || ! in_array($port, $allowedPorts, true)) {
+                throw new RuntimeException('Tenant database management target is not in the configured host/port allowlist.');
+            }
+
+            $targetHost ??= $host;
+            $targetPort ??= $port;
+
+            if ($host !== $targetHost || $port !== $targetPort) {
+                throw new RuntimeException('Tenant and landlord database connections must use the same host and port.');
+            }
         }
     }
 }

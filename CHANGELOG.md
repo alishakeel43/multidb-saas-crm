@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add Telephony VoIP module scaffold (Webkul/Telephony) with Twilio SDK (`twilio/sdk`), call_logs tenant migration, landlord telephony routing table (`tenant_telephony_routes`), and package skeleton.
+- Allow tenant database provisioning on explicitly allowlisted production MySQL/MariaDB hosts and ports while protecting the configured landlord and base tenant databases.
+- Add Telephony VoIP module scaffold (Webkul/Telephony) with Twilio SDK (`twilio/sdk`), call_logs tenant migration using Krayin-compatible foreign-key types, landlord telephony routing table (`tenant_telephony_routes`), and package skeleton.
 - Add Telephony Admin UI: person click-to-call action, call-history panel, call-log index page, and Telephony settings form injected through the person view without touching core files.
 
 - Replace channel-letter placeholders with consistent WhatsApp, Messenger, Instagram, and generic channel SVG icons across inbox filters, conversations, channel cards, and connected accounts.

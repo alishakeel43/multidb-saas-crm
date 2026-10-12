@@ -241,35 +241,88 @@ it('reports landlord connection failures with an actionable database check messa
         ->shouldReceive('databaseExists')
         ->once()
         ->with('demo')
-        ->andThrow(new RuntimeException('Unable to check tenant database [tenant_demo]. Verify MAMP MySQL connectivity.'));
+        ->andThrow(new RuntimeException('Unable to check tenant database [tenant_demo]. Verify database connectivity.'));
 
     expect(fn () => provisionTenantForTest())
-        ->toThrow(RuntimeException::class, 'Verify MAMP MySQL connectivity')
+        ->toThrow(RuntimeException::class, 'Verify database connectivity')
         ->and(Tenant::query()->count())->toBe(0);
 });
 
-it('refuses database operations when the configured target is not the approved MAMP MySQL instance', function () {
+it('refuses database operations when the configured connection is not MySQL or MariaDB', function () {
     config([
         'database.connections.landlord.driver' => 'sqlite',
         'database.connections.tenant.driver' => 'sqlite',
     ]);
 
-    expect(fn () => (new TenantDatabaseManager)->assertMampConnection())
-        ->toThrow(RuntimeException::class, 'restricted to MAMP MySQL at 127.0.0.1:8889');
+    expect(fn () => (new TenantDatabaseManager)->assertProvisioningConnection())
+        ->toThrow(RuntimeException::class, 'requires MySQL or MariaDB connections');
 });
 
-it('wraps database inspection failures with an actionable MAMP connectivity message', function () {
+it('allows tenant database provisioning on an explicitly approved production MySQL host', function () {
+    $port = (string) config('tenant-provisioning.database_port_allowlist')[0];
+
+    config([
+        'tenant-provisioning.database_host_allowlist' => ['mysql.internal'],
+        'tenant-provisioning.database_port_allowlist' => [$port],
+        'database.connections.landlord' => [
+            'driver' => 'mysql',
+            'host' => 'mysql.internal',
+            'port' => $port,
+            'database' => 'tenant_demo',
+        ],
+        'database.connections.tenant' => [
+            'driver' => 'mysql',
+            'host' => 'mysql.internal',
+            'port' => $port,
+            'database' => 'tenant_main',
+        ],
+    ]);
+
+    expect(fn () => (new TenantDatabaseManager)->assertProvisioningConnection())
+        ->not->toThrow(RuntimeException::class)
+        ->and((new TenantDatabaseManager)->isProtectedSlug('demo'))->toBeTrue()
+        ->and((new TenantDatabaseManager)->isProtectedSlug('main'))->toBeTrue();
+});
+
+it('refuses tenant database provisioning outside the configured database allowlist', function () {
+    $port = (string) config('tenant-provisioning.database_port_allowlist')[0];
+
+    config([
+        'tenant-provisioning.database_host_allowlist' => ['mysql.internal'],
+        'tenant-provisioning.database_port_allowlist' => [$port],
+        'database.connections.landlord' => [
+            'driver' => 'mysql',
+            'host' => 'unapproved.internal',
+            'port' => $port,
+            'database' => 'production_landlord',
+        ],
+        'database.connections.tenant' => [
+            'driver' => 'mysql',
+            'host' => 'unapproved.internal',
+            'port' => $port,
+            'database' => 'tenant_bootstrap',
+        ],
+    ]);
+
+    expect(fn () => (new TenantDatabaseManager)->assertProvisioningConnection())
+        ->toThrow(RuntimeException::class, 'not in the configured host/port allowlist');
+});
+
+it('wraps database inspection failures with an actionable connectivity message', function () {
+    $host = config('tenant-provisioning.database_host_allowlist')[0];
+    $port = (string) config('tenant-provisioning.database_port_allowlist')[0];
+
     config([
         'database.connections.landlord' => [
             'driver' => 'mysql',
-            'host' => '127.0.0.1',
-            'port' => '8889',
+            'host' => $host,
+            'port' => $port,
             'database' => 'zaristech_saas',
         ],
         'database.connections.tenant' => [
             'driver' => 'mysql',
-            'host' => '127.0.0.1',
-            'port' => '8889',
+            'host' => $host,
+            'port' => $port,
         ],
     ]);
 
@@ -281,7 +334,7 @@ it('wraps database inspection failures with an actionable MAMP connectivity mess
 
     try {
         expect(fn () => (new TenantDatabaseManager)->databaseExists('demo'))
-            ->toThrow(RuntimeException::class, 'Verify MAMP MySQL connectivity and landlord database privileges: Connection refused');
+            ->toThrow(RuntimeException::class, 'Verify database connectivity and landlord database privileges: Connection refused');
     } finally {
         DB::swap($databaseManager);
     }

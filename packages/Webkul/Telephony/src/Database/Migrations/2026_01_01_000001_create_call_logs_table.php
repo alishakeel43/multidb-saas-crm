@@ -15,9 +15,9 @@ return new class extends Migration
             $table->string('status', 50);
             $table->string('from_number', 30)->nullable();
             $table->string('to_number', 30)->nullable();
-            $table->unsignedBigInteger('contact_id')->nullable();
-            $table->unsignedBigInteger('lead_id')->nullable();
-            $table->unsignedBigInteger('user_id')->nullable();
+            $table->unsignedInteger('contact_id')->nullable();
+            $table->unsignedInteger('lead_id')->nullable();
+            $table->unsignedInteger('user_id')->nullable();
             $table->unsignedInteger('duration_seconds')->nullable();
             $table->text('recording_url')->nullable();
             $table->string('recording_sid', 191)->nullable();
