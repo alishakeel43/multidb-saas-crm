@@ -28,11 +28,12 @@ return [
     'tenant_finder' => DomainTenantFinder::class,
 
     /*
-     * The base domain used to build tenant subdomains automatically.
-     * Tenants are provisioned at {slug}.{tenant_base_domain}.
-     * Override in .env with TENANT_BASE_DOMAIN.
+    * The base domain used when no flat tenant suffix is configured.
+    * Production may set TENANT_DOMAIN_SUFFIX=-saas.zaristech.com so tenant
+    * hosts stay within one DNS label and match the *.zaristech.com certificate.
      */
     'tenant_base_domain' => env('TENANT_BASE_DOMAIN', 'localhost'),
+    'tenant_domain_suffix' => env('TENANT_DOMAIN_SUFFIX', ''),
 
     /*
      * These fields are used by tenant:artisan command to match one or more tenant.

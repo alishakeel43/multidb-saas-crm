@@ -4,6 +4,7 @@ namespace App\Filament\Resources\TenantResource\Pages;
 
 use App\Filament\Resources\TenantResource;
 use App\Services\TenantProvisioningService;
+use App\Support\TenantIdentifier;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
@@ -20,8 +21,7 @@ class CreateTenant extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $adminPassword = $data['admin_password'];
-        $baseDomain = config('multitenancy.tenant_base_domain', 'localhost');
-        $domain = $data['domain'] ?? ($data['slug'].'.'.$baseDomain);
+        $domain = $data['domain'] ?? TenantIdentifier::domainForSlug($data['slug']);
 
         try {
             $tenant = app(TenantProvisioningService::class)->provision(

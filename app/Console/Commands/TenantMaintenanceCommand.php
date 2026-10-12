@@ -39,7 +39,7 @@ abstract class TenantMaintenanceCommand extends Command
         }
 
         try {
-            $databaseManager->assertMampConnection();
+            $databaseManager->assertProvisioningConnection();
         } catch (\Throwable $exception) {
             $this->error($exception->getMessage());
 

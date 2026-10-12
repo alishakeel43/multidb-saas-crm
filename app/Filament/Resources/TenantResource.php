@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Services\StorageQuotaService;
 use App\Services\TenantOverviewService;
 use App\Services\TenantSeedService;
+use App\Support\TenantIdentifier;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -53,11 +54,10 @@ class TenantResource extends Resource
                     ->visibleOn('create')
                     ->live(debounce: 400)
                     ->afterStateUpdated(function (string $state, Set $set) {
-                        $baseDomain = config('multitenancy.tenant_base_domain', 'localhost');
                         $slug = strtolower(trim($state));
 
                         if ($slug !== '') {
-                            $set('domain', "{$slug}.{$baseDomain}");
+                            $set('domain', TenantIdentifier::domainForSlug($slug));
                         }
                     }),
                 // Hidden — carries computed domain value on form submit

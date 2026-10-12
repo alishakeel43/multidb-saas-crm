@@ -43,6 +43,23 @@ it('normalizes valid local tenant domains and derives safe database names', func
         ->toBe('tenant_demo');
 });
 
+it('builds flat tenant domains when a suffix is configured', function () {
+    config(['multitenancy.tenant_domain_suffix' => '-saas.zaristech.com']);
+
+    expect(TenantIdentifier::domainForSlug('zdemo'))
+        ->toBe('zdemo-saas.zaristech.com');
+});
+
+it('falls back to the tenant base domain when no suffix is configured', function () {
+    config([
+        'multitenancy.tenant_domain_suffix' => '',
+        'multitenancy.tenant_base_domain' => 'saas.zaristech.com',
+    ]);
+
+    expect(TenantIdentifier::domainForSlug('zdemo'))
+        ->toBe('zdemo.saas.zaristech.com');
+});
+
 it('rejects malformed and oversized tenant identifiers', function (string $slug) {
     expect(fn () => TenantIdentifier::databaseName($slug))
         ->toThrow(InvalidArgumentException::class);
@@ -54,14 +71,17 @@ it('rejects malformed and oversized tenant identifiers', function (string $slug)
 ]);
 
 it('refuses database operations for the protected bootstrap database', function () {
+    $host = config('tenant-provisioning.database_host_allowlist')[0];
+    $port = (string) config('tenant-provisioning.database_port_allowlist')[0];
+
     config([
         'database.connections.landlord.driver' => 'mysql',
-        'database.connections.landlord.host' => '127.0.0.1',
-        'database.connections.landlord.port' => '8889',
+        'database.connections.landlord.host' => $host,
+        'database.connections.landlord.port' => $port,
         'database.connections.landlord.database' => 'zaristech_saas',
         'database.connections.tenant.driver' => 'mysql',
-        'database.connections.tenant.host' => '127.0.0.1',
-        'database.connections.tenant.port' => '8889',
+        'database.connections.tenant.host' => $host,
+        'database.connections.tenant.port' => $port,
     ]);
 
     $manager = app(TenantDatabaseManager::class);

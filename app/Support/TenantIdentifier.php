@@ -58,6 +58,18 @@ class TenantIdentifier
         return $domain;
     }
 
+    public static function domainForSlug(string $slug): string
+    {
+        $slug = self::validateSlug($slug);
+        $suffix = trim((string) config('multitenancy.tenant_domain_suffix', ''));
+
+        if ($suffix !== '') {
+            return self::validateDomain($slug.$suffix);
+        }
+
+        return self::validateDomain($slug.'.'.config('multitenancy.tenant_base_domain', 'localhost'));
+    }
+
     public static function databaseName(string $slug): string
     {
         return 'tenant_'.self::validateSlug($slug);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Route SaaS tenant domains through single-level `*-saas.zaristech.com` hosts compatible with the existing wildcard certificate and Apache tenant vhost.
+- Fix tenant maintenance commands calling the removed MAMP-only database guard.
 - Allow tenant database provisioning on explicitly allowlisted production MySQL/MariaDB hosts and ports while protecting the configured landlord and base tenant databases.
 - Add Telephony VoIP module scaffold (Webkul/Telephony) with Twilio SDK (`twilio/sdk`), call_logs tenant migration using Krayin-compatible foreign-key types, landlord telephony routing table (`tenant_telephony_routes`), and package skeleton.
 - Add Telephony Admin UI: person click-to-call action, call-history panel, call-log index page, and Telephony settings form injected through the person view without touching core files.

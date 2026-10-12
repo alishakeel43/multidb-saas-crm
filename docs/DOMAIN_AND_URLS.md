@@ -79,10 +79,16 @@ When provisioning new tenants, register domains as `{slug}.krayinsaas.localhost`
 
 | Surface | Example |
 |---------|---------|
-| Platform | `https://platform.yoursaas.com/super-admin` |
-| Tenant | `https://acme.yoursaas.com/admin` |
-| DNS | `*.yoursaas.com` → same app server / same `public/` |
-| Web server | One wildcard vhost (or equivalent), same DocumentRoot |
+| Platform | `https://saas.zaristech.com/super-admin` |
+| Tenant | `https://zdemo-saas.zaristech.com/admin` |
+| DNS | `*.zaristech.com` → same app server; Cloudflare proxied |
+| Web server | SaaS vhost aliases `*-saas.zaristech.com` to this app's `public/` |
+
+Set `TENANT_BASE_DOMAIN=saas.zaristech.com` and
+`TENANT_DOMAIN_SUFFIX=-saas.zaristech.com`. The flat tenant hostname stays
+inside one subdomain label, matching the existing `*.zaristech.com` edge and
+origin certificates. Do not use `{slug}.saas.zaristech.com` unless the edge and
+origin certificates explicitly cover `*.saas.zaristech.com`.
 
 ## How you know which tenant it is
 
