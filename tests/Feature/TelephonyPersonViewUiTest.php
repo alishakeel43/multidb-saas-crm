@@ -13,6 +13,17 @@ it('renders the telephony settings page without a blank-screen view error', func
         ->assertSee('Account SID');
 });
 
+it('renders telephony credentials fields in the admin configuration editor', function () {
+    $admin = getDefaultAdmin();
+
+    test()->actingAs($admin)
+        ->get(route('admin.configuration.index', ['telephony', 'credentials']))
+        ->assertOk()
+        ->assertSee('Twilio Credentials')
+        ->assertSee('Account SID')
+        ->assertSee('Auth Token');
+});
+
 it('renders the telephony click-to-call and call history UI on the person view', function () {
     $admin = getDefaultAdmin();
 

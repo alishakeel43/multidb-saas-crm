@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-004",
+  "type": "test",
+  "description": "Write Pest feature tests covering: webhook signature validation (valid/invalid), tenant routing logic, call log upsert idempotency, outbound call initiation (mocked Twilio client), permission enforcement, and tenant isolation. Depends on FEAT-001, FEAT-002 (service classes and models exist).",
+  "status": "completed",
+  "steps": [
+    "1. Create packages/Webkul/Telephony/tests/Feature/WebhookControllerTest.php — use Pest. Tests: (a) valid_hmac_signature_creates_call_log — mock TwilioClientFactory, build a fake webhook POST with correct X-Twilio-Signature HMAC (use Twilio\\Security\\RequestValidator to compute it in the test), assert CallLog was created in tenant DB with correct CallSid; (b) invalid_hmac_returns_403 — POST with wrong signature, assert response status 403, assert no CallLog created; (c) unknown_twilio_number_returns_200_without_crash — POST for a To number not in tenant_telephony_routes, assert 200 response and no exception; (d) duplicate_call_sid_is_idempotent — POST the same CallSid twice, assert only one CallLog row exists (upsert); (e) completed_event_updates_status_and_duration — POST a 'completed' status event, assert CallLog status='completed' and duration_seconds updated.",
+    "2. Create packages/Webkul/Telephony/tests/Feature/TenantIsolationTest.php — tests: (a) call_log_stored_in_correct_tenant_database — set up two fake tenants with separate DB connections (use RefreshDatabase with tenant connection), POST webhook for tenant-A number, assert CallLog exists in tenant-A DB and NOT in tenant-B DB; (b) recording_proxy_requires_tenant_ownership — assert that agent from tenant-A cannot access recording belonging to tenant-B CallLog.",
+    "3. Create packages/Webkul/Telephony/tests/Feature/CallLogControllerTest.php — tests: (a) authenticated_agent_can_initiate_outbound_call — mock TwilioClientFactory::make() to return a fake Twilio client with $client->calls->create() returning a fake CallInstance; POST to admin.telephony.call_logs.store, assert 200 and CallLog created with direction=outbound; (b) unauthenticated_request_is_rejected — POST without auth, assert 302/401; (c) agent_without_permission_is_rejected — login as agent lacking 'telephony.call_logs.create', assert 403; (d) recording_proxy_streams_correctly — mock the recording fetch, assert 200 response.",
+    "4. Create packages/Webkul/Telephony/tests/Feature/TelephonyServiceTest.php — unit-style tests: (a) initiateCall_builds_correct_twilio_params — mock Client, assert calls->create() called with correct $to, $from, statusCallback, statusCallbackEvent; (b) parseAndValidateWebhook_accepts_valid_signature; (c) parseAndValidateWebhook_rejects_invalid_signature; (d) fetchRecordingMetadata_returns_mapped_array.",
+    "5. Create packages/Webkul/Telephony/tests/Pest.php (or add to root tests/Pest.php if tests are run from project root) — uses(Tests\\TestCase::class)->in('Feature').",
+    "6. Ensure tests mock Twilio HTTP calls using Mockery (already in require-dev) — never make real Twilio API calls. Use Mockery::mock(Twilio\\Rest\\Client::class) and bind to the container via $this->instance().",
+    "7. Run ./vendor/bin/pint on all new PHP files.",
+    "8. Update CHANGELOG.md: '- Add Pest feature tests for Telephony: webhook signature validation, tenant isolation, outbound call initiation, call log idempotency, and permission enforcement.'"
+  ],
+  "acceptance_criteria": [
+    "php artisan test --compact runs all new Telephony tests and they pass",
+    "No real Twilio API calls are made during the test suite",
+    "No existing tests are broken",
+    "./vendor/bin/pint --test returns 0 (no formatting violations)"
+  ],
+  "verification": [
+    "php artisan test --compact",
+    "./vendor/bin/pint"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

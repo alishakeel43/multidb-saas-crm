@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Implement the Blade views (call log index, settings page, click-to-call button, call history panel on Contact/Person view), inject UI into Contact person view via view_render_event hooks without touching core files. Depends on FEAT-002 (routes and controllers exist).",
+  "status": "completed",
+  "steps": [
+    "1. Create packages/Webkul/Telephony/src/Resources/views/call-logs/index.blade.php — wraps <x-admin::layouts>, renders the CallLogDataGrid using the datagrid() helper (same pattern as admin::activities.index). Title from telephony::app.call-logs.index.title.",
+    "2. Create packages/Webkul/Telephony/src/Resources/views/settings/index.blade.php — a settings form with fields for account_sid (text input, placeholder 'ACXXXXXXXX'), auth_token (password input, never pre-filled with stored value — show a 'saved' indicator instead), from_number (text), status_callback_base_url (text, optional), webhook_signing_enabled (checkbox). POST to admin.telephony.settings.update. Show flash messages. Match admin panel styling (use <x-admin::form>, <x-admin::form.control-group>, Tailwind classes from other admin views).",
+    "3. Create packages/Webkul/Telephony/src/Resources/views/persons/click-to-call.blade.php — a small Blade partial rendered by the view_render_event listener. Shows a phone button for each contact_number on $person. On click, makes a POST to admin.telephony.call_logs.store (AJAX) with {to: number, contact_id: person.id}. Uses Alpine.js for click handling and loading state (matches pattern in admin views). Gracefully disables the button if telephony.credentials are not configured (checks via @if(core()->getConfigData('telephony.credentials.account_sid'))).",
+    "4. Create packages/Webkul/Telephony/src/Resources/views/persons/call-history.blade.php — a panel partial rendered on the right side of the Person view. Lists the last 10 call logs for $person->id via an AJAX fetch to admin.telephony.call_logs.index with ?filters[contact_id][eq]=$person->id, rendered as a simple table (direction badge, status, duration, started_at, agent). Alpine.js for data loading. Shows 'No calls yet' on empty. Links to the full call log index filtered by contact.",
+    "5. Create packages/Webkul/Telephony/src/Providers/EventServiceProvider.php — extends Illuminate\\Foundation\\Support\\Providers\\EventServiceProvider. In boot(), listen to: (a) 'admin.contact.persons.view.actions.after' → injects 'telephony::persons.click-to-call' template via $viewRenderManager->addTemplate(), passing $params['person'] through. (b) 'admin.contact.persons.view.right.before' → injects 'telephony::persons.call-history' template. Pattern exactly as Assignment's EventServiceProvider. Wrap in try/catch to never block person view if telephony tables are unavailable.",
+    "6. Register EventServiceProvider in TelephonyServiceProvider::boot(): $this->app->register(EventServiceProvider::class).",
+    "7. Create packages/Webkul/Telephony/src/Resources/views/call-logs/datagrid/ — add any datagrid cell partials if needed (e.g. direction badge with colored pill, same pattern as admin::activities.datagrid.is-done).",
+    "8. Update CHANGELOG.md: '- Add Telephony UI: call log index page, credential settings page, click-to-call button on Contact/Person view (via view_render_event hook), and call history panel on Person view.'"
+  ],
+  "acceptance_criteria": [
+    "Visiting /admin/telephony/call-logs renders the DataGrid page without errors",
+    "Visiting /admin/telephony/settings renders the settings form without errors",
+    "The Contact/Person view page renders without errors and shows the click-to-call button (or graceful disabled state if credentials absent)",
+    "The call history panel appears on the right side of the Person view",
+    "php artisan test --compact passes (no view compilation errors)"
+  ],
+  "verification": [
+    "php artisan test --compact",
+    "php artisan route:list --name=telephony (all routes present)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

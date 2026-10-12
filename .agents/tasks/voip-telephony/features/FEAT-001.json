@@ -1,0 +1,38 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Install twilio/twilio-php SDK and scaffold the Telephony package skeleton: directory structure, Contracts, Models, Proxies, Repositories, ServiceProviders (TelephonyServiceProvider + ModuleServiceProvider), Config files (menu.php, acl.php, core_config.php for credentials), landlord migration for tenant_telephony_routes, and tenant migration for call_logs. Register TelephonyServiceProvider in bootstrap/providers.php.",
+  "status": "completed",
+  "steps": [
+    "1. Install twilio/twilio-php via composer: `composer require twilio/twilio-php` (confirms PHP 8.3 / no Laravel-framework dependency, plain PHP SDK, MIT-like license — Twilio Helper Library License). Verify it resolves without conflicts.",
+    "2. Create directory tree: packages/Webkul/Telephony/src/{Providers,Contracts,Models,Repositories,Http/Controllers,Routes,Database/Migrations,Resources/views,Resources/lang/en,Config}/",
+    "3. Create packages/Webkul/Telephony/src/Contracts/CallLog.php — empty interface extending nothing (matches Activity/Contracts/Activity.php pattern).",
+    "4. Create packages/Webkul/Telephony/src/Models/CallLog.php — Eloquent model implementing CallLog contract. Table: call_logs. Fillable: provider_call_id, direction, status, from_number, to_number, contact_id, lead_id, user_id, duration_seconds, recording_url, recording_sid, started_at, ended_at, provider_payload. Casts: started_at/ended_at as datetime, provider_payload as array. Relationships: belongsTo PersonProxy, belongsTo LeadProxy, belongsTo UserProxy.",
+    "5. Create packages/Webkul/Telephony/src/Models/CallLogProxy.php — same pattern as ActivityProxy.php (extends Konekt\\Concord\\Proxies\\ModelProxy).",
+    "6. Create packages/Webkul/Telephony/src/Repositories/CallLogRepository.php — extends Webkul\\Core\\Eloquent\\Repository, model() returns 'Webkul\\Telephony\\Contracts\\CallLog'.",
+    "7. Create packages/Webkul/Telephony/src/Providers/ModuleServiceProvider.php — extends BaseModuleServiceProvider, $models = [CallLog::class].",
+    "8. Create packages/Webkul/Telephony/src/Providers/TelephonyServiceProvider.php — boot(): loadMigrationsFrom, loadRoutesFrom, loadTranslationsFrom, loadViewsFrom, Blade::anonymousComponentPath. register(): bindIf for CallLog contract, mergeConfigFrom for menu/acl/core_config, singleton for TwilioClientFactory.",
+    "9. Create packages/Webkul/Telephony/src/Config/menu.php — adds a 'telephony' top-level menu item (key='telephony', sort=11, route='admin.telephony.call_logs.index', icon-class='icon-activity') and a child 'telephony.settings' (route='admin.telephony.settings.index').",
+    "10. Create packages/Webkul/Telephony/src/Config/acl.php — telephony (view), telephony.call_logs.view, telephony.call_logs.delete, telephony.settings.edit entries.",
+    "11. Create packages/Webkul/Telephony/src/Config/core_config.php — group key='telephony', sub-key='telephony.credentials' with fields: account_sid (text), auth_token (password), from_number (text), status_callback_base_url (text, optional override), webhook_signing_enabled (boolean).",
+    "12. Create landlord migration: database/migrations/landlord/2026_XX_XX_000000_create_tenant_telephony_routes_table.php — Schema::connection('landlord')->create('tenant_telephony_routes', ...) with: id, tenant_id FK, twilio_phone_number (varchar 30, unique), is_active bool, timestamps. This maps an inbound Twilio number to a tenant so the central webhook can dispatch without a URL parameter.",
+    "13. Create tenant migration: packages/Webkul/Telephony/src/Database/Migrations/XXXX_create_call_logs_table.php — id, provider_call_id varchar(191) unique, direction enum(inbound,outbound), status varchar(50), from_number varchar(30), to_number varchar(30), contact_id (nullable FK users/persons — actually FK to persons.id nullable), lead_id nullable FK leads.id, user_id FK users.id, duration_seconds int nullable, recording_url text nullable, recording_sid varchar(191) nullable, started_at timestamp nullable, ended_at timestamp nullable, provider_payload json nullable, timestamps.",
+    "14. Add 'Webkul\\Telephony\\Providers\\TelephonyServiceProvider::class' to bootstrap/providers.php (append before the closing bracket, after UnifiedInboxServiceProvider).",
+    "15. Create packages/Webkul/Telephony/composer.json stub (name: webkul/telephony, autoload PSR-4 Webkul\\Telephony\\: src/). Note: parent composer.json already has a path repository for packages/Webkul/*; verify this is the case and document if not.",
+    "16. Update CHANGELOG.md under Unreleased: '- Add Telephony VoIP module scaffold (Webkul/Telephony) with Twilio SDK, call_logs tenant migration, landlord telephony routing table, and package skeleton.'"
+  ],
+  "acceptance_criteria": [
+    "composer require twilio/twilio-php completes without dependency conflicts",
+    "php artisan migrate --database=tenant runs the call_logs migration without errors (inside a tenant context)",
+    "php artisan migrate --database=landlord runs the tenant_telephony_routes migration",
+    "php artisan route:list shows no errors after provider registration",
+    "php artisan test --compact passes all existing tests (no regressions from adding the provider)"
+  ],
+  "verification": [
+    "composer install (confirm no conflicts after requiring twilio/twilio-php)",
+    "php artisan test --compact (all existing tests green)",
+    "php artisan route:list --name=telephony (no exception; shows routes once FEAT-002 is done)"
+  ],
+  "blocked_reason": null,
+  "findings": "1. Twilio SDK package name on Packagist is 'twilio/sdk' (not 'twilio/twilio-php' as listed in the task — the old name was deprecated). Installed as ^8.12. 2. Tenant migration filename: packages/Webkul/Telephony/src/Database/Migrations/2026_01_01_000001_create_call_logs_table.php. 3. Landlord migration filename: database/migrations/landlord/2026_01_01_000000_create_tenant_telephony_routes_table.php. 4. TwilioClientFactory lives at packages/Webkul/Telephony/src/Services/TwilioClientFactory.php — FEAT-002 should use app(TwilioClientFactory::class)->make() to get a per-tenant Twilio client. 5. php artisan route:list --name=telephony returns ERROR 'no routes matching' (expected — routes not yet defined; no exception thrown, provider loads cleanly). 6. Pre-existing test suite memory OOM in SuperAdminAccessTest (Filament Blade rendering, not related to Telephony changes) — confirmed failure exists before and after this commit. Unit tests pass (1 passed / 106 skipped). 7. TelephonyServiceProvider registers ModuleServiceProvider as sub-provider in boot() to match the two-provider pattern."
+}

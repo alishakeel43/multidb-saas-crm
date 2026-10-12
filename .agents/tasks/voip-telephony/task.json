@@ -1,0 +1,7 @@
+{
+  "task_id": "task-voip-telephony",
+  "task_description": "Implement a VoIP/Telephony module (packages/Webkul/Telephony) for Krayin CRM using twilio/twilio-php as the provider SDK. Covers: outbound click-to-call from Contact pages, inbound call webhook, call logs DataGrid, per-tenant credential storage via core_config, landlord routing table for multi-tenant webhook dispatch, and Pest tests.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}

@@ -5,6 +5,8 @@ namespace Webkul\Telephony\Providers;
 use Illuminate\Support\ServiceProvider;
 use Webkul\Telephony\Contracts\CallLog as CallLogContract;
 use Webkul\Telephony\Models\CallLog;
+use Webkul\Telephony\Services\TelephonyService;
+use Webkul\Telephony\Services\TenantTelephonyRouter;
 use Webkul\Telephony\Services\TwilioClientFactory;
 
 class TelephonyServiceProvider extends ServiceProvider
@@ -21,6 +23,8 @@ class TelephonyServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/core_config.php', 'core_config');
 
         $this->app->singleton(TwilioClientFactory::class);
+        $this->app->singleton(TelephonyService::class);
+        $this->app->singleton(TenantTelephonyRouter::class);
     }
 
     /**
@@ -30,10 +34,13 @@ class TelephonyServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
 
+        $this->loadRoutesFrom(__DIR__.'/../Routes/web.php');
+
         $this->loadTranslationsFrom(__DIR__.'/../Resources/lang', 'telephony');
 
         $this->loadViewsFrom(__DIR__.'/../Resources/views', 'telephony');
 
+        $this->app->register(EventServiceProvider::class);
         $this->app->register(ModuleServiceProvider::class);
 
         $this->app->booted(function () {

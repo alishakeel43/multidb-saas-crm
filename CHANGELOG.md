@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add Telephony VoIP module scaffold (Webkul/Telephony) with Twilio SDK (`twilio/sdk`), call_logs tenant migration, landlord telephony routing table (`tenant_telephony_routes`), and package skeleton.
+- Add Telephony Admin UI: person click-to-call action, call-history panel, call-log index page, and Telephony settings form injected through the person view without touching core files.
 
 - Replace channel-letter placeholders with consistent WhatsApp, Messenger, Instagram, and generic channel SVG icons across inbox filters, conversations, channel cards, and connected accounts.
 - Harden Unified Inbox Meta onboarding with tenant/user-bound single-use OAuth state and verified WhatsApp signup account details; secure Meta webhooks with signature and verification-token checks, authoritative landlord channel routing that cannot be reassigned across tenants, resolved-tenant account validation, scoped delivery callbacks, and idempotent inbound message handling. Prevent cross-account replies and false sent states; add unread filtering and paginated conversation/message history.

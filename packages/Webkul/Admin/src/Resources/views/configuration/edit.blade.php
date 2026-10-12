@@ -1,7 +1,8 @@
 @php
     $activeConfiguration = system_config()->getActiveConfigurationItem();
+    $child = $activeConfiguration;
 
-    $name = $activeConfiguration->getName();
+    $name = $activeConfiguration?->getName() ?? __('admin::app.configuration.index.title');
 @endphp
 
 <x-admin::layouts>
@@ -50,34 +51,63 @@
         </div>
 
         <div class="grid grid-cols-[1fr_2fr] gap-10 max-lg:grid-cols-1 max-lg:gap-4 lg:mt-6">
-            @foreach ($activeConfiguration->getChildren() as $child)
+            @if ($activeConfiguration?->haveChildren())
+                @foreach ($activeConfiguration->getChildren() as $child)
+                    <div class="grid content-start gap-2.5 max-lg:mt-6">
+                        <p class="text-base font-semibold text-gray-600 dark:text-gray-300">
+                            {{ $child->getName() }}
+                        </p>
+
+                        <p class="leading-[140%] text-gray-600 dark:text-gray-300">
+                            {!! $child->getInfo() !!}
+                        </p>
+                    </div>
+
+                    <div class="box-shadow rounded bg-white p-4 dark:bg-gray-900">
+                        {!! view_render_event('admin.configuration.edit.form_controls.before') !!}
+
+                        @foreach ($child->getFields() as $field)
+                            @if (
+                                $field->getType() == 'blade'
+                                && view()->exists($path = $field->getPath())
+                            )
+                                {!! view($path, compact('field', 'child'))->render() !!}
+                            @else 
+                                @include ('admin::configuration.field-type')
+                            @endif
+                        @endforeach
+
+                        {!! view_render_event('admin.configuration.edit.form_controls.after') !!}
+                    </div>
+                @endforeach
+            @elseif ($activeConfiguration)
                 <div class="grid content-start gap-2.5 max-lg:mt-6">
                     <p class="text-base font-semibold text-gray-600 dark:text-gray-300">
-                        {{ $child->getName() }}
+                        {{ $activeConfiguration->getName() }}
                     </p>
 
                     <p class="leading-[140%] text-gray-600 dark:text-gray-300">
-                        {!! $child->getInfo() !!}
+                        {!! $activeConfiguration->getInfo() !!}
                     </p>
                 </div>
 
                 <div class="box-shadow rounded bg-white p-4 dark:bg-gray-900">
                     {!! view_render_event('admin.configuration.edit.form_controls.before') !!}
 
-                    @foreach ($child->getFields() as $field)
+                    @foreach ($activeConfiguration->getFields() as $field)
                         @if (
                             $field->getType() == 'blade'
                             && view()->exists($path = $field->getPath())
                         )
-                            {!! view($path, compact('field', 'child'))->render() !!}
-                        @else 
+                            {!! view($path, compact('field', 'activeConfiguration'))->render() !!}
+                        @else
                             @include ('admin::configuration.field-type')
                         @endif
                     @endforeach
 
                     {!! view_render_event('admin.configuration.edit.form_controls.after') !!}
                 </div>
-            @endforeach
+            @endif
         </div>
     </x-admin::form>
 
