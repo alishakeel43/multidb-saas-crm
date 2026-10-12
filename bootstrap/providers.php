@@ -29,6 +29,7 @@ use Webkul\Product\Providers\ProductServiceProvider;
 use Webkul\Quote\Providers\QuoteServiceProvider;
 use Webkul\QuoteApproval\Providers\QuoteApprovalServiceProvider;
 use Webkul\Tag\Providers\TagServiceProvider;
+use Webkul\Telephony\Providers\TelephonyServiceProvider;
 use Webkul\UnifiedInbox\Providers\UnifiedInboxServiceProvider;
 use Webkul\User\Providers\UserServiceProvider;
 use Webkul\Warehouse\Providers\WarehouseServiceProvider;
@@ -79,4 +80,5 @@ return [
     WarehouseServiceProvider::class,
     WebFormServiceProvider::class,
     UnifiedInboxServiceProvider::class,
+    TelephonyServiceProvider::class,
 ];

@@ -1,0 +1,17 @@
+{
+    "name": "webkul/telephony",
+    "description": "VoIP telephony integration (Twilio) for Krayin CRM with multi-tenant support",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Webkul\\Telephony\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\Telephony\\Providers\\TelephonyServiceProvider"
+            ]
+        }
+    }
+}

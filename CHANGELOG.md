@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add Telephony VoIP module scaffold (Webkul/Telephony) with Twilio SDK (`twilio/sdk`), call_logs tenant migration, landlord telephony routing table (`tenant_telephony_routes`), and package skeleton.
+
 - Replace channel-letter placeholders with consistent WhatsApp, Messenger, Instagram, and generic channel SVG icons across inbox filters, conversations, channel cards, and connected accounts.
 - Harden Unified Inbox Meta onboarding with tenant/user-bound single-use OAuth state and verified WhatsApp signup account details; secure Meta webhooks with signature and verification-token checks, authoritative landlord channel routing that cannot be reassigned across tenants, resolved-tenant account validation, scoped delivery callbacks, and idempotent inbound message handling. Prevent cross-account replies and false sent states; add unread filtering and paginated conversation/message history.
 - Add Unified Inbox package (`Webkul/UnifiedInbox`) with Meta Embedded Signup v4 (WhatsApp, Messenger, Instagram), centralized root webhook URL routing with landlord channel route resolution (guaranteeing root domain without tenant subdomains), reference `.ui-workspace` design system and component structure (`partials/styles`, `partials/header`, `partials/list`, 3-tab CRM drawer, and channel cards), prominent Connect Channels button and multi-channel status indicators on Unified Inbox UI, outbound Graph API messaging, and CRM Contact/Lead linking.
