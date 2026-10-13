@@ -129,7 +129,7 @@
                                     @php $uiLastDay = $uiDay; @endphp
                                 @endif
                                 <article class="ui-message ui-message-{{ $message->direction }}">
-                                    <p v-pre class="whitespace-pre-wrap break-words">{{ $message->body }}</p>
+                                    <p v-pre class="whitespace-pre-wrap break-words">{!! str_replace(["\r\n", "\r", "\n"], '<br>', e($message->body)) !!}</p>
                                     <div class="ui-message-meta">
                                         <span>{{ $message->occurred_at?->format('H:i') }}</span>
                                         @if ($message->direction === 'outbound')
@@ -354,7 +354,7 @@
                                                         <a class="ui-tl-title" href="{{ route('admin.activities.edit', $act->id) }}">{{ $act->title }}</a>
                                                     @endif
                                                     @if ($act->comment)
-                                                        <p v-pre class="ui-tl-comment">{{ \Illuminate\Support\Str::limit($act->comment, 280) }}</p>
+                                                        <p v-pre class="ui-tl-comment">{!! str_replace(["\r\n", "\r", "\n"], '<br>', e(\Illuminate\Support\Str::limit($act->comment, 280))) !!}</p>
                                                     @endif
                                                     <p class="ui-tl-meta ui-muted">
                                                         {{ $act->user?->name ?? 'System' }}
@@ -389,7 +389,7 @@
                                                         <span class="ui-note-author">{{ $noteAuthor }}</span>
                                                         <time class="ui-note-time" datetime="{{ $note->created_at?->toIso8601String() }}" title="{{ $note->created_at?->format('d M Y, H:i') }}">{{ $note->created_at?->format('d M, H:i') }} · {{ $note->created_at?->diffForHumans(null, true) }} ago</time>
                                                     </div>
-                                                    <div class="ui-note-body">{{ $note->comment }}</div>
+                                                    <div class="ui-note-body">{!! str_replace(["\r\n", "\r", "\n"], '<br>', e($note->comment)) !!}</div>
                                                 </li>
                                             @empty
                                                 <li class="ui-notes-empty">No internal notes for this conversation yet.</li>

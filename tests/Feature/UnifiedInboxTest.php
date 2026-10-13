@@ -14,11 +14,28 @@ use Webkul\User\Models\User;
 
 uses(DatabaseTransactions::class);
 
+afterEach(function () {
+    $tenant = \Illuminate\Support\Facades\DB::connection('tenant');
+    while ($tenant->transactionLevel() > 0) {
+        $tenant->rollBack();
+    }
+});
+
 beforeEach(function () {
     $this->tenant = Tenant::first();
     if ($this->tenant) {
         $this->tenant->makeCurrent();
     }
+
+    // Hard guard: makeCurrent() reconnects the tenant connection to the tenant's DB.
+    // Never let this suite wipe real local data (it deletes all inbox rows below).
+    $tenantDb = (string) \Illuminate\Support\Facades\DB::connection('tenant')->getDatabaseName();
+    if (in_array($tenantDb, ['tenant_demo', 'tenant_bootstrap'], true) || ! str_starts_with($tenantDb, 'tenant_test')) {
+        throw new RuntimeException("UnifiedInboxTest refused to run against database [{$tenantDb}]. Use the isolated test DB (see phpunit.xml).");
+    }
+
+    // The reconnect above escapes DatabaseTransactions; wrap the tenant connection again.
+    \Illuminate\Support\Facades\DB::connection('tenant')->beginTransaction();
 
     Message::query()->delete();
     Conversation::query()->delete();

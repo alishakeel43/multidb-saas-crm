@@ -32,5 +32,9 @@
         <env name="QUEUE_CONNECTION" value="sync" />
         <env name="SESSION_DRIVER" value="array" />
         <env name="TELESCOPE_ENABLED" value="false" />
+        <!-- Isolated test databases: tests must never touch tenant_demo / tenant_bootstrap / zaristech_saas -->
+        <env name="DB_DATABASE" value="tenant_test" force="true" />
+        <env name="TENANT_DB_DATABASE" value="tenant_test" force="true" />
+        <env name="LANDLORD_DB_DATABASE" value="zaristech_saas_test" force="true" />
     </php>
 </phpunit>

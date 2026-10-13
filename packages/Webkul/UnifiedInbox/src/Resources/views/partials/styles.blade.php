@@ -1228,5 +1228,11 @@
     .ui-inbox #message-form{display:flex;align-items:flex-end;gap:8px;margin:0}
     .ui-inbox .ui-composer textarea#message-input{flex:1;min-width:0;min-height:0;height:auto;resize:none;overflow-y:hidden;line-height:20px;padding:8px 12px!important;border-radius:18px;font-size:14px;box-sizing:border-box}
     .ui-inbox #send-button{flex:0 0 auto;height:36px;padding:0 16px;border-radius:18px;margin:0}
+    /* Krayin "Powered by" footer on the inbox: start it after the fixed sidebar so it no longer
+       runs under the sidebar's collapse toggle (which left an odd bordered strip bottom-left). */
+    @media (min-width:1024px){
+        body:has(.ui-inbox) #app .fixed.bottom-0.left-0.right-0:has(> .border-t.py-5.text-center){left:200px;transition:left .08s}
+        body:has(.ui-inbox) #app .sidebar-collapsed .fixed.bottom-0.left-0.right-0:has(> .border-t.py-5.text-center){left:70px}
+    }
 </style>
 @endPushOnce
