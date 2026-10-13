@@ -25,6 +25,7 @@ use Webkul\Installer\Providers\InstallerServiceProvider;
 use Webkul\Lead\Providers\LeadServiceProvider;
 use Webkul\LeadScoring\Providers\LeadScoringServiceProvider;
 use Webkul\Marketing\Providers\MarketingServiceProvider;
+use Webkul\MarketingAutomation\Providers\MarketingAutomationServiceProvider;
 use Webkul\Notification\Providers\NotificationServiceProvider;
 use Webkul\Product\Providers\ProductServiceProvider;
 use Webkul\Quote\Providers\QuoteServiceProvider;
@@ -70,6 +71,7 @@ return [
     EmailServiceProvider::class,
     GoogleContactServiceProvider::class,
     MarketingServiceProvider::class,
+    MarketingAutomationServiceProvider::class,
     InstallerServiceProvider::class,
     LeadServiceProvider::class,
     LeadScoringServiceProvider::class,
