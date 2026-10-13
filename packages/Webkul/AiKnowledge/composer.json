@@ -1,0 +1,27 @@
+{
+    "name": "krayin/laravel-ai-knowledge",
+    "description": "Tenant-scoped AI knowledge document intake for Krayin CRM.",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Webkul",
+            "email": "support@webkul.com"
+        }
+    ],
+    "require": {
+        "krayin/laravel-core": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Webkul\\AiKnowledge\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\AiKnowledge\\Providers\\AiKnowledgeServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev"
+}
