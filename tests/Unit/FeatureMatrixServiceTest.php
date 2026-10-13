@@ -159,6 +159,7 @@ it('keeps the legacy organizations alias locked to contacts when syncing', funct
     $enabled['contacts'] = false;
     $enabled['organizations'] = true;
     $enabled['consent'] = false;
+    $enabled['marketing_automation'] = false;
 
     $matrix->syncPlan($plan, $enabled);
 
