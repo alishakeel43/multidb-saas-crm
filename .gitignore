@@ -38,3 +38,6 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 .phpunit.cache/
+
+# Per-tenant uploads, public files, and local storage
+/storage/tenants/

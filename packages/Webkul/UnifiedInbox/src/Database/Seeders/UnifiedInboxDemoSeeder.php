@@ -4,6 +4,7 @@ namespace Webkul\UnifiedInbox\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Webkul\UnifiedInbox\Models\ChannelConnection;
 use Webkul\UnifiedInbox\Models\Conversation;
 use Webkul\UnifiedInbox\Models\Message;
@@ -33,6 +34,14 @@ class UnifiedInboxDemoSeeder extends Seeder
             return;
         }
 
+        $this->seedChannels();
+    }
+
+    /**
+     * @param  list<array{person_id?: int, lead_id?: int, organization_id?: int, user_id?: int}>  $crmLinks
+     */
+    public function seedChannels(array $crmLinks = []): void
+    {
         foreach ($this->dataset() as $channel => $set) {
             $connection = ChannelConnection::updateOrCreate(
                 ['channel' => $channel, 'external_id' => $set['account_id']],
@@ -46,24 +55,43 @@ class UnifiedInboxDemoSeeder extends Seeder
             );
 
             foreach ($set['chats'] as $i => $chat) {
-                $this->seedChat($channel, $connection->external_id, $i, $chat);
+                $this->seedChat($channel, $connection->external_id, $i, $chat, $crmLinks[$i] ?? null);
             }
 
             $this->command?->info(sprintf('%s: connection #%d, %d chats', $channel, $connection->id, count($set['chats'])));
         }
     }
 
-    protected function seedChat(string $channel, string $accountId, int $i, array $chat): void
+    /**
+     * @param  array{person_id?: int, lead_id?: int, organization_id?: int, user_id?: int}|null  $link
+     */
+    protected function seedChat(string $channel, string $accountId, int $i, array $chat, ?array $link = null): void
     {
         $base = Carbon::now()->subMinutes($chat['ago']);
+        $attributes = [
+            'customer_name' => $chat['name'],
+            'status' => $chat['status'] ?? 'open',
+            'unread_count' => $chat['unread'] ?? 0,
+            'metadata' => [self::TAG => true],
+        ];
+
+        if ($link) {
+            foreach (['person_id', 'lead_id', 'user_id', 'organization_id'] as $column) {
+                if (! array_key_exists($column, $link)) {
+                    continue;
+                }
+
+                if (! Schema::hasColumn('unified_inbox_conversations', $column)) {
+                    continue;
+                }
+
+                $attributes[$column] = $link[$column];
+            }
+        }
+
         $conversation = Conversation::updateOrCreate(
             ['channel' => $channel, 'account_id' => $accountId, 'external_id' => $chat['id']],
-            [
-                'customer_name' => $chat['name'],
-                'status' => $chat['status'] ?? 'open',
-                'unread_count' => $chat['unread'] ?? 0,
-                'metadata' => [self::TAG => true],
-            ]
+            $attributes
         );
 
         $last = null;

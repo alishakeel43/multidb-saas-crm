@@ -307,6 +307,16 @@ class TenantResource extends Resource
                         ->action(function (Tenant $record): void {
                             self::runSeedAction($record, true);
                         }),
+                    Action::make('seedFeatures')
+                        ->label('Seed all features')
+                        ->icon('heroicon-m-squares-2x2')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Seed every feature')
+                        ->modalDescription(fn (Tenant $record): string => "Add linked dummy data for every feature, including unified inbox channels, for {$record->slug}? Does not delete existing data.")
+                        ->action(function (Tenant $record): void {
+                            self::runSeedAction($record, false, true);
+                        }),
                 ])
                     ->label('Seeders')
                     ->icon('heroicon-m-circle-stack')
@@ -316,15 +326,19 @@ class TenantResource extends Resource
             ->defaultSort('created_at', 'desc');
     }
 
-    public static function runSeedAction(Tenant $record, bool $demo): void
+    public static function runSeedAction(Tenant $record, bool $demo = false, bool $allFeatures = false): void
     {
         try {
-            app(TenantSeedService::class)->seed($record, $demo);
+            app(TenantSeedService::class)->seed($record, $demo, $allFeatures);
+
+            $title = match (true) {
+                $allFeatures => "All-features seed completed for {$record->slug}",
+                $demo => "Demo seed completed for {$record->slug}",
+                default => "Baseline seed completed for {$record->slug}",
+            };
 
             Notification::make()
-                ->title($demo
-                    ? "Demo seed completed for {$record->slug}"
-                    : "Baseline seed completed for {$record->slug}")
+                ->title($title)
                 ->success()
                 ->send();
         } catch (Throwable $exception) {

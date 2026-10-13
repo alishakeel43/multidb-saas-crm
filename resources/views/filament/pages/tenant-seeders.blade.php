@@ -4,7 +4,9 @@
             <strong>Baseline</strong> reseeds CRM lookups (pipelines, attributes, workflows).
             <strong>Demo + P0</strong> also adds sample organizations, contacts, leads, bookings,
             consents, quote approvals, lead scoring rules, and notifications for process testing.
-            Both modes are idempotent and do not delete existing records.
+            <strong>All features</strong> adds that demo data plus linked products, inventory, mail,
+            marketing, automation, web forms, telephony, knowledge documents, and WhatsApp, Messenger,
+            and Instagram conversations. Every mode is idempotent and does not delete existing records.
         </p>
     </div>
 
@@ -35,7 +37,7 @@
                                 <x-filament::button
                                     color="gray"
                                     size="sm"
-                                    wire:click="seedTenant({{ $tenant['id'] }}, false)"
+                                    wire:click="seedTenant({{ $tenant['id'] }}, 'baseline')"
                                     wire:confirm="Run CRM baseline seed for {{ $tenant['slug'] }}?"
                                 >
                                     Baseline
@@ -43,10 +45,18 @@
                                 <x-filament::button
                                     color="primary"
                                     size="sm"
-                                    wire:click="seedTenant({{ $tenant['id'] }}, true)"
+                                    wire:click="seedTenant({{ $tenant['id'] }}, 'demo')"
                                     wire:confirm="Run demo + P0 seed for {{ $tenant['slug'] }}? This adds sample CRM records if missing."
                                 >
                                     Demo + P0
+                                </x-filament::button>
+                                <x-filament::button
+                                    color="success"
+                                    size="sm"
+                                    wire:click="seedTenant({{ $tenant['id'] }}, 'features')"
+                                    wire:confirm="Run the all-features seed for {{ $tenant['slug'] }}? This adds linked dummy data, including unified inbox channels, and does not delete existing records."
+                                >
+                                    All features
                                 </x-filament::button>
                             </div>
                         </td>

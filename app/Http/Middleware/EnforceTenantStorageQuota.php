@@ -6,6 +6,7 @@ use App\Models\Tenant;
 use App\Services\StorageQuotaService;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -23,17 +24,7 @@ class EnforceTenantStorageQuota
             return $next($request);
         }
 
-        $incoming = 0;
-
-        foreach ($request->allFiles() as $file) {
-            $files = is_array($file) ? $file : [$file];
-
-            foreach ($files as $uploaded) {
-                if ($uploaded) {
-                    $incoming += (int) $uploaded->getSize();
-                }
-            }
-        }
+        $incoming = $this->incomingUploadBytes($request->allFiles());
 
         try {
             $this->storageQuota->assertCanStore($tenant, $incoming);
@@ -46,5 +37,37 @@ class EnforceTenantStorageQuota
         }
 
         return $next($request);
+    }
+
+    /**
+     * Configuration uploads such as the admin logo are nested
+     * (`general[general][admin_logo][logo_image]`), so the file tree must be
+     * walked until each UploadedFile is reached.
+     *
+     * @param  array<string, mixed>  $files
+     */
+    private function incomingUploadBytes(array $files): int
+    {
+        $bytes = 0;
+
+        $walk = function (mixed $node) use (&$walk, &$bytes): void {
+            if ($node instanceof UploadedFile) {
+                $bytes += (int) ($node->getSize() ?: 0);
+
+                return;
+            }
+
+            if (! is_array($node)) {
+                return;
+            }
+
+            foreach ($node as $child) {
+                $walk($child);
+            }
+        };
+
+        $walk($files);
+
+        return $bytes;
     }
 }

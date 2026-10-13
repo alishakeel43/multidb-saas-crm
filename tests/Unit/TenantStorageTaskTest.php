@@ -113,6 +113,30 @@ it('roots local and public disks under the current tenant path, including cached
         ->and(Storage::disk('public')->path('probe.txt'))->toBe(storage_path('tenants/'.$slug.'/app/public/probe.txt'));
 });
 
+it('points public file urls at the current request host', function () {
+    $slug = 'url-'.strtolower(str_replace('.', '', uniqid('', true)));
+    $this->tenantStoragePaths[] = storage_path('tenants/'.$slug);
+    $tenant = Tenant::query()->create([
+        'name' => 'Public URL',
+        'slug' => $slug,
+        'database' => 'tenant_'.$slug,
+        'plan_id' => $this->plan->id,
+        'status' => 'active',
+    ]);
+
+    $originalUrl = config('filesystems.disks.public.url');
+    app()->instance('request', Request::create('https://test-saas.zaristech.com/admin/configuration/general/general', 'GET'));
+
+    $tenant->makeCurrent();
+
+    expect(config('filesystems.disks.public.url'))->toBe('/storage')
+        ->and(Storage::disk('public')->url('configuration/logo.png'))->toBe('/storage/configuration/logo.png');
+
+    Tenant::forgetCurrent();
+
+    expect(config('filesystems.disks.public.url'))->toBe($originalUrl);
+});
+
 it('does not expose files from one tenant through another tenant storage disk', function () {
     $slugA = 'isolation-a-'.strtolower(str_replace('.', '', uniqid('', true)));
     $slugB = 'isolation-b-'.strtolower(str_replace('.', '', uniqid('', true)));

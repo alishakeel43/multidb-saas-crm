@@ -2,11 +2,13 @@
 
 namespace Webkul\Core\Repositories;
 
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Webkul\Core\Contracts\CoreConfig;
 use Webkul\Core\Eloquent\Repository;
 use Webkul\Core\Traits\Sanitizer;
@@ -139,14 +141,7 @@ class CoreConfigRepository extends Repository
                         if (request()->hasFile($fieldNameWithKey)) {
                             $uploadedFile = request()->file($fieldNameWithKey);
 
-                            $val = $uploadedFile->store('configuration');
-
-                            /**
-                             * Nested configuration fields accept uploads on the same terms as the
-                             * flat ones below, so they need the same SVG sanitization; without it an
-                             * SVG carrying script was stored and later served untouched.
-                             */
-                            $this->sanitizeSVG($val, $uploadedFile);
+                            $val = $this->storeConfigurationUpload($uploadedFile, $fieldNameWithKey);
                         } else {
                             $val = $this->sanitizeConfigValue($fieldNameWithKey, $val);
                         }
@@ -175,9 +170,7 @@ class CoreConfigRepository extends Repository
 
                         $filename = md5($file->getClientOriginalName().time()).'.'.$file->getClientOriginalExtension();
 
-                        $path = $file->storeAs('configuration', $filename);
-
-                        $this->sanitizeSVG($path, $file);
+                        $path = $this->storeConfigurationUpload($file, $fieldName, $filename);
                     }
 
                     $preparedData[] = [
@@ -203,6 +196,30 @@ class CoreConfigRepository extends Repository
         }
 
         Event::dispatch('core.configuration.save.after');
+    }
+
+    /**
+     * Store a configuration upload and return its disk path.
+     *
+     * A failed write used to come back as boolean false. The null coalescing
+     * operator keeps false, and the database then stores it as "0", so the
+     * admin logo looks saved but never renders.
+     */
+    protected function storeConfigurationUpload(UploadedFile $file, string $fieldName, ?string $filename = null): string
+    {
+        $path = $filename
+            ? $file->storeAs('configuration', $filename)
+            : $file->store('configuration');
+
+        if (! is_string($path) || $path === '') {
+            throw ValidationException::withMessages([
+                $fieldName => 'The image could not be saved.',
+            ]);
+        }
+
+        $this->sanitizeSVG($path, $file);
+
+        return $path;
     }
 
     /**

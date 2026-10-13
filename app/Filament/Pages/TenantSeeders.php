@@ -25,7 +25,7 @@ class TenantSeeders extends Page
 
     protected ?string $heading = 'Tenant seeders';
 
-    protected ?string $subheading = 'Run CRM baseline lookups or full demo/P0 sample data for provisioned workspaces.';
+    protected ?string $subheading = 'Run CRM baseline lookups, demo/P0 samples, or linked dummy data for every feature.';
 
     /** @var array<int, array{id: int, name: string, slug: string, status: string}> */
     public array $tenants = [];
@@ -45,7 +45,7 @@ class TenantSeeders extends Page
                 ->requiresConfirmation()
                 ->modalHeading('Seed CRM baseline for all tenants')
                 ->modalDescription('Runs TenantCrmSeeder on every registered tenant (lookups only, repeatable). Continue?')
-                ->action(fn () => $this->seedAll(false)),
+                ->action(fn () => $this->seedAll('baseline')),
             Action::make('seedAllDemo')
                 ->label('Seed all (demo + P0)')
                 ->icon('heroicon-m-beaker')
@@ -53,21 +53,29 @@ class TenantSeeders extends Page
                 ->requiresConfirmation()
                 ->modalHeading('Seed demo CRM data for all tenants')
                 ->modalDescription('Runs TenantDemoSeeder (orgs, contacts, leads, activities) plus P0 package samples. Safe to re-run; does not delete data. Continue?')
-                ->action(fn () => $this->seedAll(true)),
+                ->action(fn () => $this->seedAll('demo')),
+            Action::make('seedAllFeatures')
+                ->label('Seed all (every feature)')
+                ->icon('heroicon-m-squares-2x2')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Seed every feature for all tenants')
+                ->modalDescription('Adds linked dummy data for products, inventory, mail, marketing, automation, web forms, telephony, knowledge, and unified inbox channels. Safe to re-run; does not delete data. Continue?')
+                ->action(fn () => $this->seedAll('features')),
         ];
     }
 
-    public function seedTenant(int $tenantId, bool $demo = false): void
+    public function seedTenant(int $tenantId, string $mode = 'baseline'): void
     {
         $tenant = Tenant::query()->findOrFail($tenantId);
+        $demo = $mode === 'demo';
+        $allFeatures = $mode === 'features';
 
         try {
-            app(TenantSeedService::class)->seed($tenant, $demo);
+            app(TenantSeedService::class)->seed($tenant, $demo, $allFeatures);
 
             Notification::make()
-                ->title($demo
-                    ? "Demo seed completed for {$tenant->slug}"
-                    : "Baseline seed completed for {$tenant->slug}")
+                ->title($this->successTitle($mode, $tenant->slug))
                 ->success()
                 ->send();
         } catch (Throwable $exception) {
@@ -79,9 +87,11 @@ class TenantSeeders extends Page
         }
     }
 
-    public function seedAll(bool $demo): void
+    public function seedAll(string $mode = 'baseline'): void
     {
-        $result = app(TenantSeedService::class)->seedAll($demo);
+        $demo = $mode === 'demo';
+        $allFeatures = $mode === 'features';
+        $result = app(TenantSeedService::class)->seedAll($demo, $allFeatures);
 
         foreach ($result['failed'] as $failure) {
             Notification::make()
@@ -92,13 +102,24 @@ class TenantSeeders extends Page
         }
 
         Notification::make()
-            ->title($demo
-                ? "Demo seed finished for {$result['succeeded']} tenant(s)"
-                : "Baseline seed finished for {$result['succeeded']} tenant(s)")
+            ->title(match ($mode) {
+                'features' => "All-features seed finished for {$result['succeeded']} tenant(s)",
+                'demo' => "Demo seed finished for {$result['succeeded']} tenant(s)",
+                default => "Baseline seed finished for {$result['succeeded']} tenant(s)",
+            })
             ->success()
             ->send();
 
         $this->refreshTenants();
+    }
+
+    private function successTitle(string $mode, string $slug): string
+    {
+        return match ($mode) {
+            'features' => "All-features seed completed for {$slug}",
+            'demo' => "Demo seed completed for {$slug}",
+            default => "Baseline seed completed for {$slug}",
+        };
     }
 
     private function refreshTenants(): void

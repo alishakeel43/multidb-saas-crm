@@ -32,18 +32,30 @@ class EditTenant extends EditRecord
                 ->modalHeading('Seed demo CRM data')
                 ->modalDescription('Adds sample orgs, contacts, leads, bookings, consents, quote approvals, scoring rules, and notifications. Does not delete existing data.')
                 ->action(fn () => $this->runSeed(true)),
+            Action::make('seedFeatures')
+                ->label('Seed all features')
+                ->icon('heroicon-m-squares-2x2')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Seed every feature')
+                ->modalDescription('Adds linked dummy data for products, inventory, mail, marketing, automation, web forms, telephony, knowledge, and unified inbox channels. Does not delete existing data.')
+                ->action(fn () => $this->runSeed(false, true)),
         ];
     }
 
-    private function runSeed(bool $demo): void
+    private function runSeed(bool $demo = false, bool $allFeatures = false): void
     {
         try {
-            app(TenantSeedService::class)->seed($this->record, $demo);
+            app(TenantSeedService::class)->seed($this->record, $demo, $allFeatures);
+
+            $title = match (true) {
+                $allFeatures => "All-features seed completed for {$this->record->slug}",
+                $demo => "Demo seed completed for {$this->record->slug}",
+                default => "Baseline seed completed for {$this->record->slug}",
+            };
 
             Notification::make()
-                ->title($demo
-                    ? "Demo seed completed for {$this->record->slug}"
-                    : "Baseline seed completed for {$this->record->slug}")
+                ->title($title)
                 ->success()
                 ->send();
         } catch (Throwable $exception) {

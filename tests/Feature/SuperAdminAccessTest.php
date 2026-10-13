@@ -120,7 +120,8 @@ it('registers and serves the Tenant seeders Operations page', function () {
         ->get('/super-admin/tenant-seeders')
         ->assertOk()
         ->assertSee('Tenant seeders')
-        ->assertSee('Demo + P0');
+        ->assertSee('Demo + P0')
+        ->assertSee('All features');
 });
 
 it('renders tenant provisioning credentials without database connection fields', function () {

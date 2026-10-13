@@ -10,18 +10,20 @@ use Throwable;
 class TenantSeedService
 {
     /**
-     * Run CRM baseline (or full demo + P0) seed for one tenant.
+     * Run CRM baseline, demo + P0, or all-feature dummy data for one tenant.
      *
      * @throws RuntimeException
      */
-    public function seed(Tenant $tenant, bool $demo = false): void
+    public function seed(Tenant $tenant, bool $demo = false, bool $allFeatures = false): void
     {
         $arguments = [
             'tenant' => $tenant->slug,
             '--no-interaction' => true,
         ];
 
-        if ($demo) {
+        if ($allFeatures) {
+            $arguments['--features'] = true;
+        } elseif ($demo) {
             $arguments['--demo'] = true;
         }
 
@@ -36,14 +38,14 @@ class TenantSeedService
     /**
      * @return array{succeeded: int, failed: array<int, array{slug: string, error: string}>}
      */
-    public function seedAll(bool $demo = false): array
+    public function seedAll(bool $demo = false, bool $allFeatures = false): array
     {
         $succeeded = 0;
         $failed = [];
 
         foreach (Tenant::query()->orderBy('id')->get() as $tenant) {
             try {
-                $this->seed($tenant, $demo);
+                $this->seed($tenant, $demo, $allFeatures);
                 $succeeded++;
             } catch (Throwable $exception) {
                 $failed[] = [

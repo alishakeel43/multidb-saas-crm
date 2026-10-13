@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix admin logo and favicon uploads on tenant configuration: nested files no longer crash the storage quota check, failed image writes are no longer stored as `0`, and the saved image is served from the current tenant host.
+- Add an all-features tenant demo seeder, with a Super Admin button, that inserts linked dummy data for products, inventory, mail, marketing, automation, web forms, telephony, knowledge, and unified inbox channels.
 - Add tenant-scoped AI knowledge retrieval to Unified Inbox reply suggestions so relevant indexed document chunks inform WhatsApp and other channel responses.
 - Integrate Marketing Automation tools under the existing Marketing campaigns and Workflows settings screens using package view hooks; keep its backend services active without a separate Marketing Automation menu or dashboard.
 - Route SaaS tenant domains through single-level `*-saas.zaristech.com` hosts compatible with the existing wildcard certificate and Apache tenant vhost.
