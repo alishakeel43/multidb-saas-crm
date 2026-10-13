@@ -10,6 +10,7 @@ use Webkul\Lead\Models\Lead;
 use Webkul\MarketingAutomation\Mail\SequenceMail;
 use Webkul\MarketingAutomation\Models\Audience;
 use Webkul\MarketingAutomation\Models\Campaign;
+use Webkul\MarketingAutomation\Models\CoreWorkflowRun;
 use Webkul\MarketingAutomation\Models\EmailEnrollment;
 use Webkul\MarketingAutomation\Models\EmailMessage;
 use Webkul\MarketingAutomation\Models\EmailSequence;
@@ -20,6 +21,7 @@ use Webkul\MarketingAutomation\Models\WorkflowAction;
 use Webkul\MarketingAutomation\Models\WorkflowRun;
 use Webkul\MarketingAutomation\Services\AttributionRecorder;
 use Webkul\MarketingAutomation\Services\CampaignReport;
+use Webkul\MarketingAutomation\Services\CoreWorkflowActions;
 use Webkul\MarketingAutomation\Services\EmailDispatcher;
 use Webkul\MarketingAutomation\Services\SequenceRunner;
 use Webkul\MarketingAutomation\Services\TrackingService;
@@ -44,6 +46,9 @@ beforeEach(function () {
 
     $migration = require base_path('packages/Webkul/MarketingAutomation/src/Database/Migrations/2026_10_13_130000_create_marketing_automation_tables.php');
     $migration->up();
+
+    $extension = require base_path('packages/Webkul/MarketingAutomation/src/Database/Migrations/2026_10_13_140000_extend_marketing_automation_records.php');
+    $extension->up();
 
     Schema::create('users', function (Blueprint $table) {
         $table->increments('id');
@@ -348,4 +353,36 @@ it('schedules a sequence, tracks delivery, and stops after unsubscribe', functio
 
     expect(app(SequenceRunner::class)->processDue())->toBe(0);
     Mail::assertSent(SequenceMail::class, 1);
+});
+
+it('adds delay, task, and otherwise actions onto an existing workflow', function () {
+    $lead = marketingLead(['lead_value' => 50]);
+    $workflow = (object) [
+        'id' => 9,
+        'actions' => [
+            ['id' => 'ma_delay', 'attribute' => 'minutes', 'value' => '30'],
+            ['id' => 'ma_task', 'attribute' => 'title', 'value' => 'After delay'],
+            ['id' => 'ma_otherwise'],
+            ['id' => 'ma_notification', 'attribute' => 'title', 'value' => 'Small lead'],
+        ],
+    ];
+
+    $actions = app(CoreWorkflowActions::class);
+    $actions->runMatch($workflow, $lead, function (): void {
+        throw new RuntimeException('Core actions after a delay must wait.');
+    });
+
+    expect(DB::table('activities')->count())->toBe(0)
+        ->and(CoreWorkflowRun::query()->where('status', 'pending')->count())->toBe(1);
+
+    expect($actions->processDue())->toBe(0);
+
+    CoreWorkflowRun::query()->update(['run_at' => now()->subMinute()]);
+
+    expect($actions->processDue())->toBe(1)
+        ->and(DB::table('activities')->where('title', 'After delay')->count())->toBe(1);
+
+    $actions->runElse($workflow, marketingLead(['lead_value' => 10, 'title' => 'Tiny']), fn () => null);
+
+    expect(DB::table('user_notifications')->where('title', 'Small lead')->count())->toBe(1);
 });
