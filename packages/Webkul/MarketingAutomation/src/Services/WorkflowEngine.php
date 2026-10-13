@@ -162,6 +162,20 @@ class WorkflowEngine
     }
 
     /**
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $context
+     */
+    public function performConfigured(string $type, array $config, array $context): void
+    {
+        $action = new WorkflowAction([
+            'type' => $type,
+            'config' => $config,
+        ]);
+
+        $this->perform($action, $context);
+    }
+
+    /**
      * @param  array<string, mixed>  $context
      */
     private function perform(WorkflowAction $action, array $context): void

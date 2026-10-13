@@ -32,36 +32,19 @@ Route::middleware(['web', 'admin_locale', 'user'])
             ->group(function () {
                 Route::get('', 'index')->name('index');
 
-                Route::get('workflows', 'workflows')->name('workflows');
-                Route::post('workflows', 'storeWorkflow')->name('workflows.store');
-                Route::delete('workflows/{id}', 'destroyWorkflow')->name('workflows.destroy');
-
-                Route::get('campaigns', 'campaigns')->name('campaigns');
-                Route::post('campaigns', 'storeCampaign')->name('campaigns.store');
-                Route::get('campaigns/{id}', 'showCampaign')->name('campaigns.show');
-                Route::put('campaigns/{id}', 'updateCampaign')->name('campaigns.update');
-                Route::delete('campaigns/{id}', 'destroyCampaign')->name('campaigns.destroy');
-
-                Route::get('audiences', 'audiences')->name('audiences');
                 Route::post('audiences', 'storeAudience')->name('audiences.store');
                 Route::delete('audiences/{id}', 'destroyAudience')->name('audiences.destroy');
 
-                Route::get('sequences', 'sequences')->name('sequences');
                 Route::post('sequences', 'storeSequence')->name('sequences.store');
-                Route::get('sequences/{id}', 'showSequence')->name('sequences.show');
                 Route::post('sequences/{id}/steps', 'storeStep')->name('sequences.steps.store');
                 Route::delete('sequences/{id}/steps/{stepId}', 'destroyStep')->name('sequences.steps.destroy');
                 Route::post('sequences/{id}/enroll', 'enroll')->name('sequences.enroll');
                 Route::post('sequences/{id}/status', 'updateSequenceStatus')->name('sequences.status');
                 Route::post('sequences/{id}/enrollments/{enrollmentId}/status', 'updateEnrollmentStatus')->name('sequences.enrollments.status');
 
-                Route::get('attributions', 'attributions')->name('attributions');
-
-                Route::get('engagement', 'engagement')->name('engagement');
                 Route::post('engagement', 'storeEngagementRule')->name('engagement.store');
                 Route::delete('engagement/{id}', 'destroyEngagementRule')->name('engagement.destroy');
 
-                Route::get('deliverability', 'deliverability')->name('deliverability');
                 Route::post('deliverability/{id}/bounce', 'bounce')->name('deliverability.bounce');
             });
     });

@@ -15,7 +15,7 @@ class MarketingAutomationRunner
     public function run(): array
     {
         return [
-            'workflows' => $this->workflows->processDue(),
+            'workflows' => $this->workflows->processDue() + app(CoreWorkflowActions::class)->processDue(),
             'emails' => $this->sequences->processDue(),
         ];
     }

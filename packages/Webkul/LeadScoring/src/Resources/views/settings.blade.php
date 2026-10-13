@@ -67,4 +67,6 @@
             </div>
         </div>
     </div>
+
+    {!! view_render_event('lead_scoring.settings.after') !!}
 </x-admin::layouts>

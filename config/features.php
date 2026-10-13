@@ -276,12 +276,12 @@ return [
     ],
     'marketing_automation' => [
         'label' => 'Marketing and Automation',
-        'description' => 'Workflow branches, campaign attribution, email sequences, and engagement scoring',
+        'description' => 'Extends workflows, campaigns, web forms, and lead scoring with delays, attribution, sequences, and engagement points',
         'category' => 'marketing',
         'default_enabled' => true,
         'depends_on' => ['leads', 'contacts'],
         'route_prefixes' => ['admin.marketing_automation.'],
-        'menu_keys' => ['marketing_automation'],
+        'menu_keys' => [],
     ],
     'webhooks' => [
         'label' => 'Webhooks',

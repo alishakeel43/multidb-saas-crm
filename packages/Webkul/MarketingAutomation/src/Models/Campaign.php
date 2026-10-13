@@ -12,6 +12,7 @@ class Campaign extends Model implements CampaignContract
     protected $table = 'ma_campaigns';
 
     protected $fillable = [
+        'marketing_campaign_id',
         'name',
         'status',
         'budget',
