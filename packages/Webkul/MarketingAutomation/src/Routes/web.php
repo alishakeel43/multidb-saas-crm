@@ -27,15 +27,9 @@ Route::middleware(['web', 'admin_locale', 'user'])
     ->name('admin.')
     ->group(function () {
         Route::controller(MarketingAutomationController::class)
-            ->prefix('marketing-automation')
+            ->prefix('settings/marketing/automation')
             ->name('marketing_automation.')
             ->group(function () {
-                Route::get('', 'index')->name('index');
-
-                Route::get('workflows', 'workflows')->name('workflows');
-                Route::post('workflows', 'storeWorkflow')->name('workflows.store');
-                Route::delete('workflows/{id}', 'destroyWorkflow')->name('workflows.destroy');
-
                 Route::get('campaigns', 'campaigns')->name('campaigns');
                 Route::post('campaigns', 'storeCampaign')->name('campaigns.store');
                 Route::get('campaigns/{id}', 'showCampaign')->name('campaigns.show');
@@ -63,5 +57,14 @@ Route::middleware(['web', 'admin_locale', 'user'])
 
                 Route::get('deliverability', 'deliverability')->name('deliverability');
                 Route::post('deliverability/{id}/bounce', 'bounce')->name('deliverability.bounce');
+            });
+
+        Route::controller(MarketingAutomationController::class)
+            ->prefix('settings/workflows/automation')
+            ->name('marketing_automation.')
+            ->group(function () {
+                Route::get('', 'workflows')->name('workflows');
+                Route::post('', 'storeWorkflow')->name('workflows.store');
+                Route::delete('{id}', 'destroyWorkflow')->name('workflows.destroy');
             });
     });

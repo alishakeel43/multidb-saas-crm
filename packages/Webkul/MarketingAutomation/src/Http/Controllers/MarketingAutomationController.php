@@ -4,7 +4,6 @@ namespace Webkul\MarketingAutomation\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Webkul\Admin\Http\Controllers\Controller;
 use Webkul\MarketingAutomation\Models\Attribution;
@@ -39,18 +38,6 @@ class MarketingAutomationController extends Controller
         private CampaignReport $reports,
         private SequenceRunner $runner,
     ) {}
-
-    public function index(): View
-    {
-        return view('marketing_automation::index', [
-            'ready' => Schema::hasTable('ma_workflows'),
-            'workflows' => Schema::hasTable('ma_workflows') ? Workflow::query()->where('is_active', true)->count() : 0,
-            'campaigns' => Schema::hasTable('ma_campaigns') ? Campaign::query()->where('status', 'active')->count() : 0,
-            'attributions' => Schema::hasTable('ma_attributions') ? Attribution::query()->whereNotNull('lead_id')->count() : 0,
-            'sent' => Schema::hasTable('ma_email_messages') ? EmailMessage::query()->whereNotNull('sent_at')->count() : 0,
-            'engagement' => Schema::hasTable('ma_engagement_scores') ? (int) EngagementScore::query()->sum('points') : 0,
-        ]);
-    }
 
     public function workflows(): View
     {

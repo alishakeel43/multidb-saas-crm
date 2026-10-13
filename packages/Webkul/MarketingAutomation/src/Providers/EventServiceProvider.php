@@ -54,5 +54,17 @@ class EventServiceProvider extends ServiceProvider
                 $view->addTemplate('marketing_automation::attribution-script');
             }
         });
+
+        $this->app['events']->listen('admin.settings.marketing.campaigns.index.create_button.after', function ($view): void {
+            if (is_object($view) && method_exists($view, 'addTemplate') && bouncer()->hasPermission('settings.automation.campaigns')) {
+                $view->addTemplate('<a class="secondary-button" href="'.e(route('admin.marketing_automation.campaigns')).'">Automation tools</a>');
+            }
+        });
+
+        $this->app['events']->listen('admin.settings.workflows.index.create_button.after', function ($view): void {
+            if (is_object($view) && method_exists($view, 'addTemplate') && bouncer()->hasPermission('settings.automation.workflows')) {
+                $view->addTemplate('<a class="secondary-button" href="'.e(route('admin.marketing_automation.workflows')).'">Advanced workflows</a>');
+            }
+        });
     }
 }

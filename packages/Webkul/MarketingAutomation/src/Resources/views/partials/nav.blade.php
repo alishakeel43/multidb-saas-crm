@@ -1,13 +1,14 @@
 @php
     $links = [
-        'admin.marketing_automation.index' => 'Overview',
-        'admin.marketing_automation.workflows' => 'Workflows',
+        'admin.settings.marketing.campaigns.index' => 'Core campaigns',
         'admin.marketing_automation.campaigns' => 'Campaigns',
         'admin.marketing_automation.audiences' => 'Audiences',
         'admin.marketing_automation.sequences' => 'Sequences',
         'admin.marketing_automation.attributions' => 'Attribution',
         'admin.marketing_automation.engagement' => 'Engagement scoring',
         'admin.marketing_automation.deliverability' => 'Deliverability',
+        'admin.settings.workflows.index' => 'Core workflows',
+        'admin.marketing_automation.workflows' => 'Advanced workflows',
     ];
 @endphp
 

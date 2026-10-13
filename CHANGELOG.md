@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add Marketing and Automation package (`Webkul/MarketingAutomation`) that completes the partial marketing gaps without changing Krayin core packages: workflow branches, delays, tasks, record updates, and in-app notifications; web-form UTM attribution; campaigns with budgets, audiences, and results; email sequences with scheduling, unsubscribe, and deliverability; and engagement scoring beside the existing field-based lead score.
+- Add tenant-scoped AI knowledge retrieval to Unified Inbox reply suggestions so relevant indexed document chunks inform WhatsApp and other channel responses.
+- Integrate Marketing Automation tools under the existing Marketing campaigns and Workflows settings screens using package view hooks; keep its backend services active without a separate Marketing Automation menu or dashboard.
 - Route SaaS tenant domains through single-level `*-saas.zaristech.com` hosts compatible with the existing wildcard certificate and Apache tenant vhost.
 - Fix tenant maintenance commands calling the removed MAMP-only database guard.
 - Allow tenant database provisioning on explicitly allowlisted production MySQL/MariaDB hosts and ports while protecting the configured landlord and base tenant databases.

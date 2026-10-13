@@ -24,9 +24,6 @@ class MarketingAutomationServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../Config/menu.php', 'menu.admin');
-        $this->mergeConfigFrom(__DIR__.'/../Config/acl.php', 'acl');
-
         if ($this->app->runningInConsole()) {
             $this->commands([
                 RunMarketingAutomationCommand::class,

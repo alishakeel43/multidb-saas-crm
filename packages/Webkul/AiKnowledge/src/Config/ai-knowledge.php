@@ -14,5 +14,8 @@ return [
 
     'max_bytes' => 10 * 1024 * 1024,
 
+    'chunk_size' => 250,
+    'chunk_overlap' => 50,
+
     'allowed_extensions' => ['pdf', 'txt', 'md', 'csv', 'html', 'htm', 'docx'],
 ];

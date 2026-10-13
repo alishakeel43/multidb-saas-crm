@@ -8,6 +8,9 @@ use Webkul\AiKnowledge\Contracts\KnowledgeDocument as KnowledgeDocumentContract;
 class KnowledgeDocument extends Model implements KnowledgeDocumentContract
 {
     public const STATUS_PENDING = 'pending';
+    public const STATUS_PROCESSING = 'processing';
+    public const STATUS_READY = 'ready';
+    public const STATUS_FAILED = 'failed';
 
     protected $table = 'ai_knowledge_documents';
 
