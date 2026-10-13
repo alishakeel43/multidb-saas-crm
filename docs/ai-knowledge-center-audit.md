@@ -76,15 +76,15 @@ Statuses: **COMPLETE AND VERIFIED**, **IMPLEMENTED BUT UNVERIFIED**, **PARTIALLY
 
 | Feature | Status | Evidence |
 | --- | --- | --- |
-| Secure uploads | PARTIALLY COMPLETE | `LeadController::processFile()` accepts `pdf,bmp,jpeg,jpg,png,webp` (`SUPPORTED_TYPES`) with Laravel's `extensions` rule only. No size cap, no MIME/content check, no destination directory. Not a knowledge upload. |
-| File-format validation | PARTIALLY COMPLETE | Same extension rule. `MagicAIService::extractTextFromBase64File()` checks base64 and then `mime_content_type` only to choose PDF vs image. |
+| Secure uploads | COMPLETE AND VERIFIED | `KnowledgeDocumentIntake::store()` refuses to run without a current tenant, caps size, and writes `ai-knowledge/{uuid}.{ext}` on the tenant `local` disk. Verified by `tests/Unit/KnowledgeDocumentIntakeTest.php`. Stock lead AI upload in `LeadController::processFile()` is still extension-only and was not changed. |
+| File-format validation | COMPLETE AND VERIFIED | Intake allow-lists pdf, txt, md, csv, html, htm, and docx, checks MIME/content, and rejects executables, PHP payloads, double extensions such as `notes.php.txt`, and path segments. Same Pest file. Lead AI validation was not changed. |
 | Text extraction | PARTIALLY COMPLETE | PDF text via `Parser::parseFile` inside `MagicAIService`. Non-PDF bytes are treated as images and not decoded to text. No tests. |
 | Chunking with overlap | NOT IMPLEMENTED | No chunker. |
 | Embedding generation | NOT IMPLEMENTED | No embedding client or column. |
 | Vector indexing / search | NOT IMPLEMENTED | No vector client. `composer.json` has no Qdrant package. |
 | Re-index on update | NOT IMPLEMENTED | No source update flow. |
 | Source deletion and vector cleanup | NOT IMPLEMENTED | No knowledge source delete path. |
-| Background processing, retries, status | NOT IMPLEMENTED | Magic AI runs inline in the HTTP request. No status column, job, or retry. |
+| Background processing, retries, status | PARTIALLY COMPLETE | `ai_knowledge_documents.status` is stored as `pending` by `KnowledgeDocumentIntake::store()`. There is no queue job, retry, or worker. Magic AI still runs inline. |
 | Website ingestion | NOT IMPLEMENTED | No crawler. |
 
 ### C. LLM
@@ -146,7 +146,7 @@ The unmerged Unified Inbox branch has a webhook and reply **suggestions** for an
 | Tenant-specific vector records | NOT IMPLEMENTED | No vector records. |
 | Cross-tenant AI retrieval protection | NOT IMPLEMENTED | No retriever. |
 | Tenant-specific AI settings | PARTIALLY COMPLETE | Magic AI config is Krayin `core_config` on the tenant database, so it is tenant-scoped once the tenant connection is current. There is no separate knowledge-center settings record. Platform vs tenant admin is a separate guard (`platform` vs `user`). `SuperAdminAccessTest` guard expectations passed; authenticated HTTP panel checks did not run against MySQL here (see section 6). |
-| Safe knowledge cleanup | NOT IMPLEMENTED | No knowledge records to delete. |
+| Safe knowledge cleanup | COMPLETE AND VERIFIED | `KnowledgeDocumentIntake::delete()` removes the managed file and the current tenant row. It rejects paths outside `ai-knowledge/{uuid}.{ext}` and refuses a row that is not in the current tenant database. No vector records exist to clean up. |
 | Platform vs tenant admin permissions | IMPLEMENTED BUT UNVERIFIED | Code: `AuthenticateSuperAdmin`, `PlatformUser::canAccessPanel`, Bouncer on `user`. HTTP Super Admin cases returned 302 in this environment because MySQL `127.0.0.1:8889` is down and the installer gate is closed. Not re-marked verified. |
 
 ### H. Fine-tuning
@@ -187,8 +187,12 @@ Environment: PHP 8.3.6, Composer 2.10.3, `composer install` from the lockfile. A
 
 | Command | Result |
 | --- | --- |
-| `php artisan test --compact` | **83 passed, 19 failed** (247 assertions). Duration 2.89s. |
-| `php artisan test --compact --testsuite=Unit` | **53 passed, 1 failed** (183 assertions). |
+| `php artisan test --compact` (before the intake change) | **83 passed, 19 failed** (247 assertions). Duration 2.89s. |
+| `php artisan test --compact --testsuite=Unit` (before the intake change) | **53 passed, 1 failed** (183 assertions). |
+| `php artisan test --compact tests/Unit/KnowledgeDocumentIntakeTest.php` | **16 passed** (60 assertions). Covers tenant storage, pdf/md/csv/html/docx, rejected types, size, no-tenant, cross-tenant read/delete, and unsafe delete paths. |
+| `./vendor/bin/pint --dirty` | Formatted `tests/Unit/KnowledgeDocumentIntakeTest.php` and import order in `bootstrap/providers.php`. |
+| `php -l` on the intake service, migration, and test | No syntax errors. |
+| `php artisan test --compact --testsuite=Unit` (after the intake tests were added) | **69 passed, 1 failed** (243 assertions). The failure is the same installer 302 as below. |
 | `php artisan test --compact --filter='returns HTTP 403'` | **Failed**: expected 403, got 302. |
 | Same filter after a temporary `storage/installed` marker, marker removed afterward | **Passed** (2 assertions). Disabled lead and dependent quote routes returned 403. |
 | `composer audit --format=plain` | **8 advisories, 5 packages.** |
@@ -204,20 +208,22 @@ No Magic AI test exists under `tests/`. OpenRouter was not called.
 
 ## 7. Completed vs pending
 
-**Verified complete (SaaS foundation, not the knowledge center):** domain tenant resolution, tenant database switching, tenant file roots, tenant-aware queue jobs. Covered by the passing unit tests above.
+**Verified complete (SaaS foundation):** domain tenant resolution, tenant database switching, tenant file roots, tenant-aware queue jobs.
+
+**Done in this change:** tenant-scoped knowledge document intake (`Webkul\AiKnowledge\Services\KnowledgeDocumentIntake`). Files and `pending` rows stay on the current tenant. Deletion removes the file and row. No chunking or embeddings.
 
 **Present but not a knowledge center:** Magic AI lead extraction (config, route, PDF text, OpenRouter chat, lead mapping). Unverified against a live model. Upload checks and timeouts are incomplete. ACL mapping for the route is wrong (bug 1).
 
-**Not started:** knowledge documents, FAQ, chunking, embeddings, vector search, RAG, playground, analytics, WhatsApp on this branch, fine-tuning.
+**Not started:** FAQ, text extraction, chunking, embeddings, vector search, RAG, playground, analytics, WhatsApp on this branch, fine-tuning, knowledge admin UI.
 
 **Do not build for the first release:** LoRA/QLoRA. RAG over approved tenant documents is the path that matches the current gaps. Fine-tuning needs a separate privacy review and is not required to answer from uploaded documents.
 
 ## 8. Recommended implementation sequence
 
-1. Critical tenant isolation for any new AI data: store bytes and rows only for the current tenant, and refuse work with no tenant. No arbitrary filesystem paths.
+1. Done. Knowledge bytes and rows are stored only for the current tenant. Intake refuses to run with no tenant.
 2. Fix the `admin.leads.create_by_ai` ACL mapping (core file, separate small change) so view-only users cannot create leads.
-3. Knowledge document intake: allow-listed types, size cap, private tenant disk, status `pending`.
-4. Background text extraction and overlap chunking, with retries and visible status. Still no embeddings.
+3. Done. Knowledge document intake: allow-listed types, size cap, private tenant disk, status `pending`.
+4. Next. Background text extraction and overlap chunking, with retries and visible status. Still no embeddings.
 5. Embedding client plus a vector store that filters on tenant id and document id. Block live verification until Ollama and Qdrant exist.
 6. Retrieval that reads only approved/active chunks, cites them, and falls back when nothing qualifies.
 7. Tenant admin UI (documents, FAQ, behavior, playground, publish) behind Bouncer and a feature entitlement.
@@ -226,13 +232,17 @@ No Magic AI test exists under `tests/`. OpenRouter was not called.
 
 ## 9. The single next task
 
-**Secure tenant-scoped knowledge document intake.**
+The intake task selected above is implemented and covered by `tests/Unit/KnowledgeDocumentIntakeTest.php` (16 passed, 60 assertions). It is not started again here.
 
-Why this one: no critical cross-tenant defect was found in the current SaaS code. The Magic AI ACL gap is real but it is a one-tenant lead-permission bug in core Krayin, and it does not make a knowledge store safe. The knowledge center cannot start at embeddings or WhatsApp. The first missing piece that can be tested without Ollama, Qdrant, WhatsApp, or MySQL is: accept a file only for the current tenant, validate it, store it on that tenant's private disk, and record a `pending` row on the tenant connection.
+**Next task, not started: extract text from pending documents and store overlapping chunks.**
 
-Not in this task: chunking, embeddings, RAG, UI, WhatsApp, fine-tuning, ACL edit for Magic AI, Composer upgrades.
+Add a tenant-aware queued job that reads a `pending` `ai_knowledge_documents` row, extracts text (PDF via the already installed `smalot/pdfparser`, plain text for txt/md/csv/html), writes chunk rows on the tenant connection with a configured overlap, and moves status through `processing`, `ready`, or `failed` with a retry limit. Do not call an embedding API and do not add a vector client. Reuse `KnowledgeDocumentIntake` records rather than a second upload path.
+
+Still later, and not this next task: the `admin.leads.create_by_ai` ACL mapping, embeddings, RAG, admin UI, WhatsApp, and fine-tuning.
 
 ## 10. Acceptance criteria
+
+### Completed intake task (met)
 
 - New package `packages/Webkul/AiKnowledge` follows the existing contract / model / repository / provider layout and is registered in root autoload, `bootstrap/providers.php`, and `config/concord.php`. Core Krayin modules are not edited.
 - Intake refuses to run when `Tenant::current()` is null, and it does not write a shared `storage/app/ai-knowledge` file in that case.
@@ -245,3 +255,15 @@ Not in this task: chunking, embeddings, RAG, UI, WhatsApp, fine-tuning, ACL edit
 - Pest coverage proves the cases above using sqlite tenant files, with no network calls.
 - `docs/CHANGELOG_SAAS.md` records the change without a pull-request number.
 - If implementation shows an audit claim was wrong, this file is corrected with the command output.
+
+Result: those criteria are met. `php artisan test --compact tests/Unit/KnowledgeDocumentIntakeTest.php` passed with 16 tests and 60 assertions. Symfony's `UploadedFile` basename-strips `../../etc/passwd.txt` to `passwd.txt` before the service sees it; the service still rejects a client name that contains `/` or `..` when that name is preserved. No audit claim about missing Ollama, Qdrant, or WhatsApp was disproved.
+
+### Next task (text extraction and overlapping chunks)
+
+- A queued job, dispatched only while a tenant is current, loads a `pending` document from the tenant connection and does nothing when no tenant is current.
+- PDF text uses `smalot/pdfparser`. txt, md, csv, and html are read as text. docx text can be deferred if the OOXML body is not parsed yet, but the job must mark that document `failed` with a visible reason instead of pretending it was indexed.
+- Chunks are stored in a tenant-database table with document id, ordinal, text, and overlap taken from the previous chunk. No embedding column and no network call.
+- Status moves `pending` → `processing` → `ready`, or `failed` after the retry limit. A failed job leaves the file in place.
+- Re-running a `ready` document does not duplicate chunks.
+- Deleting a document also deletes its chunks.
+- Pest coverage uses sqlite tenant files and does not contact OpenRouter, Ollama, or Qdrant.

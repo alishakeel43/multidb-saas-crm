@@ -65,6 +65,7 @@
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/",
             "Webkul\\Activity\\": "packages/Webkul/Activity/src",
+            "Webkul\\AiKnowledge\\": "packages/Webkul/AiKnowledge/src",
             "Webkul\\Admin\\": "packages/Webkul/Admin/src",
             "Webkul\\Attribute\\": "packages/Webkul/Attribute/src",
             "Webkul\\Contact\\": "packages/Webkul/Contact/src",
