@@ -1,5 +1,11 @@
 # SaaS Change Log
 
+## 2026-10-13 — Tenant-scoped knowledge document intake
+
+- Added the `AiKnowledge` package to accept a knowledge file only while a tenant is current, validate the file type and size, store it on that tenant's private disk, and record a `pending` row on the tenant connection.
+- Deleting a document removes that file and row, and refuses paths outside the managed directory or rows that are not in the current tenant database.
+- Chunking, embeddings, retrieval, and admin UI are not part of this change.
+
 ## 2026-10-09 — Tenant support-account management
 
 - Added a Super Admin support-user management resource to create, view, update, activate/deactivate, and delete multiple support identities per tenant. Each account uses an individual tenant CRM email and password; passwords are stored only as tenant-side hashes.

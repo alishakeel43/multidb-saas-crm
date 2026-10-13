@@ -1,6 +1,7 @@
 <?php
 
 use Webkul\Admin\Providers\ModuleServiceProvider as AdminModuleServiceProvider;
+use Webkul\AiKnowledge\Providers\ModuleServiceProvider as AiKnowledgeModuleServiceProvider;
 use Webkul\Assignment\Providers\ModuleServiceProvider as AssignmentModuleServiceProvider;
 use Webkul\Attribute\Providers\ModuleServiceProvider as AttributeModuleServiceProvider;
 use Webkul\Automation\Providers\ModuleServiceProvider as AutomationModuleServiceProvider;
@@ -28,6 +29,7 @@ return [
     'modules' => [
         DataTransferModuleServiceProvider::class,
         AdminModuleServiceProvider::class,
+        AiKnowledgeModuleServiceProvider::class,
         AssignmentModuleServiceProvider::class,
         AttributeModuleServiceProvider::class,
         AutomationModuleServiceProvider::class,
