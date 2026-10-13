@@ -1,0 +1,17 @@
+{
+    "name": "webkul/marketing-automation",
+    "description": "Marketing and Automation extensions for Krayin CRM",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Webkul\\MarketingAutomation\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\MarketingAutomation\\Providers\\MarketingAutomationServiceProvider"
+            ]
+        }
+    }
+}

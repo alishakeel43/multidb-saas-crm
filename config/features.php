@@ -274,6 +274,15 @@ return [
             'settings.automation' => 'admin.settings.marketing.campaigns.index',
         ],
     ],
+    'marketing_automation' => [
+        'label' => 'Marketing and Automation',
+        'description' => 'Workflow branches, campaign attribution, email sequences, and engagement scoring',
+        'category' => 'marketing',
+        'default_enabled' => true,
+        'depends_on' => ['leads', 'contacts'],
+        'route_prefixes' => ['admin.marketing_automation.'],
+        'menu_keys' => ['marketing_automation'],
+    ],
     'webhooks' => [
         'label' => 'Webhooks',
         'category' => 'automation',

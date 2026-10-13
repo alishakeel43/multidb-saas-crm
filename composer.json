@@ -91,6 +91,7 @@
             "Webkul\\EmailTemplate\\": "packages/Webkul/EmailTemplate/src",
             "Webkul\\GoogleContact\\": "packages/Webkul/GoogleContact/src",
             "Webkul\\Marketing\\": "packages/Webkul/Marketing/src",
+            "Webkul\\MarketingAutomation\\": "packages/Webkul/MarketingAutomation/src",
             "Webkul\\Installer\\": "packages/Webkul/Installer/src",
             "Webkul\\Lead\\": "packages/Webkul/Lead/src",
             "Webkul\\Product\\": "packages/Webkul/Product/src",

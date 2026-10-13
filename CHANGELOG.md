@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+<<<<<<< Updated upstream
+=======
+- Add Marketing and Automation package (`Webkul/MarketingAutomation`) that completes the partial marketing gaps without changing Krayin core packages: workflow branches, delays, tasks, record updates, and in-app notifications; web-form UTM attribution; campaigns with budgets, audiences, and results; email sequences with scheduling, unsubscribe, and deliverability; and engagement scoring beside the existing field-based lead score.
+- Route SaaS tenant domains through single-level `*-saas.zaristech.com` hosts compatible with the existing wildcard certificate and Apache tenant vhost.
+- Fix tenant maintenance commands calling the removed MAMP-only database guard.
+- Allow tenant database provisioning on explicitly allowlisted production MySQL/MariaDB hosts and ports while protecting the configured landlord and base tenant databases.
+- Add Telephony VoIP module scaffold (Webkul/Telephony) with Twilio SDK (`twilio/sdk`), call_logs tenant migration using Krayin-compatible foreign-key types, landlord telephony routing table (`tenant_telephony_routes`), and package skeleton.
+- Add Telephony Admin UI: person click-to-call action, call-history panel, call-log index page, and Telephony settings form injected through the person view without touching core files.
+
+- Replace channel-letter placeholders with consistent WhatsApp, Messenger, Instagram, and generic channel SVG icons across inbox filters, conversations, channel cards, and connected accounts.
+- Harden Unified Inbox Meta onboarding with tenant/user-bound single-use OAuth state and verified WhatsApp signup account details; secure Meta webhooks with signature and verification-token checks, authoritative landlord channel routing that cannot be reassigned across tenants, resolved-tenant account validation, scoped delivery callbacks, and idempotent inbound message handling. Prevent cross-account replies and false sent states; add unread filtering and paginated conversation/message history.
+- Add Unified Inbox package (`Webkul/UnifiedInbox`) with Meta Embedded Signup v4 (WhatsApp, Messenger, Instagram), centralized root webhook URL routing with landlord channel route resolution (guaranteeing root domain without tenant subdomains), reference `.ui-workspace` design system and component structure (`partials/styles`, `partials/header`, `partials/list`, 3-tab CRM drawer, and channel cards), prominent Connect Channels button and multi-channel status indicators on Unified Inbox UI, outbound Graph API messaging, and CRM Contact/Lead linking.
+- Fix Unified Inbox blank screen by replacing invalid inline Blade `@php(...)` calls with standard blocks, adding `v-pre` to `.ui-workspace` containers to prevent Vue 3 in-DOM template compilation crashes, and adding safe null checks on conversation list.
+>>>>>>> Stashed changes
 - Add demo-tenant P0 CRM smoke coverage (Pest live inventory + admin route checks; Super Admin Playwright Tenant seeders flow).
 - Expose CRM baseline / demo+P0 seeders in Super Admin (Operations → Tenant seeders, plus Tenant list/edit actions) via `TenantSeedService`.
 - Add `TenantP0DemoSeeder` (via `tenants:seed {slug} --demo`) with idempotent dummy data for Assignment, Booking, Consent, Quote Approvals/fulfillment, Lead scoring, Notifications, and Sales-report-friendly lead outcomes.
