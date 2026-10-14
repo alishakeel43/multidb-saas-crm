@@ -153,7 +153,9 @@ class Acl
     {
         return collect($aclItem)
             ->sortBy('sort')
-            ->filter(fn ($value, $key) => is_array($value) && $key !== 'route')
+            ->filter(fn ($value, $key) => is_array($value)
+                && $key !== 'route'
+                && isset($value['key'], $value['name'], $value['route'], $value['sort']))
             ->map(function ($subAclItem) {
                 $subSubAclItems = $this->processSubAclItems($subAclItem);
 

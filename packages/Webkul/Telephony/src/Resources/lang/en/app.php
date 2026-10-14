@@ -8,8 +8,10 @@ return [
 
     'acl' => [
         'telephony' => 'Telephony',
+        'call-logs' => 'Call Logs',
         'call-logs-view' => 'View Call Logs',
         'call-logs-delete' => 'Delete Call Logs',
+        'settings' => 'Telephony Settings',
         'settings-edit' => 'Edit Telephony Settings',
     ],
 

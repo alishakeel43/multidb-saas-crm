@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix Roles create/edit crashing when the Telephony ACL tree omitted intermediate parent keys (`telephony.call_logs`, `telephony.settings`).
 - Fix desktop admin sidebar scrolling so every menu item stays reachable when the list is taller than the viewport, using the CRM thin custom scrollbar instead of the browser default.
 - Fix admin logo and favicon uploads on tenant configuration: nested files no longer crash the storage quota check, failed image writes are no longer stored as `0`, and the saved image is served from the current tenant host.
 - Add an all-features tenant demo seeder, with a Super Admin button, that inserts linked dummy data for products, inventory, mail, marketing, automation, web forms, telephony, knowledge, and unified inbox channels.
