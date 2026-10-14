@@ -155,6 +155,13 @@ return [
             'settings.other_settings' => 'admin.settings.tags.index',
         ],
     ],
+    'tasks' => [
+        'label' => 'Tasks',
+        'category' => 'crm',
+        'default_enabled' => true,
+        'route_prefixes' => ['admin.tasks.'],
+        'menu_keys' => ['tasks'],
+    ],
     'consent' => [
         'label' => 'Consent management',
         'category' => 'marketing',

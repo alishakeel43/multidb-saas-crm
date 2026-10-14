@@ -21,6 +21,7 @@ use Webkul\Product\Providers\ModuleServiceProvider as ProductModuleServiceProvid
 use Webkul\Quote\Providers\ModuleServiceProvider as QuoteModuleServiceProvider;
 use Webkul\QuoteApproval\Providers\ModuleServiceProvider as QuoteApprovalModuleServiceProvider;
 use Webkul\Tag\Providers\ModuleServiceProvider as TagModuleServiceProvider;
+use Webkul\Task\Providers\ModuleServiceProvider as TaskModuleServiceProvider;
 use Webkul\UnifiedInbox\Providers\ModuleServiceProvider as UnifiedInboxModuleServiceProvider;
 use Webkul\User\Providers\ModuleServiceProvider as UserModuleServiceProvider;
 use Webkul\Warehouse\Providers\ModuleServiceProvider as WarehouseModuleServiceProvider;
@@ -49,6 +50,7 @@ return [
         QuoteModuleServiceProvider::class,
         QuoteApprovalModuleServiceProvider::class,
         TagModuleServiceProvider::class,
+        TaskModuleServiceProvider::class,
         UserModuleServiceProvider::class,
         WarehouseModuleServiceProvider::class,
         WebFormModuleServiceProvider::class,

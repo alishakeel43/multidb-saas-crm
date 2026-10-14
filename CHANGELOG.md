@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Show a “No records found” message in the task form when a related lead, person, organization, or quote search has no matches.
+- Save tasks when the due time includes seconds or a related record was not chosen, and return to the task list so the new task is visible.
+- Add tenant-database task management: tasks and kanban stages live in each tenant database, with list and board views, lead/person/organization/quote links, and per-tenant due reminders.
+
 - Fix Roles create/edit crashing when the Telephony ACL tree omitted intermediate parent keys (`telephony.call_logs`, `telephony.settings`).
 - Fix desktop admin sidebar scrolling so every menu item stays reachable when the list is taller than the viewport, using the CRM thin custom scrollbar instead of the browser default.
 - Fix admin logo and favicon uploads on tenant configuration: nested files no longer crash the storage quota check, failed image writes are no longer stored as `0`, and the saved image is served from the current tenant host.

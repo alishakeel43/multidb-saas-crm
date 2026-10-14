@@ -31,6 +31,7 @@ use Webkul\Product\Providers\ProductServiceProvider;
 use Webkul\Quote\Providers\QuoteServiceProvider;
 use Webkul\QuoteApproval\Providers\QuoteApprovalServiceProvider;
 use Webkul\Tag\Providers\TagServiceProvider;
+use Webkul\Task\Providers\TaskServiceProvider;
 use Webkul\Telephony\Providers\TelephonyServiceProvider;
 use Webkul\UnifiedInbox\Providers\UnifiedInboxServiceProvider;
 use Webkul\User\Providers\UserServiceProvider;
@@ -80,6 +81,7 @@ return [
     QuoteServiceProvider::class,
     QuoteApprovalServiceProvider::class,
     TagServiceProvider::class,
+    TaskServiceProvider::class,
     UserServiceProvider::class,
     WarehouseServiceProvider::class,
     WebFormServiceProvider::class,
