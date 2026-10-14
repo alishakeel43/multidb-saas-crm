@@ -3,7 +3,7 @@
     ref="sidebar"
     class="duration-80 fixed top-[60px] z-[10002] h-full w-[200px] border-gray-300 bg-white pt-4 transition-all group-[.sidebar-collapsed]/container:w-[70px] dark:border-gray-800 dark:bg-gray-900 max-lg:hidden ltr:border-r rtl:border-l"
 >
-    <div class="journal-scroll h-[calc(100vh-100px)] overflow-hidden group-[.sidebar-collapsed]/container:overflow-visible">
+    <div class="journal-scroll h-[calc(100vh-100px)] overflow-y-auto group-[.sidebar-collapsed]/container:overflow-visible">
         <nav class="sidebar-rounded grid w-full gap-2">
             <!-- Navigation Menu -->
             @foreach (menu()->getItems('admin') as $menuItem)
@@ -36,7 +36,7 @@
                             :class="[isMenuActive && (hoveringMenu == '{{$menuItem->getKey()}}') ? '!flex' : 'hidden']"
                         >
                             <div class="sidebar-rounded fixed z-[1000] h-full min-w-[140px] max-w-max bg-white pt-4 after:-right-[30px] dark:border-gray-800 dark:bg-gray-900 max-lg:hidden ltr:border-r rtl:border-x">
-                                <div class="journal-scroll h-[calc(100vh-100px)] overflow-hidden">
+                                <div class="journal-scroll h-[calc(100vh-100px)] overflow-y-auto">
                                     <nav class="grid w-full gap-2">
                                         @foreach ($menuItem->getChildren() as $subMenuItem)
                                             <div class="px-4 group/item {{ $menuItem->isActive() ? 'active' : 'inactive' }}">
@@ -67,6 +67,52 @@
 
     {!! view_render_event('admin.layout.sidebar.toggle.after') !!}
 </div>
+
+@pushOnce('styles')
+    <style>
+        /*
+         * Thin CRM scrollbar for the desktop sidebar. Source styles also live in
+         * Admin app.css (.journal-scroll); this keeps the look available when
+         * Vite assets have not been rebuilt yet on this host.
+         */
+        #admin-sidebar .journal-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #d1d5db transparent;
+        }
+
+        #admin-sidebar .journal-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        #admin-sidebar .journal-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #admin-sidebar .journal-scroll::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 9999px;
+            border: 1px solid transparent;
+            background-clip: content-box;
+        }
+
+        #admin-sidebar .journal-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #9ca3af;
+        }
+
+        .dark #admin-sidebar .journal-scroll {
+            scrollbar-color: #4b5563 transparent;
+        }
+
+        .dark #admin-sidebar .journal-scroll::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+        }
+
+        .dark #admin-sidebar .journal-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #6b7280;
+        }
+    </style>
+@endPushOnce
 
 @pushOnce('scripts')
     <script
