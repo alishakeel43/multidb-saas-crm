@@ -8,15 +8,29 @@
 @endphp
 
 <aside class="ui-list" aria-label="Conversations">
-    <form method="GET" action="{{ route('admin.unified_inbox.index') }}" class="ui-list-search">
-        <input type="hidden" name="channel" value="{{ request('channel') }}">
-        <input type="hidden" name="status" value="{{ $uiStatus }}">
-        @if ($uiUnread)<input type="hidden" name="unread" value="1">@endif
-        <label class="ui-search">
-            <span class="sr-only">Search</span>
-            <input type="search" name="search" value="{{ request('search') }}" placeholder="Search conversations..." maxlength="200">
-        </label>
-    </form>
+    @php
+        $uiComposeChannels = collect($channels ?? [])->filter(fn ($channel, $key) => ($uiLinked ?? collect())->contains($key));
+        $uiComposeDefault = $uiComposeChannels->has(request('channel')) ? request('channel') : $uiComposeChannels->keys()->first();
+    @endphp
+    <div class="ui-list-toolbar">
+        <form method="GET" action="{{ route('admin.unified_inbox.index') }}" class="ui-list-search">
+            <input type="hidden" name="channel" value="{{ request('channel') }}">
+            <input type="hidden" name="status" value="{{ $uiStatus }}">
+            @if ($uiUnread)<input type="hidden" name="unread" value="1">@endif
+            <label class="ui-search">
+                <span class="sr-only">Search</span>
+                <input type="search" name="search" value="{{ request('search') }}" placeholder="Search conversations..." maxlength="200">
+            </label>
+        </form>
+        @if ($uiComposeChannels->isNotEmpty())
+            <button type="button" class="ui-new-chat" onclick="uiOpenCompose(@js($uiComposeDefault))" title="Add new contact" aria-label="Add new contact">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z"/>
+                </svg>
+            </button>
+        @endif
+    </div>
 
     <div class="ui-chips" role="group" aria-label="Filters">
         <a class="ui-chip" href="{{ $uiChip(['unread' => $uiUnread ? null : 1]) }}" @if($uiUnread) aria-pressed="true" @endif>Unread</a>

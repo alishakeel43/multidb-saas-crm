@@ -7,10 +7,12 @@ use App\Models\Tenant;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
+use Webkul\UnifiedInbox\Services\InboxHistorySync;
 use Webkul\UnifiedInbox\Services\MetaGraphClient;
 
 class ChannelController extends Controller
@@ -18,7 +20,8 @@ class ChannelController extends Controller
     public function __construct(
         protected ChannelConnectionRepository $channelRepository,
         protected MetaGraphClient $metaClient,
-        protected CentralWebhookRouter $router
+        protected CentralWebhookRouter $router,
+        protected InboxHistorySync $historySync
     ) {}
 
     public function index(): View
@@ -46,7 +49,7 @@ class ChannelController extends Controller
                 'desc' => trans('unified_inbox::app.channels.whatsapp-desc'),
                 'icon' => 'icon-whatsapp',
                 'color' => '#25D366',
-                'connection' => $connections->firstWhere('channel', 'whatsapp'),
+                'connection' => $this->channelRepository->preferredForChannel($connections, 'whatsapp'),
             ],
             'messenger' => [
                 'key' => 'messenger',
@@ -54,7 +57,7 @@ class ChannelController extends Controller
                 'desc' => trans('unified_inbox::app.channels.messenger-desc'),
                 'icon' => 'icon-messenger',
                 'color' => '#0084FF',
-                'connection' => $connections->firstWhere('channel', 'messenger'),
+                'connection' => $this->channelRepository->preferredForChannel($connections, 'messenger'),
             ],
             'instagram' => [
                 'key' => 'instagram',
@@ -62,7 +65,7 @@ class ChannelController extends Controller
                 'desc' => trans('unified_inbox::app.channels.instagram-desc'),
                 'icon' => 'icon-instagram',
                 'color' => '#E1306C',
-                'connection' => $connections->firstWhere('channel', 'instagram'),
+                'connection' => $this->channelRepository->preferredForChannel($connections, 'instagram'),
             ],
         ];
 
@@ -101,6 +104,8 @@ class ChannelController extends Controller
             if (! $accessToken) {
                 throw new Exception('No access token returned from Meta.');
             }
+
+            $this->ensureInboundDelivery();
 
             $wabaId = (string) $request->input('waba_id');
             $phoneNumberId = (string) $request->input('phone_number_id');
@@ -147,13 +152,21 @@ class ChannelController extends Controller
 
                 // Register with central landlord router
                 $this->router->registerRoute($currentTenant->id, 'whatsapp', $extId, $wabaId, $channelName);
+                $this->retireOtherConnections($currentTenant, 'whatsapp', [$extId]);
                 $connectedChannel = true;
 
                 if ($wabaId) {
                     try {
-                        $this->metaClient->subscribeWabaApps($wabaId, $accessToken);
-                    } catch (Exception) {
-                        // Keep connection even if auto-subscription needs app review
+                        $this->metaClient->subscribeWabaApps(
+                            $wabaId,
+                            $accessToken,
+                            $this->router->getCentralWebhookUrl(),
+                            (string) config('unified-inbox.meta.verify_token')
+                        );
+                    } catch (Exception $e) {
+                        Log::warning('Unified Inbox could not subscribe the WhatsApp account to webhooks.', [
+                            'reason' => $e->getMessage(),
+                        ]);
                     }
                 }
             }
@@ -162,6 +175,8 @@ class ChannelController extends Controller
             if ($channel !== 'whatsapp') {
                 try {
                     $pages = $this->metaClient->getFacebookPages($accessToken);
+                    $messengerIds = [];
+                    $instagramIds = [];
 
                     foreach ($pages as $page) {
                         $pageId = (string) ($page['id'] ?? '');
@@ -185,11 +200,15 @@ class ChannelController extends Controller
                             );
 
                             $this->router->registerRoute($currentTenant->id, 'messenger', $pageId, null, $pageName);
+                            $messengerIds[] = $pageId;
                             $connectedChannel = true;
 
                             try {
                                 $this->metaClient->subscribePageApps($pageId, $pageToken);
-                            } catch (Exception) {
+                            } catch (Exception $e) {
+                                Log::warning('Unified Inbox could not subscribe the Facebook Page to webhooks.', [
+                                    'reason' => $e->getMessage(),
+                                ]);
                             }
 
                             // Check connected Instagram business account
@@ -216,9 +235,20 @@ class ChannelController extends Controller
                                 );
 
                                 $this->router->registerRoute($currentTenant->id, 'instagram', $igId, null, '@'.$igUsername);
+                                $instagramIds[] = $igId;
                                 $connectedChannel = true;
                             }
                         }
+                    }
+
+                    if ($messengerIds !== []) {
+                        $this->retireOtherConnections($currentTenant, 'messenger', $messengerIds);
+                        $this->syncConnected('messenger', $messengerIds);
+                    }
+
+                    if ($instagramIds !== []) {
+                        $this->retireOtherConnections($currentTenant, 'instagram', $instagramIds);
+                        $this->syncConnected('instagram', $instagramIds);
                     }
                 } catch (Exception) {
                 }
@@ -283,6 +313,8 @@ class ChannelController extends Controller
             $validated['name']
         );
 
+        $this->retireOtherConnections($currentTenant, $validated['channel'], [$validated['external_id']]);
+
         session()->flash('success', ucfirst($validated['channel']).' channel connected successfully.');
 
         return redirect()->route('admin.unified_inbox.channels.index');
@@ -303,6 +335,56 @@ class ChannelController extends Controller
         }
 
         return redirect()->route('admin.unified_inbox.channels.index');
+    }
+
+    /**
+     * One account is shown per channel. Older connections for that channel are disconnected.
+     */
+    protected function retireOtherConnections(Tenant $tenant, string $channel, array $keepExternalIds): void
+    {
+        $others = $this->channelRepository->getModel()->newQuery()
+            ->where('channel', $channel)
+            ->whereNotIn('external_id', $keepExternalIds)
+            ->where('status', 'connected')
+            ->get();
+
+        foreach ($others as $other) {
+            $this->router->removeRoute($tenant->id, $other->channel, $other->external_id);
+
+            $other->update([
+                'status' => 'disconnected',
+            ]);
+        }
+    }
+
+    protected function ensureInboundDelivery(): void
+    {
+        try {
+            $this->metaClient->registerPlatformWebhooks(
+                $this->router->getCentralWebhookUrl(),
+                (string) config('unified-inbox.meta.verify_token')
+            );
+        } catch (Exception $e) {
+            Log::warning('Unified Inbox could not register the Meta app webhook.', [
+                'reason' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $externalIds
+     */
+    protected function syncConnected(string $channel, array $externalIds): void
+    {
+        $connections = $this->channelRepository->getModel()->newQuery()
+            ->where('channel', $channel)
+            ->whereIn('external_id', $externalIds)
+            ->where('status', 'connected')
+            ->get();
+
+        foreach ($connections as $connection) {
+            $this->historySync->sync($connection);
+        }
     }
 
     protected function requireCurrentTenant(): Tenant

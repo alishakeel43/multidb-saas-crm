@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Deliver WhatsApp, Messenger, and Instagram events to this inbox by registering the CRM webhook and a WhatsApp account callback, and sync recent Messenger and Instagram threads after connect.
+- Place the inbox new-contact control beside the conversation search bar, and use a compose dialog with a channel choice, recipient, and template or message fields.
+- Start a conversation from the inbox: an approved WhatsApp template to any number, or a Messenger or Instagram message to someone who already contacted that account.
+- Show the latest connected Meta account on the channel card. A newer Embedded Signup no longer stays hidden behind an older disconnected row for the same channel.
 - Fix lead import sample download returning an empty CSV after the tenant storage disk no longer contains the shared sample file.
 
 - Show a “No records found” message in the task form when a related lead, person, organization, or quote search has no matches.
