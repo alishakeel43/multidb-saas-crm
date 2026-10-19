@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add `crm:lead-ai-fields` and `tenants:lead-ai-fields` commands that create (or with `--remove` delete) the AI-sales lead fields (fit score, personalization notes, intent, confidence, recommended product, human approval, etc.) as regular user-defined Attributes, so they stay editable and deletable from Settings → Attributes. New tenants get these fields automatically during provisioning.
+- Continue old-number WhatsApp chats on the current number via an approved template: require an open 24-hour customer service window on the current number before sending free text or attachments, and copy CRM links when starting the continuation thread.
 - Deliver WhatsApp, Messenger, and Instagram events to this inbox by registering the CRM webhook and a WhatsApp account callback, and sync recent Messenger and Instagram threads after connect.
 - Place the inbox new-contact control beside the conversation search bar, and use a compose dialog with a channel choice, recipient, and template or message fields.
 - Start a conversation from the inbox: an approved WhatsApp template to any number, or a Messenger or Instagram message to someone who already contacted that account.

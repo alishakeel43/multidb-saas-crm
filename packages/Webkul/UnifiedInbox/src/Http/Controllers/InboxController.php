@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Webkul\Activity\Models\ActivityProxy;
 use Webkul\Activity\Repositories\ActivityRepository;
@@ -52,7 +54,7 @@ class InboxController extends Controller
         // Meta-style left rail folder: inbox | unread | follow_up | done | spam.
         $folder = in_array($request->input('folder'), ['inbox', 'unread', 'follow_up', 'done', 'spam'], true) ? $request->input('folder') : null;
         $labelFilter = trim((string) $request->input('label', ''));
-        $hasFolders = \Illuminate\Support\Facades\Schema::hasColumn('unified_inbox_conversations', 'is_spam');
+        $hasFolders = Schema::hasColumn('unified_inbox_conversations', 'is_spam');
         $activeId = $request->input('conversation_id');
 
         $connections = $this->channelRepository->all();
@@ -310,7 +312,7 @@ class InboxController extends Controller
 
     protected function quickReplies()
     {
-        if (! \Illuminate\Support\Facades\Schema::hasTable('unified_inbox_quick_replies')) {
+        if (! Schema::hasTable('unified_inbox_quick_replies')) {
             return collect();
         }
 
@@ -428,7 +430,7 @@ class InboxController extends Controller
 
         $conversation = $this->resolveReplyConversation($conversation);
 
-        if ($conversation->last_incoming_at && ! $conversation->serviceWindowOpen()) {
+        if (! $conversation->serviceWindowOpen()) {
             return response()->json(['success' => false, 'error' => 'The 24-hour reply window has closed. Send an approved template instead.'], 422);
         }
 
@@ -506,8 +508,8 @@ class InboxController extends Controller
         $filename = (string) ($attachment['filename'] ?? (($attachment['type'] ?? 'file').'-'.$message->id));
         $disposition = $request->boolean('download') ? 'attachment' : 'inline';
 
-        if (! empty($attachment['path']) && \Illuminate\Support\Facades\Storage::disk('local')->exists($attachment['path'])) {
-            return \Illuminate\Support\Facades\Storage::disk('local')->response($attachment['path'], $filename, [
+        if (! empty($attachment['path']) && Storage::disk('local')->exists($attachment['path'])) {
+            return Storage::disk('local')->response($attachment['path'], $filename, [
                 'Content-Type' => $attachment['mime_type'] ?? 'application/octet-stream',
                 'X-Content-Type-Options' => 'nosniff',
             ], $disposition);
@@ -595,7 +597,7 @@ class InboxController extends Controller
         $originalConversationId = $conversation->id;
         $conversation = $this->resolveReplyConversation($conversation);
 
-        // WhatsApp 24h customer service window: free text only within 24h of the last inbound message.
+        // WhatsApp 24h customer service window: free text only within 24h of the last inbound message on this number.
         if ($conversation->channel === 'whatsapp' && $conversation->last_incoming_at && ! $conversation->serviceWindowOpen()) {
             return response()->json([
                 'success' => false,
@@ -1115,6 +1117,12 @@ class InboxController extends Controller
             return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
         }
 
+        $prior = $this->conversationRepository->getModel()->newQuery()
+            ->where('channel', $channel)
+            ->where('external_id', $recipient)
+            ->orderByDesc('last_message_at')
+            ->first();
+
         $conversation = $this->conversationRepository->getModel()->newQuery()->firstOrCreate(
             [
                 'channel' => $channel,
@@ -1122,11 +1130,27 @@ class InboxController extends Controller
                 'external_id' => $recipient,
             ],
             [
-                'customer_name' => trim((string) ($validated['name'] ?? '')) ?: $recipient,
+                'customer_name' => trim((string) ($validated['name'] ?? '')) ?: ($prior?->customer_name ?: $recipient),
                 'status' => 'open',
                 'unread_count' => 0,
+                'person_id' => $prior?->person_id,
+                'lead_id' => $prior?->lead_id,
+                'organization_id' => $prior?->organization_id,
+                'user_id' => $prior?->user_id,
+                'metadata' => $prior && $prior->account_id !== (string) $connection->external_id
+                    ? ['previous_conversation_id' => $prior->id]
+                    : null,
             ]
         );
+
+        if ($prior && $prior->id !== $conversation->id) {
+            $conversation->fill(array_filter([
+                'person_id' => $conversation->person_id ?: $prior->person_id,
+                'lead_id' => $conversation->lead_id ?: $prior->lead_id,
+                'organization_id' => $conversation->organization_id ?: $prior->organization_id,
+                'user_id' => $conversation->user_id ?: $prior->user_id,
+            ], fn ($v) => $v !== null));
+        }
 
         $message = $this->messageRepository->create([
             'conversation_id' => $conversation->id,

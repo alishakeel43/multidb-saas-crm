@@ -54,6 +54,7 @@
     .ui-slash button.is-active,.ui-slash button:hover{background:#e8e9fe}
     .ui-slash small{display:block;color:var(--ui-muted,#74809a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ui-attach-preview{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 8px;border:1px dashed var(--ui-line,#e7eaf2);border-radius:8px;margin-bottom:6px}
+    .ui-attach-preview[hidden],.ui-popover[hidden],.ui-emoji-grid[hidden]{display:none!important}
     .ui-attach-preview button{margin-inline-start:auto;border:0;background:none;cursor:pointer}
     /* Bubbles: attachments */
     .ui-msg-media{display:block;max-width:260px;max-height:260px;border-radius:8px;margin-bottom:4px;object-fit:cover}

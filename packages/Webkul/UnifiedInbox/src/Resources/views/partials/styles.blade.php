@@ -920,9 +920,10 @@
     .ui-composer textarea{min-height:64px;resize:vertical;font-size:14px}
     .ui-composer .secondary-button{padding:4px 10px;font-size:12px;border-radius:999px;font-weight:500}
     #send-button{min-width:96px;position:relative}
-    #send-button:disabled{opacity:.75;cursor:progress}
-    #send-button:disabled span{visibility:hidden}
-    #send-button:disabled::after{content:"";position:absolute;width:16px;height:16px;border:2px solid #ffffff66;border-top-color:#fff;border-radius:50%;animation:ui-spin .7s linear infinite}
+    #send-button:disabled{opacity:.55;cursor:not-allowed}
+    #send-button.is-sending:disabled{opacity:.75;cursor:progress}
+    #send-button.is-sending:disabled span{visibility:hidden}
+    #send-button.is-sending:disabled::after{content:"";position:absolute;width:16px;height:16px;border:2px solid #ffffff66;border-top-color:#fff;border-radius:50%;animation:ui-spin .7s linear infinite}
     @keyframes ui-spin{to{transform:rotate(360deg)}}
     /* Side panel */
     .ui-profile{padding:18px;background:var(--ui-bg)}
@@ -1371,6 +1372,8 @@
     .dark .ui-inbox .ui-thread-whatsapp .ui-history,.ui-inbox.dark .ui-thread-whatsapp .ui-history{background-color:#0b141a;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.05' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 18h20a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H24l-6 5v-5h-4a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4z'/%3E%3Cpath d='M78 14l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z'/%3E%3Cpath d='M130 30c-4-6-14-4-12 4 1 5 12 11 12 11s11-6 12-11c2-8-8-10-12-4z'/%3E%3Ccircle cx='30' cy='84' r='9'/%3E%3Cpath d='M26 82h.01M34 82h.01M26 88c2 2 6 2 8 0'/%3E%3Cpath d='M72 74h22v16H72zM72 74l11 9 11-9'/%3E%3Cpath d='M120 76v18M114 82l6-6 6 6M112 100h16'/%3E%3Cpath d='M18 132a10 10 0 0 1 20 0M28 122v-6M22 140h12'/%3E%3Cpath d='M70 128l8-8 8 8-8 8zM96 118c4 0 6 4 4 7'/%3E%3Ccircle cx='128' cy='130' r='7'/%3E%3Cpath d='M128 125v5l3 2'/%3E%3Cpath d='M50 50l4 4M54 50l-4 4M104 48a3 3 0 1 0 0 .1M150 60l3 3M40 108h4M146 110a2 2 0 1 0 0 .1'/%3E%3C/g%3E%3C/svg%3E")}
     /* Compact WhatsApp-style composer */
     .ui-inbox .ui-composer{margin:0 12px 10px;padding:0 10px 8px;border-radius:10px}
+    .ui-inbox .ui-composer > .ui-window:first-child{margin-top:8px}
+    .ui-workspace [hidden],.ui-compose [hidden],.ui-qr-dialog [hidden]{display:none!important}
     .ui-inbox .ui-composer-tabs{display:flex;align-items:center;gap:14px;margin:0 -10px 6px;padding:0 10px;min-width:0}
     .ui-inbox .ui-composer-tab{padding:6px 0;font-size:12.5px;flex:0 0 auto}
     .ui-inbox .ui-composer-hint{margin-left:auto;min-width:0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1383,7 +1386,8 @@
     .ui-inbox .ui-ai-refresh{padding:0 5px;font-size:13px;line-height:20px}
     .ui-inbox .ui-ai-list{display:flex;flex-wrap:nowrap;gap:4px;max-height:none;overflow:visible;font-size:11.5px;white-space:nowrap}
     .ui-inbox .ui-ai-chip{flex:0 0 auto;max-width:260px;padding:2px 9px;font-size:11.5px;line-height:1.4;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .ui-inbox .ui-composer.is-note .ui-suggest-row{display:none}
+    .ui-inbox .ui-composer.is-note .ui-suggest-row,
+    .ui-inbox .ui-composer.is-window-closed:not(.is-note) .ui-suggest-row{display:none}
     .ui-inbox #message-form{display:flex;align-items:flex-end;gap:8px;margin:0}
     .ui-inbox .ui-composer textarea#message-input{flex:1;min-width:0;min-height:0;height:auto;resize:none;overflow-y:hidden;line-height:20px;padding:8px 12px!important;border-radius:18px;font-size:14px;box-sizing:border-box}
     .ui-inbox #send-button{flex:0 0 auto;height:36px;padding:0 16px;border-radius:18px;margin:0}

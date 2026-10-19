@@ -191,10 +191,10 @@
                             $uiWindowOpen = ! $uiIsWa || ($uiWindowSource?->serviceWindowOpen() ?? false);
                         @endphp
                         <div class="ui-composer {{ $uiWindowOpen ? '' : 'is-window-closed' }}" data-window-open="{{ $uiWindowOpen ? '1' : '0' }}">
-                            @if ($uiOnOldNumber)
+                            @if ($uiOnOldNumber && ! $uiIsWa)
                                 <div class="ui-window ui-window-closed">
                                     <span aria-hidden="true">↪</span>
-                                    <span>This chat was on old number {{ $uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id] }}. Replies are sent from your current number and continue in that conversation.</span>
+                                    <span>This chat was on old account {{ $uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id] }}. Replies are sent from your current account and continue in that conversation.</span>
                                     @if ($continuation ?? null)
                                         <a class="secondary-button" href="{{ route('admin.unified_inbox.index', ['conversation_id' => $continuation->id]) }}">Open current chat</a>
                                     @endif
@@ -204,13 +204,36 @@
                                 @if ($uiWindowOpen)
                                     <div class="ui-window ui-window-open" id="ui-window" data-ends="{{ $uiWindowEnds?->toIso8601String() }}">
                                         <span aria-hidden="true">●</span>
-                                        <span>24h reply window open · <strong id="ui-window-left">{{ $uiWindowEnds ? now()->diff($uiWindowEnds)->format('%hh %Im') : '' }}</strong> left</span>
+                                        <span>
+                                            @if ($uiOnOldNumber)
+                                                This chat was on old number {{ $uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id] }} · 24h reply window open on current number ·
+                                            @else
+                                                24h reply window open ·
+                                            @endif
+                                            <strong id="ui-window-left">{{ $uiWindowEnds ? now()->diff($uiWindowEnds)->format('%hh %Im') : '' }}</strong> left
+                                        </span>
+                                        @if ($uiOnOldNumber && ($continuation ?? null))
+                                            <a class="secondary-button" href="{{ route('admin.unified_inbox.index', ['conversation_id' => $continuation->id]) }}">Open current chat</a>
+                                        @endif
                                     </div>
                                 @else
                                     <div class="ui-window ui-window-closed" id="ui-window">
                                         <span aria-hidden="true">⏱</span>
-                                        <span>{{ $uiWindowEnds ? '24h reply window closed '.$uiWindowEnds->diffForHumans() : 'No customer message yet' }} — only approved templates can be sent.</span>
-                                        <button type="button" class="primary-button" onclick="uiOpenTemplateFor(@js($activeConversation->external_id), @js($activeConversation->customer_name))">Send template</button>
+                                        <span>
+                                            @if ($uiOnOldNumber && $uiWindowEnds)
+                                                This chat was on old number {{ $uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id] }} · 24h reply window closed {{ $uiWindowEnds->diffForHumans() }} — only approved templates can be sent.
+                                            @elseif ($uiOnOldNumber)
+                                                This chat was on old number {{ $uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id] }} — send an approved template from your current number to continue.
+                                            @elseif ($uiWindowEnds)
+                                                24h reply window closed {{ $uiWindowEnds->diffForHumans() }} — only approved templates can be sent.
+                                            @else
+                                                No customer message yet — only approved templates can be sent.
+                                            @endif
+                                        </span>
+                                        @if ($uiOnOldNumber && ($continuation ?? null))
+                                            <a class="secondary-button" href="{{ route('admin.unified_inbox.index', ['conversation_id' => $continuation->id]) }}">Open current chat</a>
+                                        @endif
+                                        <button type="button" class="primary-button" onclick="uiOpenTemplateFor(@js($activeConversation->external_id), @js($activeConversation->customer_name), @js($uiOnOldNumber))">Send template</button>
                                     </div>
                                 @endif
                             @endif
@@ -670,15 +693,21 @@
                 if (!response.ok) {
                     throw new Error(data.error || 'Could not load templates.');
                 }
-                const templates = (data.templates || []).filter(template => template.name && !template.media);
+                const all = (data.templates || []).filter(template => template.name);
+                const templates = all.filter(template => !template.media);
                 select.replaceChildren();
                 if (!templates.length) {
                     const empty = document.createElement('option');
                     empty.value = '';
                     empty.textContent = 'No approved text templates';
                     select.appendChild(empty);
+                    error.hidden = false;
+                    error.textContent = all.length
+                        ? 'The approved templates on this WhatsApp Business account need an image, video, or document header, which is not supported here yet.'
+                        : 'This WhatsApp Business account has no approved message templates. Create and submit one in Meta WhatsApp Manager (Message templates), wait for approval, then reopen this dialog.';
                     return;
                 }
+                error.hidden = true;
                 templates.forEach(template => {
                     const option = document.createElement('option');
                     option.value = template.name + '\n' + template.language;
@@ -792,6 +821,7 @@
             if (!body) return;
 
             button.disabled = true;
+            button.classList.add('is-sending');
 
             try {
                 const response = await fetch("{{ url(config('app.admin_path') . '/unified-inbox/conversations') }}/" + conversationId + "/send", {
@@ -832,7 +862,8 @@
             } catch (err) {
                 alert('Network error while sending message.');
             } finally {
-                button.disabled = false;
+                button.classList.remove('is-sending');
+                button.disabled = button.dataset.replyLocked === '1' && uiComposerMode !== 'note';
             }
         }
 
@@ -925,11 +956,17 @@
 
         // ---- AI reply suggestions (click-to-insert only, never auto-sent) ----
         const uiAiCache = {};
-        async function uiLoadAiSuggestions(force) {
+        async         function uiLoadAiSuggestions(force) {
             const box = document.getElementById('ui-ai');
             const list = document.getElementById('ui-ai-list');
             const btn = document.getElementById('ui-ai-refresh');
             if (!box || !list || !UI_CONV_ID) return;
+            const composer = document.querySelector('.ui-composer');
+            if (!force && composer && composer.dataset.windowOpen === '0') {
+                box.dataset.state = 'closed';
+                list.textContent = '';
+                return;
+            }
             const render = (data) => {
                 list.innerHTML = '';
                 const sugg = (data && data.suggestions) || [];
@@ -1016,12 +1053,16 @@
             const comment = input.value.trim();
             if (!comment) return;
             button.disabled = true;
+            button.classList.add('is-sending');
             try {
                 const { ok, data } = await uiPost('/conversations/' + id + '/notes', { comment });
                 if (ok) { sessionStorage.setItem('ui-side-tab', 'work'); window.location.reload(); }
                 else alert(data.message || data.error || 'Could not save note.');
             } catch (e) { alert('Network error while saving note.'); }
-            finally { button.disabled = false; }
+            finally {
+                button.classList.remove('is-sending');
+                button.disabled = button.dataset.replyLocked === '1' && uiComposerMode !== 'note';
+            }
         }
 
         async function uiSaveSideNote(id) {
@@ -1149,10 +1190,16 @@
             setInterval(tick, 30000);
         })();
 
-        function uiOpenTemplateFor(recipient, name) {
+        function uiOpenTemplateFor(recipient, name, continueFromOld = false) {
             uiOpenCompose('whatsapp');
-            document.getElementById('ui-compose-recipient').value = String(recipient || '').replace(/\D/g, '');
+            const input = document.getElementById('ui-compose-recipient');
+            input.value = String(recipient || '').replace(/\D/g, '');
             document.getElementById('ui-compose-name').value = name || '';
+            if (continueFromOld) {
+                document.getElementById('ui-compose-title').textContent = 'Continue on current WhatsApp number';
+                document.getElementById('ui-compose-help').textContent = 'This customer has not messaged your current number yet. Send an approved template to continue the conversation from your current number.';
+            }
+            document.getElementById('ui-compose-template').focus();
         }
 
         // Emoji picker (no dependency).
@@ -1321,6 +1368,7 @@
             form.append('file', uiPendingFile);
             form.append('caption', input.value.trim());
             button.disabled = true;
+            button.classList.add('is-sending');
             try {
                 const r = await fetch(UI_BASE + '/conversations/' + id + '/attachments', {
                     method: 'POST', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': UI_CSRF }, body: form
@@ -1331,7 +1379,8 @@
             } catch (e) {
                 alert('Network error while sending the attachment.');
             } finally {
-                button.disabled = false;
+                button.classList.remove('is-sending');
+                button.disabled = button.dataset.replyLocked === '1' && uiComposerMode !== 'note';
             }
         }
 
