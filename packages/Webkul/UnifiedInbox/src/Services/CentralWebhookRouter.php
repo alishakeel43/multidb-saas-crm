@@ -136,11 +136,19 @@ class CentralWebhookRouter
     }
 
     /**
-     * Central URL dedicated to WhatsApp (alias of the Meta webhook, same handler).
+     * The one common Meta webhook URL (WhatsApp, Messenger, Instagram) on the central domain.
+     */
+    public function getMetaWebhookUrl(): string
+    {
+        return preg_replace('#/unified-inbox/meta/webhook$#', '/api/meta/webhook', $this->getCentralWebhookUrl());
+    }
+
+    /**
+     * WhatsApp uses the common Meta webhook URL.
      */
     public function getWhatsAppWebhookUrl(): string
     {
-        return preg_replace('#/unified-inbox/meta/webhook$#', '/api/whatsapp/webhook', $this->getCentralWebhookUrl());
+        return preg_replace('#/unified-inbox/meta/webhook$#', '/api/meta/webhook', $this->getCentralWebhookUrl());
     }
 
     protected function hasColumn(string $column): bool

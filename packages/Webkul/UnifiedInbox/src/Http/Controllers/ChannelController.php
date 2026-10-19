@@ -161,7 +161,7 @@ class ChannelController extends Controller
                         $this->metaClient->subscribeWabaApps(
                             $wabaId,
                             $accessToken,
-                            $this->router->getCentralWebhookUrl(),
+                            $this->router->getMetaWebhookUrl(),
                             (string) config('unified-inbox.meta.verify_token')
                         );
                     } catch (Exception $e) {
@@ -316,6 +316,8 @@ class ChannelController extends Controller
 
         $this->retireOtherConnections($currentTenant, $validated['channel'], [$validated['external_id']]);
 
+        $this->subscribeManualConnection($validated['channel'], $credentials, $validated['external_id']);
+
         session()->flash('success', ucfirst($validated['channel']).' channel connected successfully.');
 
         return redirect()->route('admin.unified_inbox.channels.index');
@@ -347,6 +349,37 @@ class ChannelController extends Controller
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Manual connect: subscribe the app to webhooks the same way Embedded Signup does
+     * (WABA subscribed_apps for WhatsApp; Page subscribed_apps for Messenger/Instagram). Best effort.
+     */
+    protected function subscribeManualConnection(string $channel, array $credentials, string $externalId): void
+    {
+        $token = (string) ($credentials['access_token'] ?? '');
+
+        if ($token === '' || str_starts_with($externalId, 'demo-')) {
+            return;
+        }
+
+        try {
+            if ($channel === 'whatsapp' && filled($credentials['waba_id'] ?? null)) {
+                $this->metaClient->subscribeWabaApps(
+                    (string) $credentials['waba_id'],
+                    $token,
+                    $this->router->getMetaWebhookUrl(),
+                    (string) config('unified-inbox.meta.verify_token')
+                );
+            } elseif (in_array($channel, ['messenger', 'instagram'], true) && filled($credentials['page_id'] ?? null)) {
+                $this->metaClient->subscribePageApps((string) $credentials['page_id'], $token);
+            }
+        } catch (Exception $e) {
+            Log::warning('Unified Inbox could not subscribe a manually connected channel to webhooks.', [
+                'channel' => $channel,
+                'reason' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function disconnect(int $id): RedirectResponse

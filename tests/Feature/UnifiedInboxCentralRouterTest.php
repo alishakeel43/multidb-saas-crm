@@ -65,7 +65,7 @@ function uiRouterPost($test, array $payload, ?string $secret = 'test_meta_app_se
         $server['HTTP_X_HUB_SIGNATURE_256'] = 'sha256='.hash_hmac('sha256', $body, $secret);
     }
 
-    return $test->call('POST', '/api/whatsapp/webhook', [], [], [], $server, $body);
+    return $test->call('POST', '/api/meta/webhook', [], [], [], $server, $body);
 }
 
 function uiWaPayload(string $phoneId, array $value): array
@@ -88,11 +88,11 @@ function uiWaPayload(string $phoneId, array $value): array
 it('verifies the central WhatsApp webhook alias with the configured verify token', function () {
     config()->set('unified-inbox.meta.verify_token', 'router_token');
 
-    $ok = $this->get('/api/whatsapp/webhook?hub_mode=subscribe&hub_verify_token=router_token&hub_challenge=CH_1');
+    $ok = $this->get('/api/meta/webhook?hub_mode=subscribe&hub_verify_token=router_token&hub_challenge=CH_1');
     $ok->assertStatus(200);
     expect($ok->getContent())->toBe('CH_1');
 
-    $this->get('/api/whatsapp/webhook?hub_mode=subscribe&hub_verify_token=nope&hub_challenge=CH_1')->assertForbidden();
+    $this->get('/api/meta/webhook?hub_mode=subscribe&hub_verify_token=nope&hub_challenge=CH_1')->assertForbidden();
 });
 
 it('rejects central WhatsApp webhook posts with a bad signature', function () {

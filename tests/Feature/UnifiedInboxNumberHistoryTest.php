@@ -136,7 +136,7 @@ it('continues the same customer history when they message the new number', funct
             'contacts' => [['profile' => ['name' => 'History Hina'], 'wa_id' => '923001234567']],
             'messages' => [['from' => '923001234567', 'id' => 'wamid.new.1', 'timestamp' => (string) time(), 'type' => 'text', 'text' => ['body' => 'Hi on the new number']]],
         ]]]]]]);
-        $this->call('POST', '/api/whatsapp/webhook', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_HUB_SIGNATURE_256' => nhSign($body)], $body)->assertStatus(200);
+        $this->call('POST', '/api/meta/webhook', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_HUB_SIGNATURE_256' => nhSign($body)], $body)->assertStatus(200);
     } finally {
         $router->removeRoute($this->tenant->id, 'whatsapp', 'PHONE_NEW_2');
     }

@@ -22,14 +22,13 @@ Route::middleware(['web'])
         Route::post('webhook', [WebhookController::class, 'handle'])->name('handle');
     });
 
-// Central WhatsApp webhook alias: one URL for every tenant, registered once in Meta.
-// Same handler (signature check + phone_number_id -> tenant routing) as the Meta webhook above.
+// One common Meta webhook for WhatsApp, Messenger and Instagram (register this URL once in Meta).
 Route::middleware(['web'])
     ->withoutMiddleware([
         ValidateCsrfToken::class,
     ])
-    ->prefix('api/whatsapp')
-    ->name('unified_inbox.whatsapp_webhook.')
+    ->prefix('api/meta')
+    ->name('unified_inbox.meta_webhook.')
     ->group(function () {
         Route::get('webhook', [WebhookController::class, 'verify'])->name('verify');
         Route::post('webhook', [WebhookController::class, 'handle'])->name('handle');

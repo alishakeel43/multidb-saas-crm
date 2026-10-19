@@ -105,13 +105,21 @@ class WebhookController extends Controller
     protected function routeAndProcessMessagingEntry(array $entry, string $object): void
     {
         $channel = $object === 'instagram' ? 'instagram' : 'messenger';
-        $pageId = (string) ($entry['id'] ?? '');
+
+        // Route on entry.id (Page ID / IG account ID); fall back to messaging[].recipient.id
+        // (the business side of an inbound event) when entry.id has no active route.
+        $candidates = collect([(string) ($entry['id'] ?? '')])
+            ->merge(collect((array) ($entry['messaging'] ?? []))->map(fn ($e) => (string) data_get($e, 'recipient.id', '')))
+            ->filter()->unique()->values();
+
+        $pageId = $candidates->first(fn ($id) => $this->centralRouter->resolveTenant($channel, $id) !== null)
+            ?? (string) ($candidates->first() ?? '');
 
         $this->runInTenantContext(
             channel: $channel,
             externalId: $pageId,
             wabaId: null,
-            callback: fn () => $this->handleMessagingEntry($entry, $object)
+            callback: fn () => $this->handleMessagingEntry($entry, $object, $pageId)
         );
     }
 
@@ -232,11 +240,11 @@ class WebhookController extends Controller
         }
     }
 
-    protected function handleMessagingEntry(array $entry, string $object): void
+    protected function handleMessagingEntry(array $entry, string $object, ?string $accountId = null): void
     {
         $messagingEvents = (array) ($entry['messaging'] ?? []);
         $channel = $object === 'instagram' ? 'instagram' : 'messenger';
-        $pageId = (string) ($entry['id'] ?? '');
+        $pageId = $accountId ?: (string) ($entry['id'] ?? '');
 
         foreach ($messagingEvents as $event) {
             if (! empty($event['message'])) {
@@ -274,7 +282,51 @@ class WebhookController extends Controller
                 }
             }
 
+            // Button / quick-reply postbacks: stored as an inbound message so agents see the choice.
+            if (! empty($event['postback'])) {
+                $senderId = (string) ($event['sender']['id'] ?? '');
+                $postback = (array) $event['postback'];
+                $title = trim((string) ($postback['title'] ?? ''));
+                $payload = (string) ($postback['payload'] ?? '');
+
+                if ($senderId !== '' && $senderId !== $pageId) {
+                    $this->storeInboundMessage(
+                        channel: $channel,
+                        accountId: $pageId,
+                        externalSenderId: $senderId,
+                        customerName: ucfirst($channel).' User',
+                        externalMessageId: (string) ($postback['mid'] ?? '') ?: 'postback:'.sha1($senderId.'|'.($event['timestamp'] ?? '').'|'.$payload),
+                        body: '[Button] '.($title !== '' ? $title : $payload),
+                        attachments: [array_filter(['type' => 'postback', 'title' => $title ?: null, 'payload' => $payload !== '' ? mb_substr($payload, 0, 1000) : null])],
+                        occurredAt: $this->timestamp($event['timestamp'] ?? null, milliseconds: true)
+                    );
+                }
+            }
+
             $recipientId = (string) ($event['recipient']['id'] ?? '');
+
+            // Instagram messaging_seen: read.mid marks that message (and earlier ones) as read.
+            $seenMid = (string) data_get($event, 'read.mid', '');
+            $customerId = (string) ($event['sender']['id'] ?? '');
+
+            if ($seenMid !== '' && $customerId !== '') {
+                $seen = $this->messageRepository->getModel()->newQuery()
+                    ->where('external_id', $seenMid)
+                    ->where('direction', 'outbound')
+                    ->whereHas('conversation', fn ($query) => $query
+                        ->where('channel', $channel)
+                        ->where('account_id', $pageId)
+                        ->where('external_id', $customerId))
+                    ->first();
+
+                if ($seen) {
+                    $seen->conversation->messages()
+                        ->where('direction', 'outbound')
+                        ->where('occurred_at', '<=', $seen->occurred_at)
+                        ->whereNotIn('status', ['read', 'failed'])
+                        ->update(['status' => 'read']);
+                }
+            }
 
             foreach ((array) data_get($event, 'delivery.mids', []) as $messageId) {
                 $this->updateDeliveryStatus($channel, $pageId, $recipientId, (string) $messageId, 'delivered');
@@ -282,17 +334,23 @@ class WebhookController extends Controller
 
             $watermark = data_get($event, 'read.watermark');
 
-            if ($recipientId !== '' && is_numeric($watermark)) {
+            if (is_numeric($watermark)) {
                 $readAt = $this->timestamp($watermark, milliseconds: true);
-                $this->messageRepository->getModel()->newQuery()
-                    ->where('direction', 'outbound')
-                    ->whereNotNull('external_id')
-                    ->where('occurred_at', '<=', $readAt)
-                    ->whereHas('conversation', fn ($query) => $query
-                        ->where('channel', $channel)
-                        ->where('account_id', $pageId)
-                        ->where('external_id', $recipientId))
-                    ->update(['status' => 'read']);
+                // Meta sends read receipts with sender = customer, recipient = Page; accept either side.
+                $customerIds = array_values(array_filter(array_unique([$customerId, $recipientId]), fn ($id) => $id !== '' && $id !== $pageId));
+
+                if ($customerIds !== []) {
+                    $this->messageRepository->getModel()->newQuery()
+                        ->where('direction', 'outbound')
+                        ->whereNotNull('external_id')
+                        ->where('occurred_at', '<=', $readAt)
+                        ->whereNotIn('status', ['read', 'failed'])
+                        ->whereHas('conversation', fn ($query) => $query
+                            ->where('channel', $channel)
+                            ->where('account_id', $pageId)
+                            ->whereIn('external_id', $customerIds))
+                        ->update(['status' => 'read']);
+                }
             }
         }
     }
