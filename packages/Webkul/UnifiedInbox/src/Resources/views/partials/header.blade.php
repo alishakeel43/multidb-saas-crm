@@ -6,7 +6,7 @@
         ->groupBy('channel')
         ->pluck('unread', 'channel');
     $uiUnreadAll = (int) $uiUnreadByChannel->sum();
-    $uiTabQuery = request()->only('search', 'status', 'unread');
+    $uiTabQuery = request()->only('search', 'status', 'unread', 'folder', 'label');
 @endphp
 
 <header class="ui-header">

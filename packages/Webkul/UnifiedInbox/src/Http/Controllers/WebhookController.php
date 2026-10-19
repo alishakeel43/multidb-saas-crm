@@ -123,7 +123,11 @@ class WebhookController extends Controller
         $targetTenant = $this->centralRouter->resolveTenant($channel, $externalId, $wabaId);
 
         if (! $targetTenant) {
-            Log::warning("Unified Inbox webhook has no active tenant route for {$channel} account.");
+            Log::warning("Unified Inbox webhook has no active tenant route for {$channel} account.", [
+                'channel' => $channel,
+                'external_id' => $externalId,
+                'waba_id' => $wabaId,
+            ]);
 
             return;
         }
@@ -168,15 +172,20 @@ class WebhookController extends Controller
 
                 if ($type === 'text') {
                     $messageBody = (string) ($waMsg['text']['body'] ?? '');
-                } elseif ($type === 'image') {
-                    $messageBody = '[Image] '.($waMsg['image']['caption'] ?? '');
-                    $attachments[] = ['type' => 'image', 'id' => $waMsg['image']['id'] ?? null];
-                } elseif ($type === 'audio') {
-                    $messageBody = '[Voice Note]';
-                    $attachments[] = ['type' => 'audio', 'id' => $waMsg['audio']['id'] ?? null];
-                } elseif ($type === 'document') {
-                    $messageBody = '[Document] '.($waMsg['document']['filename'] ?? '');
-                    $attachments[] = ['type' => 'document', 'id' => $waMsg['document']['id'] ?? null];
+                } elseif (in_array($type, ['image', 'audio', 'document', 'video', 'sticker'], true)) {
+                    $media = (array) ($waMsg[$type] ?? []);
+                    $label = ['image' => '[Image]', 'audio' => '[Voice Note]', 'document' => '[Document]', 'video' => '[Video]', 'sticker' => '[Sticker]'][$type];
+                    $caption = (string) ($media['caption'] ?? '');
+                    $messageBody = $type === 'document'
+                        ? trim($label.' '.($media['filename'] ?? '').($caption !== '' ? ' — '.$caption : ''))
+                        : trim($label.' '.$caption);
+                    $attachments[] = array_filter([
+                        'type' => $type,
+                        'id' => $media['id'] ?? null,
+                        'mime_type' => $media['mime_type'] ?? null,
+                        'filename' => isset($media['filename']) ? basename((string) $media['filename']) : null,
+                        'caption' => $caption !== '' ? $caption : null,
+                    ], fn ($v) => $v !== null);
                 } else {
                     $messageBody = "[{$type}]";
                 }
@@ -301,16 +310,30 @@ class WebhookController extends Controller
         $occurredAt ??= now();
 
         DB::transaction(function () use ($channel, $accountId, $externalSenderId, $customerName, $externalMessageId, $body, $attachments, $occurredAt) {
+            // Same customer on an older/other number of this tenant: carry CRM links into the new
+            // number's conversation and remember the previous thread (its history stays untouched).
+            $previous = $this->conversationRepository->getModel()->newQuery()
+                ->where('channel', $channel)
+                ->where('external_id', $externalSenderId)
+                ->where('account_id', '!=', $accountId)
+                ->orderByDesc('last_message_at')
+                ->first();
+
             $conversation = $this->conversationRepository->getModel()->newQuery()->firstOrCreate(
                 [
                     'channel' => $channel,
                     'account_id' => $accountId,
                     'external_id' => $externalSenderId,
                 ],
-                [
+                array_filter([
                     'customer_name' => $customerName,
                     'status' => 'open',
-                ]
+                    'person_id' => $previous?->person_id,
+                    'lead_id' => $previous?->lead_id,
+                    'organization_id' => $previous?->organization_id,
+                    'user_id' => $previous?->user_id,
+                    'metadata' => $previous ? ['previous_conversation_id' => $previous->id] : null,
+                ], fn ($v) => $v !== null)
             );
             $conversation = $conversation->newQuery()
                 ->lockForUpdate()

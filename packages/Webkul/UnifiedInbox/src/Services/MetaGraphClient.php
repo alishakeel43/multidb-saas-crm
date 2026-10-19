@@ -266,4 +266,90 @@ class MetaGraphClient
             'messaging_type' => 'RESPONSE',
         ], $token);
     }
+
+    /**
+     * Upload a local file to WhatsApp Cloud API media storage and return the media ID.
+     */
+    public function uploadWhatsAppMedia(string $phoneNumberId, string $path, string $filename, string $mime, string $token): string
+    {
+        $version = (string) config('unified-inbox.meta.version', 'v21.0');
+        $stream = fopen($path, 'r');
+
+        try {
+            $response = Http::acceptJson()->withToken($token)->connectTimeout(5)->timeout(60)
+                ->attach('file', $stream, $filename, ['Content-Type' => $mime])
+                ->post('https://graph.facebook.com/'.$version.'/'.$phoneNumberId.'/media', [
+                    'messaging_product' => 'whatsapp',
+                    'type' => $mime,
+                ]);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        $id = (string) ($this->payload($response)['id'] ?? '');
+
+        if ($id === '') {
+            throw new RuntimeException('Meta did not confirm the media upload.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * Send an uploaded image/document (by media ID) with an optional caption.
+     */
+    public function sendWhatsAppMedia(string $phoneNumberId, string $to, string $type, string $mediaId, ?string $caption, ?string $filename, string $token): array
+    {
+        $media = ['id' => $mediaId];
+
+        if (filled($caption)) {
+            $media['caption'] = $caption;
+        }
+
+        if ($type === 'document' && filled($filename)) {
+            $media['filename'] = $filename;
+        }
+
+        return $this->request('post', $phoneNumberId.'/messages', [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $to,
+            'type' => $type,
+            $type => $media,
+        ], $token);
+    }
+
+    /**
+     * Download inbound WhatsApp media by ID (bounded to 16 MB, Meta CDN hosts only).
+     *
+     * @return array{body: string, mime: string}
+     */
+    public function downloadWhatsAppMedia(string $mediaId, string $token): array
+    {
+        $limit = 16 * 1024 * 1024;
+        $meta = $this->request('get', $mediaId, [], $token);
+        $url = (string) ($meta['url'] ?? '');
+        $host = (string) parse_url($url, PHP_URL_HOST);
+
+        if (parse_url($url, PHP_URL_SCHEME) !== 'https' || ! (str_ends_with($host, '.fbsbx.com') || $host === 'graph.facebook.com' || str_ends_with($host, '.whatsapp.net')) || parse_url($url, PHP_URL_USER) || parse_url($url, PHP_URL_PORT)) {
+            throw new RuntimeException('Unexpected media host.');
+        }
+
+        if ((int) ($meta['file_size'] ?? 0) > $limit) {
+            throw new RuntimeException('Attachment exceeds size limit.');
+        }
+
+        $response = Http::withToken($token)->connectTimeout(5)->timeout(30)->withoutRedirecting()->get($url);
+
+        if (! $response->successful() || strlen($response->body()) > $limit) {
+            throw new RuntimeException('Media download failed.');
+        }
+
+        return [
+            'body' => $response->body(),
+            'mime' => (string) ($meta['mime_type'] ?? $response->header('Content-Type') ?: 'application/octet-stream'),
+        ];
+    }
 }

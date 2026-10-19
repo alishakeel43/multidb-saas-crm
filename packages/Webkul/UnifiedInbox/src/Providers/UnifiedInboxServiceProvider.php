@@ -13,6 +13,12 @@ class UnifiedInboxServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__.'/../Routes/web.php');
         $this->loadTranslationsFrom(__DIR__.'/../Resources/lang', 'unified_inbox');
         $this->loadViewsFrom(__DIR__.'/../Resources/views', 'unified_inbox');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Webkul\UnifiedInbox\Console\Commands\SyncChannelRoutesCommand::class,
+            ]);
+        }
     }
 
     public function register(): void

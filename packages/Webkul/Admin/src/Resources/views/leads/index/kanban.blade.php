@@ -164,6 +164,18 @@
                                         </div>
                                     </div>
 
+                                    @if (bouncer()->hasPermission('leads.delete'))
+                                        <div class="-mt-3 flex justify-end">
+                                            <button
+                                                type="button"
+                                                class="icon-delete rounded-md p-1 text-lg text-gray-500 hover:bg-red-100 hover:text-red-600"
+                                                title="@lang('admin::app.leads.index.datagrid.delete')"
+                                                aria-label="@lang('admin::app.leads.index.datagrid.delete')"
+                                                @click.prevent.stop="deleteLead(element)"
+                                            ></button>
+                                        </div>
+                                    @endif
+
                                     {!! view_render_event('admin.leads.index.kanban.content.stage.body.card.header.after') !!}
 
                                     {!! view_render_event('admin.leads.index.kanban.content.stage.body.card.title.before') !!}
@@ -407,6 +419,30 @@
             },
 
             methods: {
+                /**
+                 * Delete a single lead from its kanban card (same route and ACL as the datagrid action).
+                 */
+                deleteLead(lead) {
+                    this.$emitter.emit('open-confirm-modal', {
+                        agree: () => {
+                            this.$axios.delete("{{ route('admin.leads.delete', 'replaceId') }}".replace('replaceId', lead.id))
+                                .then(response => {
+                                    this.$emitter.emit('add-flash', { type: 'success', message: response.data.message });
+
+                                    this.get()
+                                        .then(response => {
+                                            for (let [sortOrder, data] of Object.entries(response.data)) {
+                                                this.stageLeads[sortOrder] = data;
+                                            }
+                                        });
+                                })
+                                .catch(error => {
+                                    this.$emitter.emit('add-flash', { type: 'error', message: error.response?.data?.message || 'Could not delete the lead.' });
+                                });
+                        },
+                    });
+                },
+
                 /**
                  * Initialization: This function checks for any previously saved filters in local storage and applies them as needed.
                  *

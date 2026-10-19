@@ -72,6 +72,7 @@ class ChannelController extends Controller
         return view('unified_inbox::admin.channels.index', [
             'channels' => $channels,
             'centralWebhookUrl' => $this->router->getCentralWebhookUrl(),
+            'numberHistory' => $this->numberHistory($connections),
             'oauthStates' => $oauthStates,
             'metaConfig' => [
                 'app_id' => (string) config('unified-inbox.meta.app_id'),
@@ -151,7 +152,7 @@ class ChannelController extends Controller
                 );
 
                 // Register with central landlord router
-                $this->router->registerRoute($currentTenant->id, 'whatsapp', $extId, $wabaId, $channelName);
+                $this->router->registerRoute($currentTenant->id, 'whatsapp', $extId, $wabaId, $channelName, (string) ($targetPhone['display_phone_number'] ?? '') ?: null);
                 $this->retireOtherConnections($currentTenant, 'whatsapp', [$extId]);
                 $connectedChannel = true;
 
@@ -320,13 +321,41 @@ class ChannelController extends Controller
         return redirect()->route('admin.unified_inbox.channels.index');
     }
 
+    /**
+     * Current + archived numbers/accounts with dates and conversation counts (never deleted).
+     */
+    protected function numberHistory($connections): array
+    {
+        $counts = \Webkul\UnifiedInbox\Models\Conversation::query()
+            ->selectRaw('channel, account_id, COUNT(*) as total')
+            ->groupBy('channel', 'account_id')
+            ->get()
+            ->mapWithKeys(fn ($r) => [$r->channel.'|'.$r->account_id => (int) $r->total]);
+
+        return $connections
+            ->reject(fn ($c) => str_starts_with((string) $c->external_id, 'demo-') && $c->status !== 'connected' && ! $counts->has($c->channel.'|'.$c->external_id))
+            ->sortBy([['channel', 'asc'], [fn ($c) => $c->status === 'connected' ? 0 : 1, 'asc'], ['id', 'desc']])
+            ->map(fn ($c) => [
+                'channel' => $c->channel,
+                'label' => $c->numberLabel(),
+                'external_id' => $c->external_id,
+                'waba_id' => ($c->credentials ?? [])['waba_id'] ?? null,
+                'current' => $c->status === 'connected',
+                'connected_at' => $c->connected_at ?? $c->created_at,
+                'disconnected_at' => $c->status === 'connected' ? null : ($c->disconnected_at ?? null),
+                'conversations' => $counts[$c->channel.'|'.$c->external_id] ?? 0,
+            ])
+            ->values()
+            ->all();
+    }
+
     public function disconnect(int $id): RedirectResponse
     {
         $currentTenant = $this->requireCurrentTenant();
         $connection = $this->channelRepository->find($id);
 
         if ($connection) {
-            $this->router->removeRoute($currentTenant->id, $connection->channel, $connection->external_id);
+            $this->router->deactivateRoute($currentTenant->id, $connection->channel, $connection->external_id);
 
             $connection->update([
                 'status' => 'disconnected',
@@ -349,7 +378,7 @@ class ChannelController extends Controller
             ->get();
 
         foreach ($others as $other) {
-            $this->router->removeRoute($tenant->id, $other->channel, $other->external_id);
+            $this->router->deactivateRoute($tenant->id, $other->channel, $other->external_id);
 
             $other->update([
                 'status' => 'disconnected',

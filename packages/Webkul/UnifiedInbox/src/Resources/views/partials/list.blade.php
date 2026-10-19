@@ -1,5 +1,5 @@
 @php
-    $uiBase = request()->only('search', 'channel', 'status', 'unread');
+    $uiBase = request()->only('search', 'channel', 'status', 'unread', 'folder', 'label');
     $uiChip = function (array $set) use ($uiBase) {
         return route('admin.unified_inbox.index', array_filter(array_merge($uiBase, $set), fn ($v) => $v !== null && $v !== ''));
     };
@@ -17,6 +17,8 @@
             <input type="hidden" name="channel" value="{{ request('channel') }}">
             <input type="hidden" name="status" value="{{ $uiStatus }}">
             @if ($uiUnread)<input type="hidden" name="unread" value="1">@endif
+            @if (request('folder'))<input type="hidden" name="folder" value="{{ request('folder') }}">@endif
+            @if (request('label'))<input type="hidden" name="label" value="{{ request('label') }}">@endif
             <label class="ui-search">
                 <span class="sr-only">Search</span>
                 <input type="search" name="search" value="{{ request('search') }}" placeholder="Search conversations..." maxlength="200">
@@ -37,7 +39,7 @@
         @foreach (['open' => 'Open', 'pending' => 'Pending', 'closed' => 'Closed'] as $value => $label)
             <a class="ui-chip" href="{{ $uiChip(['status' => $uiStatus === $value ? null : $value]) }}" @if($uiStatus === $value) aria-pressed="true" @endif>{{ $label }}</a>
         @endforeach
-        @if ($uiStatus || $uiUnread || request('search'))
+        @if ($uiStatus || $uiUnread || request('search') || request('folder') || request('label'))
             <a class="ui-chip ui-chip-clear" href="{{ route('admin.unified_inbox.index', request()->only('channel')) }}">Clear</a>
         @endif
     </div>
@@ -47,7 +49,7 @@
         @forelse ($uiRows as $item)
             <a class="ui-conversation" href="{{ route('admin.unified_inbox.index', array_merge(request()->query(), ['conversation_id' => $item->id])) }}" @if($activeConversation?->id === $item->id) aria-current="page" @endif>
                 <span class="ui-avatar-wrap">
-                    <span class="ui-avatar" v-pre>{{ mb_strtoupper(mb_substr($item->customer_name, 0, 1)) }}</span>
+                    <span class="ui-avatar" v-pre>@if ($item->avatar_url)<img class="ui-avatar-img" src="{{ $item->avatar_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">@else{{ mb_strtoupper(mb_substr($item->customer_name, 0, 1)) }}@endif</span>
                     <span class="ui-channel ui-channel-{{ $item->channel }} ui-avatar-badge" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $item->channel])</span>
                 </span>
                 <span class="ui-conversation-copy">
@@ -58,7 +60,13 @@
                     <span class="ui-row-mid">
                         <span class="ui-pill ui-pill-{{ $item->channel }}">{{ $channels[$item->channel]['label'] ?? ucfirst($item->channel) }}</span>
                         @if ($item->status !== 'open')
-                            <span class="ui-pill ui-pill-status-{{ $item->status }}">{{ ucfirst($item->status) }}</span>
+                            <span class="ui-pill ui-pill-status-{{ $item->status }}">{{ $item->status === 'closed' ? 'Done' : ucfirst($item->status) }}</span>
+                        @endif
+                        @if (isset($oldNumbers[$item->channel.'|'.$item->account_id]))
+                            <span class="ui-pill ui-pill-oldnum" title="Conversation on a number that is no longer connected">via old {{ $oldNumbers[$item->channel.'|'.$item->account_id] }}</span>
+                        @endif
+                        @if ($item->is_follow_up)
+                            <span class="ui-pill" title="Follow up">⚑ Follow up</span>
                         @endif
                     </span>
                     <span class="ui-row-bottom">
@@ -67,6 +75,13 @@
                             <span class="ui-count">{{ $item->unread_count }}</span>
                         @endif
                     </span>
+                    @if (! empty($item->labels))
+                        <span class="ui-labels" v-pre>
+                            @foreach (array_slice($item->labels, 0, 3) as $rowLabel)
+                                <span class="ui-label" style="--ui-label-hue: {{ crc32($rowLabel) % 360 }}">{{ $rowLabel }}</span>
+                            @endforeach
+                        </span>
+                    @endif
                 </span>
             </a>
         @empty

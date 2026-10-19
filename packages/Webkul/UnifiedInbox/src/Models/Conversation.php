@@ -32,15 +32,37 @@ class Conversation extends Model implements ConversationContract
         'lead_id',
         'organization_id',
         'metadata',
+        'is_follow_up',
+        'is_spam',
+        'labels',
+        'avatar_url',
     ];
 
     protected function casts(): array
     {
         return [
             'metadata' => 'array',
+            'labels' => 'array',
+            'is_follow_up' => 'boolean',
+            'is_spam' => 'boolean',
             'last_message_at' => 'datetime',
             'last_incoming_at' => 'datetime',
         ];
+    }
+
+    /**
+     * WhatsApp customer service window: 24h after the last inbound message.
+     */
+    public function serviceWindowEndsAt(): ?\Carbon\Carbon
+    {
+        return $this->last_incoming_at?->copy()->addHours(24);
+    }
+
+    public function serviceWindowOpen(): bool
+    {
+        $ends = $this->serviceWindowEndsAt();
+
+        return $ends !== null && $ends->isFuture();
     }
 
     public function messages(): HasMany

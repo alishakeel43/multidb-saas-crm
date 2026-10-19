@@ -85,6 +85,11 @@
                         />
                     @endif
 
+                    @if (bouncer()->hasPermission('leads.delete'))
+                        <!-- Delete Lead Action -->
+                        <v-lead-delete-action></v-lead-delete-action>
+                    @endif
+
                     {!! view_render_event('admin.leads.view.actions.after', ['lead' => $lead]) !!}
                 </div>
             </div>
@@ -141,4 +146,53 @@
 
         {!! view_render_event('admin.leads.view.right.after', ['lead' => $lead]) !!}
     </div>
+
+    @if (bouncer()->hasPermission('leads.delete'))
+        @pushOnce('scripts')
+            <script type="text/x-template" id="v-lead-delete-action-template">
+                <button
+                    type="button"
+                    class="flex h-[74px] w-[84px] flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-red-100 font-medium text-red-700 transition-all hover:border-red-400"
+                    :disabled="isDeleting"
+                    @click="remove"
+                >
+                    <span class="icon-delete text-2xl dark:!text-red-700"></span>
+
+                    @lang('admin::app.leads.index.datagrid.delete')
+                </button>
+            </script>
+
+            <script type="module">
+                app.component('v-lead-delete-action', {
+                    template: '#v-lead-delete-action-template',
+
+                    data() {
+                        return { isDeleting: false };
+                    },
+
+                    methods: {
+                        remove() {
+                            this.$emitter.emit('open-confirm-modal', {
+                                agree: () => {
+                                    this.isDeleting = true;
+
+                                    this.$axios.delete(@js(route('admin.leads.delete', $lead->id)))
+                                        .then(response => {
+                                            this.$emitter.emit('add-flash', { type: 'success', message: response.data.message });
+
+                                            window.location.href = @js(route('admin.leads.index'));
+                                        })
+                                        .catch(error => {
+                                            this.isDeleting = false;
+
+                                            this.$emitter.emit('add-flash', { type: 'error', message: error.response?.data?.message || 'Could not delete the lead.' });
+                                        });
+                                },
+                            });
+                        },
+                    },
+                });
+            </script>
+        @endPushOnce
+    @endif
 </x-admin::layouts>

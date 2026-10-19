@@ -17,6 +17,7 @@ use Webkul\Contact\Repositories\PersonRepository;
 use Webkul\Lead\Repositories\LeadRepository;
 use Webkul\Lead\Repositories\PipelineRepository;
 use Webkul\UnifiedInbox\Exceptions\MetaGraphException;
+use Webkul\UnifiedInbox\Models\QuickReply;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Repositories\ConversationRepository;
 use Webkul\UnifiedInbox\Repositories\MessageRepository;
@@ -48,22 +49,34 @@ class InboxController extends Controller
         $search = $request->input('search');
         // Unread is a modifier that stacks on top of one status filter.
         $unreadFilter = $request->boolean('unread');
+        // Meta-style left rail folder: inbox | unread | follow_up | done | spam.
+        $folder = in_array($request->input('folder'), ['inbox', 'unread', 'follow_up', 'done', 'spam'], true) ? $request->input('folder') : null;
+        $labelFilter = trim((string) $request->input('label', ''));
+        $hasFolders = \Illuminate\Support\Facades\Schema::hasColumn('unified_inbox_conversations', 'is_spam');
         $activeId = $request->input('conversation_id');
 
         $connections = $this->channelRepository->all();
         $linkedChannels = $connections->where('status', 'connected')->pluck('channel')->unique()->values()->all();
         $activeConnections = $connections->where('status', 'connected')->values();
 
-        // Only conversations for the account that is connected now, so an older disconnected number cannot hide the live one.
+        // History belongs to the tenant, not the number: conversations from every account this tenant
+        // ever connected (current + archived/old numbers) are listed. Old ones get a "via old number" badge.
+        $historyConnections = $connections->whereIn('status', ['connected', 'disconnected'])->values();
+        $oldNumbers = $historyConnections
+            ->where('status', '!=', 'connected')
+            ->reject(fn ($c) => $activeConnections->contains(fn ($a) => $a->channel === $c->channel && $a->external_id === $c->external_id))
+            ->mapWithKeys(fn ($c) => [$c->channel.'|'.$c->external_id => $c->numberLabel()])
+            ->all();
+
         $query = $this->conversationRepository->getModel()->newQuery()
             ->with(['person', 'lead', 'user', 'organization'])
             ->orderByDesc('last_message_at');
 
-        if ($activeConnections->isEmpty()) {
+        if ($historyConnections->isEmpty()) {
             $query->whereRaw('1 = 0');
         } else {
-            $query->where(function ($outer) use ($activeConnections) {
-                foreach ($activeConnections as $connection) {
+            $query->where(function ($outer) use ($historyConnections) {
+                foreach ($historyConnections as $connection) {
                     $outer->orWhere(function ($inner) use ($connection) {
                         $inner->where('channel', $connection->channel)
                             ->where('account_id', $connection->external_id);
@@ -90,6 +103,55 @@ class InboxController extends Controller
 
         if ($unreadFilter) {
             $query->where('unread_count', '>', 0);
+        }
+
+        if ($hasFolders) {
+            // Spam is hidden everywhere except the Spam folder.
+            if ($folder === 'spam') {
+                $query->where('is_spam', true);
+            } else {
+                $query->where(fn ($q) => $q->whereNull('is_spam')->orWhere('is_spam', false));
+            }
+
+            match ($folder) {
+                'inbox' => $query->where('status', '!=', 'closed'),
+                'unread' => $query->where('unread_count', '>', 0),
+                'follow_up' => $query->where('is_follow_up', true),
+                'done' => $query->where('status', 'closed'),
+                default => null,
+            };
+
+            if ($labelFilter !== '') {
+                $query->whereJsonContains('labels', $labelFilter);
+            }
+        }
+
+        $folderCounts = [];
+        $allLabels = [];
+        if ($hasFolders) {
+            $base = $this->conversationRepository->getModel()->newQuery();
+            if ($historyConnections->isNotEmpty()) {
+                $base->where(function ($outer) use ($historyConnections) {
+                    foreach ($historyConnections as $connection) {
+                        $outer->orWhere(fn ($inner) => $inner->where('channel', $connection->channel)->where('account_id', $connection->external_id));
+                    }
+                });
+            } else {
+                $base->whereRaw('1 = 0');
+            }
+            if ($channelFilter && in_array($channelFilter, ['whatsapp', 'messenger', 'instagram'])) {
+                $base->where('channel', $channelFilter);
+            }
+            $notSpam = fn ($q) => $q->where(fn ($w) => $w->whereNull('is_spam')->orWhere('is_spam', false));
+            $folderCounts = [
+                'inbox' => $notSpam(clone $base)->where('status', '!=', 'closed')->count(),
+                'unread' => $notSpam(clone $base)->where('unread_count', '>', 0)->count(),
+                'follow_up' => $notSpam(clone $base)->where('is_follow_up', true)->count(),
+                'done' => $notSpam(clone $base)->where('status', 'closed')->count(),
+                'spam' => (clone $base)->where('is_spam', true)->count(),
+            ];
+            $allLabels = (clone $base)->whereNotNull('labels')->pluck('labels')
+                ->flatten()->filter(fn ($l) => is_string($l) && $l !== '')->unique()->sort()->values()->all();
         }
 
         $activeConversation = null;
@@ -148,6 +210,333 @@ class InboxController extends Controller
             'crmRelated' => $crmRelated,
             'timeline' => $timeline,
             'chatNotes' => $chatNotes,
+            'folder' => $folder,
+            'labelFilter' => $labelFilter,
+            'folderCounts' => $folderCounts,
+            'allLabels' => $allLabels,
+            'hasFolders' => $hasFolders,
+            'quickReplies' => $this->quickReplies(),
+            'oldNumbers' => $oldNumbers,
+            'historyChannels' => $this->conversationRepository->getModel()->newQuery()
+                ->whereIn('channel', $historyConnections->where('status', '!=', 'connected')->pluck('channel')->unique()->all() ?: ['__none__'])
+                ->distinct()->pluck('channel')->all(),
+            'priorThreads' => $activeConversation ? $this->priorThreads($activeConversation, $connections) : collect(),
+            'continuation' => $activeConversation && isset($oldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id])
+                ? $this->continuationFor($activeConversation)
+                : null,
+        ]);
+    }
+
+    /**
+     * Same customer (wa_id / PSID) on other numbers of this tenant, oldest number first, with recent messages.
+     */
+    protected function priorThreads($conversation, $connections)
+    {
+        return $this->conversationRepository->getModel()->newQuery()
+            ->where('channel', $conversation->channel)
+            ->where('external_id', $conversation->external_id)
+            ->where('id', '!=', $conversation->id)
+            ->orderBy('last_message_at')
+            ->get()
+            ->map(function ($other) use ($connections) {
+                $conn = $connections->first(fn ($c) => $c->channel === $other->channel && $c->external_id === $other->account_id);
+                $other->number_label = $conn?->numberLabel() ?? $other->account_id;
+                $other->number_active = $conn?->status === 'connected';
+                $other->recent_messages = $other->messages()->orderByDesc('occurred_at')->limit(30)->get()->reverse()->values();
+                $other->message_total = $other->messages()->count();
+
+                return $other;
+            });
+    }
+
+    /**
+     * For a conversation on an old number: the same customer's conversation on the current number, if any.
+     */
+    protected function continuationFor($conversation)
+    {
+        $active = $this->connectedChannel($conversation->channel);
+
+        if (! $active || $active->status !== 'connected' || $active->external_id === $conversation->account_id) {
+            return null;
+        }
+
+        return $this->conversationRepository->getModel()->newQuery()
+            ->where('channel', $conversation->channel)
+            ->where('account_id', $active->external_id)
+            ->where('external_id', $conversation->external_id)
+            ->first();
+    }
+
+    /**
+     * Replies to a conversation whose number was disconnected go out from the tenant's current number,
+     * continuing in that number's conversation with the same customer (created if needed, CRM links copied).
+     */
+    protected function resolveReplyConversation($conversation)
+    {
+        $own = $this->channelRepository->findOneWhere([
+            'channel' => $conversation->channel,
+            'external_id' => $conversation->account_id,
+            'status' => 'connected',
+        ]);
+
+        if ($own || $conversation->channel !== 'whatsapp') {
+            return $conversation;
+        }
+
+        $active = $this->connectedChannel('whatsapp');
+
+        if (! $active || $active->status !== 'connected') {
+            return $conversation;
+        }
+
+        return $this->conversationRepository->getModel()->newQuery()->firstOrCreate(
+            [
+                'channel' => 'whatsapp',
+                'account_id' => (string) $active->external_id,
+                'external_id' => $conversation->external_id,
+            ],
+            [
+                'customer_name' => $conversation->customer_name,
+                'status' => 'open',
+                'unread_count' => 0,
+                'person_id' => $conversation->person_id,
+                'lead_id' => $conversation->lead_id,
+                'organization_id' => $conversation->organization_id,
+                'user_id' => $conversation->user_id,
+                'metadata' => ['previous_conversation_id' => $conversation->id],
+            ]
+        );
+    }
+
+    protected function quickReplies()
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('unified_inbox_quick_replies')) {
+            return collect();
+        }
+
+        return QuickReply::query()->orderBy('sort_order')->orderBy('title')->get(['id', 'title', 'shortcut', 'body']);
+    }
+
+    /**
+     * Toggle Meta-style folder flags: follow_up / spam.
+     */
+    public function updateFlags(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'is_follow_up' => 'sometimes|boolean',
+            'is_spam' => 'sometimes|boolean',
+        ]);
+
+        $conversation = $this->conversationRepository->find($id);
+
+        if (! $conversation) {
+            return response()->json(['error' => 'Conversation not found.'], 404);
+        }
+
+        $conversation->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'is_follow_up' => (bool) $conversation->is_follow_up,
+            'is_spam' => (bool) $conversation->is_spam,
+        ]);
+    }
+
+    /**
+     * Replace the label set of a conversation.
+     */
+    public function updateLabels(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'labels' => 'present|array|max:20',
+            'labels.*' => 'nullable|string|max:40',
+        ]);
+
+        $conversation = $this->conversationRepository->find($id);
+
+        if (! $conversation) {
+            return response()->json(['error' => 'Conversation not found.'], 404);
+        }
+
+        $labels = collect($request->input('labels', []))
+            ->map(fn ($l) => trim(strip_tags((string) $l)))
+            ->filter()->unique()->values()->all();
+
+        $conversation->update(['labels' => $labels ?: null]);
+
+        return response()->json(['success' => true, 'labels' => $labels]);
+    }
+
+    public function quickRepliesIndex(): JsonResponse
+    {
+        return response()->json(['data' => $this->quickReplies()]);
+    }
+
+    public function quickRepliesStore(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:120',
+            'shortcut' => 'nullable|string|max:60|regex:/^[A-Za-z0-9_\-]+$/',
+            'body' => 'required|string|max:4096',
+        ]);
+
+        $reply = QuickReply::create($validated + ['user_id' => auth()->guard('user')->id()]);
+
+        return response()->json(['success' => true, 'data' => $reply]);
+    }
+
+    public function quickRepliesUpdate(Request $request, int $replyId): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:120',
+            'shortcut' => 'nullable|string|max:60|regex:/^[A-Za-z0-9_\-]+$/',
+            'body' => 'required|string|max:4096',
+        ]);
+
+        $reply = QuickReply::findOrFail($replyId);
+        $reply->update($validated);
+
+        return response()->json(['success' => true, 'data' => $reply]);
+    }
+
+    public function quickRepliesDestroy(int $replyId): JsonResponse
+    {
+        QuickReply::findOrFail($replyId)->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Send an image or document over WhatsApp Cloud API (upload to /media, then send by media ID).
+     */
+    public function sendAttachment(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|max:16384|mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv',
+            'caption' => 'nullable|string|max:1024',
+        ]);
+
+        $conversation = $this->conversationRepository->find($id);
+
+        if (! $conversation) {
+            return response()->json(['error' => 'Conversation not found.'], 404);
+        }
+
+        if ($conversation->channel !== 'whatsapp') {
+            return response()->json(['success' => false, 'error' => 'Attachments are available for WhatsApp conversations only.'], 422);
+        }
+
+        $conversation = $this->resolveReplyConversation($conversation);
+
+        if ($conversation->last_incoming_at && ! $conversation->serviceWindowOpen()) {
+            return response()->json(['success' => false, 'error' => 'The 24-hour reply window has closed. Send an approved template instead.'], 422);
+        }
+
+        $connection = $this->channelRepository->findOneWhere([
+            'channel' => 'whatsapp',
+            'external_id' => $conversation->account_id,
+            'status' => 'connected',
+        ]);
+
+        $credentials = $connection?->credentials ?? [];
+        $token = (string) ($credentials['access_token'] ?? '');
+
+        if (! $connection || ! $connection->usable() || $token === '' || str_starts_with((string) $connection->external_id, 'demo-')) {
+            return response()->json(['success' => false, 'error' => 'No live WhatsApp connection is available for this conversation.'], 422);
+        }
+
+        $file = $request->file('file');
+        $mime = (string) $file->getMimeType();
+        $type = str_starts_with($mime, 'image/') ? 'image' : 'document';
+        $filename = basename((string) $file->getClientOriginalName());
+        $caption = trim((string) $request->input('caption', '')) ?: null;
+        $phoneNumberId = (string) ($credentials['phone_number_id'] ?? $connection->external_id);
+
+        // Keep a tenant-local copy so the agent sees the file in the thread.
+        $stored = $file->store('unified-inbox/'.$conversation->id, 'local');
+
+        $message = $this->messageRepository->create([
+            'conversation_id' => $conversation->id,
+            'direction' => 'outbound',
+            'body' => trim(($type === 'image' ? '[Image]' : '[Document] '.$filename).($caption ? ' '.$caption : '')),
+            'status' => 'pending',
+            'attachments' => [array_filter(['type' => $type, 'path' => $stored, 'mime_type' => $mime, 'filename' => $filename, 'caption' => $caption])],
+            'occurred_at' => now(),
+        ]);
+
+        try {
+            $mediaId = $this->metaClient->uploadWhatsAppMedia($phoneNumberId, $file->getRealPath(), $filename, $mime, $token);
+            $result = $this->metaClient->sendWhatsAppMedia($phoneNumberId, $conversation->external_id, $type, $mediaId, $caption, $filename, $token);
+            $externalMessageId = (string) ($result['messages'][0]['id'] ?? '');
+
+            if ($externalMessageId === '') {
+                throw new \RuntimeException('The messaging provider did not confirm the message ID.');
+            }
+        } catch (MetaGraphException $e) {
+            $message->update(['status' => 'failed']);
+
+            return response()->json(['success' => false, 'error' => $this->metaSendErrorMessage($e), 'message' => $message->fresh()], 502);
+        } catch (Exception $e) {
+            $message->update(['status' => 'unknown']);
+            Log::warning('Unified Inbox attachment delivery could not be confirmed.', ['conversation_id' => $conversation->id, 'exception' => get_class($e)]);
+
+            return response()->json(['success' => false, 'error' => 'Delivery could not be confirmed. Check the conversation on WhatsApp before retrying.', 'message' => $message->fresh()], 502);
+        }
+
+        $attachments = $message->attachments;
+        $attachments[0]['id'] = $mediaId;
+        $message->update(['external_id' => $externalMessageId, 'status' => 'sent', 'attachments' => $attachments]);
+        $conversation->update(['last_message_preview' => $message->body, 'last_message_at' => $message->occurred_at]);
+
+        return response()->json(['success' => true, 'message' => $message->fresh()]);
+    }
+
+    /**
+     * Stream an attachment: local copy for outbound files, Meta media (by ID) for inbound ones.
+     */
+    public function attachment(Request $request, int $id, int $messageId, int $index)
+    {
+        $conversation = $this->conversationRepository->find($id);
+        abort_unless($conversation, 404);
+
+        $message = $conversation->messages()->whereKey($messageId)->firstOrFail();
+        $attachment = ($message->attachments ?? [])[$index] ?? null;
+        abort_unless(is_array($attachment), 404);
+
+        $filename = (string) ($attachment['filename'] ?? (($attachment['type'] ?? 'file').'-'.$message->id));
+        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
+
+        if (! empty($attachment['path']) && \Illuminate\Support\Facades\Storage::disk('local')->exists($attachment['path'])) {
+            return \Illuminate\Support\Facades\Storage::disk('local')->response($attachment['path'], $filename, [
+                'Content-Type' => $attachment['mime_type'] ?? 'application/octet-stream',
+                'X-Content-Type-Options' => 'nosniff',
+            ], $disposition);
+        }
+
+        $mediaId = (string) ($attachment['id'] ?? '');
+        abort_unless($conversation->channel === 'whatsapp' && preg_match('/^\d+$/', $mediaId), 404);
+
+        $connection = $this->channelRepository->findOneWhere(['channel' => 'whatsapp', 'external_id' => $conversation->account_id]);
+        $token = (string) (($connection?->credentials ?? [])['access_token'] ?? '');
+        abort_if($token === '', 404);
+
+        try {
+            $media = $this->metaClient->downloadWhatsAppMedia($mediaId, $token);
+        } catch (\Throwable $e) {
+            abort(502, 'Could not fetch media from WhatsApp.');
+        }
+
+        $mime = $media['mime'];
+        // Only render images/audio/video/pdf inline; everything else downloads.
+        if (! preg_match('#^(image/(png|jpe?g|webp|gif)|audio/|video/|application/pdf)#', $mime)) {
+            $disposition = 'attachment';
+        }
+
+        return response($media['body'], 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => $disposition.'; filename="'.addcslashes($filename, '"\\').'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=3600',
         ]);
     }
 
@@ -202,6 +591,18 @@ class InboxController extends Controller
         }
 
         $body = trim((string) $request->input('body'));
+
+        $originalConversationId = $conversation->id;
+        $conversation = $this->resolveReplyConversation($conversation);
+
+        // WhatsApp 24h customer service window: free text only within 24h of the last inbound message.
+        if ($conversation->channel === 'whatsapp' && $conversation->last_incoming_at && ! $conversation->serviceWindowOpen()) {
+            return response()->json([
+                'success' => false,
+                'window_closed' => true,
+                'error' => 'The 24-hour reply window has closed for this customer. Send an approved WhatsApp template instead.',
+            ], 422);
+        }
 
         // Find connection for channel
         $connection = $this->channelRepository->findOneWhere([
@@ -303,6 +704,10 @@ class InboxController extends Controller
             'success' => true,
             'message' => $message,
             'conversation' => $conversation->fresh(['person', 'lead', 'user']),
+            'moved_to_current_number' => $conversation->id !== $originalConversationId,
+            'url' => $conversation->id !== $originalConversationId
+                ? route('admin.unified_inbox.index', ['conversation_id' => $conversation->id])
+                : null,
         ]);
     }
 

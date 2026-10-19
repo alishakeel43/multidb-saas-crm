@@ -81,7 +81,7 @@ class CentralWebhookRouter
     /**
      * Register a channel connection route in the landlord database.
      */
-    public function registerRoute(int $tenantId, string $channel, string $externalId, ?string $wabaId = null, ?string $name = null): void
+    public function registerRoute(int $tenantId, string $channel, string $externalId, ?string $wabaId = null, ?string $name = null, ?string $displayPhoneNumber = null): void
     {
         if ($externalId === '') {
             throw new RuntimeException('A channel route requires an external account ID.');
@@ -92,19 +92,70 @@ class CentralWebhookRouter
             ->where('external_id', $externalId)
             ->first();
 
-        if ($route && (int) $route->tenant_id !== $tenantId) {
+        // An inactive (disconnected) mapping may be claimed by the tenant that connects the number now.
+        if ($route && (int) $route->tenant_id !== $tenantId && $route->is_active) {
             throw new RuntimeException('This external channel account is already assigned to another tenant.');
+        }
+
+        $attributes = [
+            'tenant_id' => $tenantId,
+            'waba_id' => $wabaId,
+            'account_name' => $name,
+            'is_active' => true,
+        ];
+
+        if ($this->hasColumn('display_phone_number') && filled($displayPhoneNumber)) {
+            $attributes['display_phone_number'] = $displayPhoneNumber;
+        }
+
+        if ($this->hasColumn('deactivated_at')) {
+            $attributes['deactivated_at'] = null;
         }
 
         TenantChannelRoute::updateOrCreate(
             ['channel' => $channel, 'external_id' => $externalId],
-            [
-                'tenant_id' => $tenantId,
-                'waba_id' => $wabaId,
-                'account_name' => $name,
-                'is_active' => true,
-            ]
+            $attributes
         );
+    }
+
+    /**
+     * Keep the mapping row but stop routing to it (used when a tenant disconnects a channel).
+     */
+    public function deactivateRoute(int $tenantId, string $channel, string $externalId): void
+    {
+        $attributes = ['is_active' => false];
+
+        if ($this->hasColumn('deactivated_at')) {
+            $attributes['deactivated_at'] = now();
+        }
+
+        TenantChannelRoute::where('channel', $channel)
+            ->where('external_id', $externalId)
+            ->where('tenant_id', $tenantId)
+            ->update($attributes);
+    }
+
+    /**
+     * Central URL dedicated to WhatsApp (alias of the Meta webhook, same handler).
+     */
+    public function getWhatsAppWebhookUrl(): string
+    {
+        return preg_replace('#/unified-inbox/meta/webhook$#', '/api/whatsapp/webhook', $this->getCentralWebhookUrl());
+    }
+
+    protected function hasColumn(string $column): bool
+    {
+        static $cache = [];
+
+        if (! array_key_exists($column, $cache)) {
+            try {
+                $cache[$column] = \Illuminate\Support\Facades\Schema::connection('landlord')->hasColumn('tenant_channel_routes', $column);
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+
+        return $cache[$column];
     }
 
     /**

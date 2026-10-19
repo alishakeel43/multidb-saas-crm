@@ -22,6 +22,19 @@ Route::middleware(['web'])
         Route::post('webhook', [WebhookController::class, 'handle'])->name('handle');
     });
 
+// Central WhatsApp webhook alias: one URL for every tenant, registered once in Meta.
+// Same handler (signature check + phone_number_id -> tenant routing) as the Meta webhook above.
+Route::middleware(['web'])
+    ->withoutMiddleware([
+        ValidateCsrfToken::class,
+    ])
+    ->prefix('api/whatsapp')
+    ->name('unified_inbox.whatsapp_webhook.')
+    ->group(function () {
+        Route::get('webhook', [WebhookController::class, 'verify'])->name('verify');
+        Route::post('webhook', [WebhookController::class, 'handle'])->name('handle');
+    });
+
 /*
 |--------------------------------------------------------------------------
 | Admin Authenticated Routes
@@ -37,6 +50,12 @@ Route::middleware(['web', 'admin_locale', 'user'])
         Route::post('unified-inbox/compose', [InboxController::class, 'compose'])->name('compose.store');
         Route::get('unified-inbox/{id}', [InboxController::class, 'show'])->whereNumber('id')->name('show');
 
+        // Saved quick replies (composer '/' shortcut)
+        Route::get('unified-inbox/quick-replies', [InboxController::class, 'quickRepliesIndex'])->name('quick_replies.index');
+        Route::post('unified-inbox/quick-replies', [InboxController::class, 'quickRepliesStore'])->name('quick_replies.store');
+        Route::put('unified-inbox/quick-replies/{replyId}', [InboxController::class, 'quickRepliesUpdate'])->whereNumber('replyId')->name('quick_replies.update');
+        Route::delete('unified-inbox/quick-replies/{replyId}', [InboxController::class, 'quickRepliesDestroy'])->whereNumber('replyId')->name('quick_replies.destroy');
+
         Route::get('unified-inbox/crm-search', [InboxController::class, 'crmSearch'])->name('crm_search');
 
         // Conversation actions
@@ -50,6 +69,10 @@ Route::middleware(['web', 'admin_locale', 'user'])
             Route::post('link-record', [InboxController::class, 'linkRecord'])->name('link_record');
             Route::post('organization', [InboxController::class, 'createOrganization'])->name('create_organization');
             Route::post('notes', [InboxController::class, 'storeNote'])->name('notes');
+            Route::post('flags', [InboxController::class, 'updateFlags'])->name('flags');
+            Route::post('labels', [InboxController::class, 'updateLabels'])->name('labels');
+            Route::post('attachments', [InboxController::class, 'sendAttachment'])->name('attachments.store');
+            Route::get('messages/{messageId}/attachments/{index}', [InboxController::class, 'attachment'])->whereNumber(['messageId', 'index'])->name('attachments.show');
             Route::get('ai-suggestions', [InboxController::class, 'aiSuggestions'])->middleware('throttle:20,1')->name('ai_suggestions');
         });
 

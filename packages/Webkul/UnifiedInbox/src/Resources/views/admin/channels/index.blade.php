@@ -4,6 +4,7 @@
     </x-slot>
 
     @include('unified_inbox::partials.styles')
+    @include('unified_inbox::partials.styles-pro')
 
     <div class="ui-workspace" v-pre>
         <header class="ui-header">
@@ -64,6 +65,32 @@
                 </div>
             </div>
 
+            @if (! empty($numberHistory) && count($numberHistory))
+                <section class="ui-channels ui-numhist" aria-label="Number history">
+                    <div class="ui-channels-head">
+                        <h2>Number history</h2>
+                        <p>Every number and account this workspace has connected. Conversations from old numbers stay in the inbox.</p>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>Channel</th><th>Number / account</th><th>ID</th><th>Status</th><th>Connected</th><th>Disconnected</th><th>Conversations</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($numberHistory as $row)
+                                <tr>
+                                    <td>{{ ucfirst($row['channel']) }}</td>
+                                    <td>{{ $row['label'] }}</td>
+                                    <td class="font-mono">{{ $row['external_id'] }}@if ($row['waba_id']) <span class="ui-muted">· WABA {{ $row['waba_id'] }}</span>@endif</td>
+                                    <td class="{{ $row['current'] ? 'is-current' : 'ui-muted' }}">{{ $row['current'] ? 'Current' : 'Archived' }}</td>
+                                    <td>{{ $row['connected_at']?->format('d M Y, H:i') ?? '—' }}</td>
+                                    <td>{{ $row['disconnected_at']?->format('d M Y, H:i') ?? ($row['current'] ? '—' : 'Unknown') }}</td>
+                                    <td><a href="{{ route('admin.unified_inbox.index', ['channel' => $row['channel']]) }}">{{ $row['conversations'] }}</a></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </section>
+            @endif
         </div>
     </div>
 

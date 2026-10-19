@@ -4,6 +4,7 @@
     </x-slot>
 
     @include('unified_inbox::partials.styles')
+    @include('unified_inbox::partials.styles-pro')
 
     @php
         $connectionPicker = app(\Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository::class);
@@ -12,7 +13,9 @@
         $igConn = $connectionPicker->preferredForChannel($connections, 'instagram');
 
         // "Linked" = a ChannelConnection row for this tenant with status 'connected'
-        $uiLinked = $connections->where('status', 'connected')->pluck('channel')->unique()->values();
+        // Channels with a live connection, plus channels that only have history from an old (archived) number.
+        $uiLinked = $connections->where('status', 'connected')->pluck('channel')->merge($historyChannels ?? [])->unique()->values();
+        $uiOldNumbers = $oldNumbers ?? [];
         $uiTab = request('channel');
         $uiTabLinked = $uiTab ? $uiLinked->contains($uiTab) : $uiLinked->isNotEmpty();
 
@@ -44,7 +47,10 @@
             <a class="primary-button" href="{{ route('admin.unified_inbox.channels.index') }}">@lang('unified_inbox::app.inbox.connect-channels')</a>
         </section>
         @else
-        <div class="ui-columns">
+        <div class="ui-columns {{ ($hasFolders ?? false) ? 'ui-has-rail' : '' }}">
+            @if ($hasFolders ?? false)
+                @include('unified_inbox::partials.rail')
+            @endif
             @include('unified_inbox::partials.list')
 
             @if ($activeConversation)
@@ -54,7 +60,7 @@
                         <header class="ui-chat-header">
                             <a class="secondary-button ui-icon-btn ui-back" href="{{ route('admin.unified_inbox.index', request()->except('conversation_id')) }}" aria-label="Back">←</a>
                             @php $displayName = $activeConversation->customer_name; @endphp
-                            <span class="ui-avatar">{{ mb_strtoupper(mb_substr($displayName, 0, 1)) }}</span>
+                            <span class="ui-avatar">@if ($activeConversation->avatar_url)<img class="ui-avatar-img" src="{{ $activeConversation->avatar_url }}" alt="" referrerpolicy="no-referrer">@else{{ mb_strtoupper(mb_substr($displayName, 0, 1)) }}@endif</span>
                             <div class="ui-chat-title">
                                 <h1 class="truncate">{{ $displayName }}</h1>
                                 <p class="ui-chat-sub">
@@ -63,6 +69,9 @@
                                         {{ $channels[$activeConversation->channel]['label'] ?? ucfirst($activeConversation->channel) }}
                                     </span>
                                     <span class="font-mono">{{ $activeConversation->external_id }}</span>
+                                    @if (isset($uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id]))
+                                        <span class="ui-pill ui-pill-oldnum" title="This conversation happened on a number that is no longer connected">via old number {{ $uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id] }}</span>
+                                    @endif
                                     <span class="ui-pill ui-pill-status-{{ $activeConversation->status }}">{{ ucfirst($activeConversation->status) }}</span>
                                 </p>
                             </div>
@@ -81,6 +90,11 @@
                                         <span class="ui-assignee-chip-name">{{ $assigneeName ?? 'Unassigned' }}</span>
                                     </span>
                                 </div>
+                                @if ($hasFolders ?? false)
+                                    <button type="button" class="ui-flag-btn {{ $activeConversation->status === 'closed' ? 'is-on' : '' }}" onclick="updateConversationStatus({{ $activeConversation->id }}, '{{ $activeConversation->status === 'closed' ? 'open' : 'closed' }}')" title="{{ $activeConversation->status === 'closed' ? 'Move back to Inbox' : 'Mark done (moves to Done)' }}">✓ {{ $activeConversation->status === 'closed' ? 'Reopen' : 'Mark done' }}</button>
+                                    <button type="button" class="ui-flag-btn {{ $activeConversation->is_follow_up ? 'is-on' : '' }}" onclick="uiSetFlag({{ $activeConversation->id }}, 'is_follow_up', {{ $activeConversation->is_follow_up ? 'false' : 'true' }})" aria-pressed="{{ $activeConversation->is_follow_up ? 'true' : 'false' }}">⚑ Follow up</button>
+                                    <button type="button" class="ui-flag-btn is-spam {{ $activeConversation->is_spam ? 'is-on' : '' }}" onclick="uiSetFlag({{ $activeConversation->id }}, 'is_spam', {{ $activeConversation->is_spam ? 'false' : 'true' }})" aria-pressed="{{ $activeConversation->is_spam ? 'true' : 'false' }}">⊘ {{ $activeConversation->is_spam ? 'Not spam' : 'Spam' }}</button>
+                                @endif
                                 <div class="ui-status-seg" role="group" aria-label="Conversation status">
                                     @foreach (['open' => 'Open', 'pending' => 'Pending', 'closed' => 'Closed'] as $stKey => $stLabel)
                                         <button
@@ -122,6 +136,24 @@
                                 </div>
                             @endif
 
+                            @foreach (($priorThreads ?? collect()) as $prior)
+                                <details class="ui-prior">
+                                    <summary>
+                                        {{ $prior->number_active ? 'Same customer on current number' : 'Earlier history on old number' }}
+                                        <strong>{{ $prior->number_label }}</strong>
+                                        · {{ $prior->message_total }} message{{ $prior->message_total === 1 ? '' : 's' }}
+                                        @if ($prior->last_message_at) · last {{ $prior->last_message_at->format('d M Y') }} @endif
+                                        <a href="{{ route('admin.unified_inbox.index', ['conversation_id' => $prior->id]) }}">Open</a>
+                                    </summary>
+                                    @foreach ($prior->recent_messages as $pm)
+                                        <article class="ui-message ui-message-{{ $pm->direction }} ui-message-prior">
+                                            <p v-pre class="whitespace-pre-wrap break-words">{!! str_replace(["\r\n", "\r", "\n"], '<br>', e($pm->body)) !!}</p>
+                                            <div class="ui-message-meta"><span>{{ $pm->occurred_at?->format('d M, H:i') }}</span></div>
+                                        </article>
+                                    @endforeach
+                                </details>
+                            @endforeach
+
                             @php $uiLastDay = null; @endphp
                             @forelse ($activeMessages as $message)
                                 @php $uiDay = $message->occurred_at?->format('D, d M Y'); @endphp
@@ -129,12 +161,15 @@
                                     <div class="ui-day"><span>{{ $uiDay }}</span></div>
                                     @php $uiLastDay = $uiDay; @endphp
                                 @endif
-                                <article class="ui-message ui-message-{{ $message->direction }}">
+                                <article class="ui-message ui-message-{{ $message->direction }}" data-message-id="{{ $message->id }}">
+                                    @if (! empty($message->attachments))
+                                        @include('unified_inbox::partials.attachments', ['message' => $message])
+                                    @endif
                                     <p v-pre class="whitespace-pre-wrap break-words">{!! str_replace(["\r\n", "\r", "\n"], '<br>', e($message->body)) !!}</p>
                                     <div class="ui-message-meta">
-                                        <span>{{ $message->occurred_at?->format('H:i') }}</span>
+                                        <span title="{{ $message->occurred_at?->format('d M Y, H:i') }}">{{ $message->occurred_at?->format('H:i') }}</span>
                                         @if ($message->direction === 'outbound')
-                                            <span class="ui-msg-status ui-msg-status-{{ $message->status }}" title="{{ ucfirst($message->status) }}">{{ in_array($message->status, ['read', 'delivered']) ? '✓✓' : ($message->status === 'failed' ? '!' : '✓') }}</span>
+                                            @include('unified_inbox::partials.tick', ['status' => (string) $message->status])
                                         @endif
                                     </div>
                                 </article>
@@ -147,17 +182,53 @@
                         </div>
 
                         <!-- Chat Composer -->
-                        <div class="ui-composer">
+                        @php
+                            $uiIsWa = $activeConversation->channel === 'whatsapp';
+                            $uiOnOldNumber = isset($uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id]);
+                            // Replies from an old-number thread go out from the current number, so its window applies.
+                            $uiWindowSource = $uiOnOldNumber ? ($continuation ?? null) : $activeConversation;
+                            $uiWindowEnds = $uiWindowSource?->serviceWindowEndsAt();
+                            $uiWindowOpen = ! $uiIsWa || ($uiWindowSource?->serviceWindowOpen() ?? false);
+                        @endphp
+                        <div class="ui-composer {{ $uiWindowOpen ? '' : 'is-window-closed' }}" data-window-open="{{ $uiWindowOpen ? '1' : '0' }}">
+                            @if ($uiOnOldNumber)
+                                <div class="ui-window ui-window-closed">
+                                    <span aria-hidden="true">↪</span>
+                                    <span>This chat was on old number {{ $uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id] }}. Replies are sent from your current number and continue in that conversation.</span>
+                                    @if ($continuation ?? null)
+                                        <a class="secondary-button" href="{{ route('admin.unified_inbox.index', ['conversation_id' => $continuation->id]) }}">Open current chat</a>
+                                    @endif
+                                </div>
+                            @endif
+                            @if ($uiIsWa)
+                                @if ($uiWindowOpen)
+                                    <div class="ui-window ui-window-open" id="ui-window" data-ends="{{ $uiWindowEnds?->toIso8601String() }}">
+                                        <span aria-hidden="true">●</span>
+                                        <span>24h reply window open · <strong id="ui-window-left">{{ $uiWindowEnds ? now()->diff($uiWindowEnds)->format('%hh %Im') : '' }}</strong> left</span>
+                                    </div>
+                                @else
+                                    <div class="ui-window ui-window-closed" id="ui-window">
+                                        <span aria-hidden="true">⏱</span>
+                                        <span>{{ $uiWindowEnds ? '24h reply window closed '.$uiWindowEnds->diffForHumans() : 'No customer message yet' }} — only approved templates can be sent.</span>
+                                        <button type="button" class="primary-button" onclick="uiOpenTemplateFor(@js($activeConversation->external_id), @js($activeConversation->customer_name))">Send template</button>
+                                    </div>
+                                @endif
+                            @endif
                             <div class="ui-composer-tabs" role="tablist">
                                 <button type="button" class="ui-composer-tab" role="tab" aria-selected="true" data-composer-mode="reply" onclick="uiSetComposerMode('reply')">Reply</button>
                                 <button type="button" class="ui-composer-tab" role="tab" aria-selected="false" data-composer-mode="note" onclick="uiSetComposerMode('note')" title="Visible to your team only — never sent to the customer">Internal Note</button>
                                 <span class="ui-muted ui-composer-hint" id="composer-hint">Enter to send · Shift+Enter for new line</span>
                             </div>
                             <div class="ui-suggest-row">
-                            <div class="ui-quick">
-                                <button type="button" onclick="insertCanned('Hello! Thank you for contacting us. How can I assist you today?')" class="ui-chip">Greeting</button>
-                                <button type="button" onclick="insertCanned('We have received your requirement. A team member will follow up shortly.')" class="ui-chip">Request received</button>
-                                <button type="button" onclick="insertCanned('Could you please share your requirements so we can prepare a tailored quote?')" class="ui-chip">Quote inquiry</button>
+                            <div class="ui-quick" id="ui-quick">
+                                @forelse (($quickReplies ?? collect())->take(6) as $qr)
+                                    <button type="button" onclick="insertCanned(@js($qr->body))" class="ui-chip" title="{{ $qr->shortcut ? '/'.$qr->shortcut : $qr->title }}">{{ $qr->title }}</button>
+                                @empty
+                                    <button type="button" onclick="insertCanned('Hello! Thank you for contacting us. How can I assist you today?')" class="ui-chip">Greeting</button>
+                                    <button type="button" onclick="insertCanned('We have received your requirement. A team member will follow up shortly.')" class="ui-chip">Request received</button>
+                                    <button type="button" onclick="insertCanned('Could you please share your requirements so we can prepare a tailored quote?')" class="ui-chip">Quote inquiry</button>
+                                @endforelse
+                                <button type="button" class="ui-chip" onclick="uiOpenQuickReplies()" title="Manage saved quick replies">⚙ Manage</button>
                             </div>
                             <div class="ui-ai" id="ui-ai" data-state="loading" aria-live="polite">
                                 <div class="ui-ai-head">
@@ -167,15 +238,29 @@
                                 <div class="ui-ai-list" id="ui-ai-list"><span class="ui-muted">Thinking…</span></div>
                             </div>
                             </div>
+                            <div class="ui-attach-preview" id="ui-attach-preview" hidden>
+                                <span aria-hidden="true">📎</span><span id="ui-attach-name"></span>
+                                <button type="button" onclick="uiClearAttachment()" aria-label="Remove attachment">✕</button>
+                            </div>
                             <form id="message-form" onsubmit="event.preventDefault(); uiSubmitComposer({{ $activeConversation->id }});">
+                                <div class="ui-composer-tools">
+                                    <button type="button" class="ui-tool-btn" onclick="uiToggleEmoji(event)" title="Emoji" aria-label="Emoji">☺</button>
+                                    @if ($uiIsWa)
+                                        <button type="button" class="ui-tool-btn" onclick="document.getElementById('ui-attach-input').click()" title="Attach image or document" aria-label="Attach" @disabled(! $uiWindowOpen)>📎</button>
+                                        <input type="file" id="ui-attach-input" hidden accept="image/jpeg,image/png,image/webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" onchange="uiPickAttachment(this)">
+                                    @endif
+                                    <div class="ui-popover ui-emoji-grid" id="ui-emoji" hidden></div>
+                                    <div class="ui-popover ui-slash" id="ui-slash" hidden role="listbox"></div>
+                                </div>
                                 <textarea
                                     id="message-input"
                                     rows="1"
-                                    oninput="uiAutoGrow(this)"
-                                    placeholder="@lang('unified_inbox::app.inbox.type-message')"
-                                    onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); uiSubmitComposer({{ $activeConversation->id }}); }"
+                                    oninput="uiAutoGrow(this); uiSlashCheck(this)"
+                                    placeholder="{{ $uiWindowOpen ? trans('unified_inbox::app.inbox.type-message').' · type / for quick replies' : 'Reply window closed — send an approved template' }}"
+                                    onkeydown="if (uiSlashKey(event)) return; if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); uiSubmitComposer({{ $activeConversation->id }}); }"
+                                    @if (! $uiWindowOpen) data-reply-locked="1" readonly @endif
                                 ></textarea>
-                                <button type="submit" id="send-button" class="primary-button"><span>Send</span></button>
+                                <button type="submit" id="send-button" class="primary-button" @if (! $uiWindowOpen) data-reply-locked="1" disabled @endif><span>Send</span></button>
                             </form>
                         </div>
                     </section>
@@ -220,6 +305,24 @@
                                             <dt>Last inbound</dt><dd>{{ $c->last_incoming_at?->diffForHumans() ?? '—' }}</dd>
                                         </dl>
                                     </section>
+                                    @if ($hasFolders ?? false)
+                                    <section>
+                                        <h2>Labels</h2>
+                                        <div class="ui-label-editor">
+                                            <div class="ui-labels" id="ui-label-list" data-labels="{{ json_encode(array_values($c->labels ?? [])) }}">
+                                                @forelse (($c->labels ?? []) as $cl)
+                                                    <span class="ui-label" style="--ui-label-hue: {{ crc32($cl) % 360 }}">{{ $cl }} <button type="button" onclick="uiRemoveLabel({{ $c->id }}, @js($cl))" aria-label="Remove label {{ $cl }}">×</button></span>
+                                                @empty
+                                                    <span class="ui-muted">No labels</span>
+                                                @endforelse
+                                            </div>
+                                            <input type="text" id="ui-label-input" list="ui-label-options" maxlength="40" placeholder="Add label and press Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();uiAddLabel({{ $c->id }}, this.value);}">
+                                            <datalist id="ui-label-options">
+                                                @foreach (($allLabels ?? []) as $opt)<option value="{{ $opt }}"></option>@endforeach
+                                            </datalist>
+                                        </div>
+                                    </section>
+                                    @endif
                                     <section>
                                         <h2>Quick Actions</h2>
                                         <div class="ui-quick-actions">
@@ -464,6 +567,30 @@
         </form>
     </dialog>
 
+    <dialog id="ui-qr" class="ui-qr-dialog">
+        <header class="ui-compose-head">
+            <div>
+                <p class="ui-compose-kicker">Composer</p>
+                <h2>Saved quick replies</h2>
+            </div>
+            <button type="button" class="ui-compose-close" onclick="document.getElementById('ui-qr').close()" aria-label="Close">×</button>
+        </header>
+        <div class="ui-qr-body">
+            <div id="ui-qr-list"></div>
+            <form id="ui-qr-form" class="ui-qr-form" onsubmit="event.preventDefault(); uiSaveQuickReply();">
+                <input type="hidden" id="ui-qr-id">
+                <input id="ui-qr-title" maxlength="120" placeholder="Title (e.g. Greeting)" required>
+                <input id="ui-qr-shortcut" maxlength="60" pattern="[A-Za-z0-9_\-]+" placeholder="Shortcut, used as /shortcut (optional)">
+                <textarea id="ui-qr-body" rows="3" maxlength="4096" placeholder="Reply text" required></textarea>
+                <p class="ui-compose-error" id="ui-qr-error" hidden></p>
+                <div class="ui-compose-actions">
+                    <button type="button" class="secondary-button" onclick="uiResetQuickReplyForm()">Clear</button>
+                    <button type="submit" class="primary-button" id="ui-qr-save">Save reply</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+
     @pushOnce('scripts')
     <script>
         const uiComposeTemplatesUrl = @js(route('admin.unified_inbox.compose.templates'));
@@ -661,6 +788,7 @@
             const button = document.getElementById('send-button');
             const body = input.value.trim();
 
+            if (uiPendingFile) return uiSendAttachment(conversationId);
             if (!body) return;
 
             button.disabled = true;
@@ -690,7 +818,7 @@
                         <p class="whitespace-pre-wrap break-words">${escapeHtml(body)}</p>
                         <div class="ui-message-meta">
                             <span>${hhmm}</span>
-                            <span class="ui-msg-status ui-msg-status-sent" title="Sent">✓</span>
+                            ${uiTickSvg('sent')}
                         </div>
                     `;
                     history.querySelector('.ui-history-empty')?.remove();
@@ -698,7 +826,9 @@
                     history.scrollTop = history.scrollHeight;
                 } else {
                     alert(data.error || 'Failed to send message.');
+                    if (data.window_closed) window.location.reload();
                 }
+                if (response.ok && data.success && data.url) window.location.assign(data.url);
             } catch (err) {
                 alert('Network error while sending message.');
             } finally {
@@ -869,6 +999,10 @@
             if (input) input.placeholder = mode === 'note' ? 'Write an internal note — only your team sees this' : "@lang('unified_inbox::app.inbox.type-message')";
             if (btn) btn.textContent = mode === 'note' ? 'Add note' : 'Send';
             if (hint) hint.textContent = mode === 'note' ? 'Saved as a Krayin note on the linked contact/lead · not sent to the customer' : 'Enter to send · Shift+Enter for new line';
+            const locked = input?.dataset.replyLocked === '1';
+            if (input && locked) input.readOnly = mode !== 'note';
+            const sendBtn = document.getElementById('send-button');
+            if (sendBtn && sendBtn.dataset.replyLocked === '1') sendBtn.disabled = mode !== 'note';
             input?.focus();
         }
 
@@ -958,6 +1092,248 @@
                 document.querySelector('.ui-side-radio[data-side-tab="' + tab + '"]')?.click();
             }
         });
+
+
+        // ---------- Phase 1: Meta-style inbox helpers ----------
+        const UI_CSRF = "{{ csrf_token() }}";
+        const uiQuickReplies = @js(($quickReplies ?? collect())->values());
+
+        function uiTickSvg(status) {
+            if (status === 'failed') return '<span class="ui-tick ui-tick-failed" title="Failed">!</span>';
+            if (status === 'sent') return '<span class="ui-tick ui-tick-sent" title="Sent"><svg viewBox="0 0 16 11" width="15" height="11" fill="currentColor"><path d="M11.07.65 4.6 7.12 1.93 4.45.87 5.51l3.73 3.73L12.13 1.7z"/></svg></span>';
+            return '<span class="ui-tick ui-tick-pending" title="Sending"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2 1.5"/></svg></span>';
+        }
+
+        async function uiSetFlag(id, flag, value) {
+            const { ok, data } = await uiPost('/conversations/' + id + '/flags', { [flag]: value });
+            if (ok) window.location.reload();
+            else alert(data.message || data.error || 'Could not update the conversation.');
+        }
+
+        function uiCurrentLabels() {
+            try { return JSON.parse(document.getElementById('ui-label-list')?.dataset.labels || '[]'); } catch (e) { return []; }
+        }
+
+        async function uiSaveLabels(id, labels) {
+            const { ok, data } = await uiPost('/conversations/' + id + '/labels', { labels });
+            if (ok) window.location.reload();
+            else alert(data.message || data.error || 'Could not update labels.');
+        }
+
+        function uiAddLabel(id, value) {
+            const label = (value || '').trim();
+            if (!label) return;
+            const labels = uiCurrentLabels();
+            if (!labels.includes(label)) labels.push(label);
+            uiSaveLabels(id, labels);
+        }
+
+        function uiRemoveLabel(id, label) {
+            uiSaveLabels(id, uiCurrentLabels().filter(l => l !== label));
+        }
+
+        // 24h window countdown (re-renders every minute; reloads when it expires so the composer locks).
+        (function () {
+            const box = document.getElementById('ui-window');
+            const left = document.getElementById('ui-window-left');
+            if (!box || !left || !box.dataset.ends) return;
+            const ends = new Date(box.dataset.ends).getTime();
+            const tick = () => {
+                const ms = ends - Date.now();
+                if (ms <= 0) { window.location.reload(); return; }
+                const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+                left.textContent = h + 'h ' + String(m).padStart(2, '0') + 'm';
+                if (ms < 3600000) box.classList.replace('ui-window-open', 'ui-window-closed');
+            };
+            tick();
+            setInterval(tick, 30000);
+        })();
+
+        function uiOpenTemplateFor(recipient, name) {
+            uiOpenCompose('whatsapp');
+            document.getElementById('ui-compose-recipient').value = String(recipient || '').replace(/\D/g, '');
+            document.getElementById('ui-compose-name').value = name || '';
+        }
+
+        // Emoji picker (no dependency).
+        const UI_EMOJI = ['😀','😁','😂','🙂','😉','😊','😍','🤝','👍','👎','🙏','👏','🎉','✅','❌','⚠️','📞','📧','📅','⏰','💰','📦','🚚','🛒','💡','🔥','⭐','❤️','👌','🤔','😅','😢','🙌','👋','📍','📝','🔗','💬','✨','🎁'];
+        function uiToggleEmoji(event) {
+            event.stopPropagation();
+            const pop = document.getElementById('ui-emoji');
+            if (!pop.childElementCount) {
+                UI_EMOJI.forEach(e => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = e;
+                    b.onclick = () => uiInsertAtCursor(e);
+                    pop.appendChild(b);
+                });
+            }
+            pop.hidden = !pop.hidden;
+        }
+        document.addEventListener('click', e => {
+            const pop = document.getElementById('ui-emoji');
+            if (pop && !pop.hidden && !pop.contains(e.target)) pop.hidden = true;
+        });
+
+        function uiInsertAtCursor(text) {
+            const input = document.getElementById('message-input');
+            if (!input || input.readOnly) return;
+            const start = input.selectionStart ?? input.value.length, end = input.selectionEnd ?? input.value.length;
+            input.value = input.value.slice(0, start) + text + input.value.slice(end);
+            input.selectionStart = input.selectionEnd = start + text.length;
+            uiAutoGrow(input);
+            input.focus();
+        }
+
+        // '/' quick reply shortcut.
+        let uiSlashIndex = 0, uiSlashItems = [];
+        function uiSlashCheck(input) {
+            const pop = document.getElementById('ui-slash');
+            const m = /(^|\s)\/([\w-]*)$/.exec(input.value.slice(0, input.selectionStart));
+            if (!m || !uiQuickReplies.length) { pop.hidden = true; return; }
+            const q = m[2].toLowerCase();
+            uiSlashItems = uiQuickReplies.filter(r => !q || (r.shortcut || '').toLowerCase().startsWith(q) || r.title.toLowerCase().includes(q)).slice(0, 8);
+            if (!uiSlashItems.length) { pop.hidden = true; return; }
+            uiSlashIndex = Math.min(uiSlashIndex, uiSlashItems.length - 1);
+            pop.replaceChildren();
+            uiSlashItems.forEach((r, i) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = i === uiSlashIndex ? 'is-active' : '';
+                const t = document.createElement('strong'); t.textContent = (r.shortcut ? '/' + r.shortcut + ' · ' : '') + r.title;
+                const sm = document.createElement('small'); sm.textContent = r.body;
+                b.append(t, sm);
+                b.onmousedown = ev => { ev.preventDefault(); uiApplySlash(r); };
+                pop.appendChild(b);
+            });
+            pop.hidden = false;
+        }
+        function uiApplySlash(reply) {
+            const input = document.getElementById('message-input');
+            const before = input.value.slice(0, input.selectionStart).replace(/\/[\w-]*$/, '');
+            input.value = before + reply.body + input.value.slice(input.selectionStart);
+            document.getElementById('ui-slash').hidden = true;
+            uiAutoGrow(input);
+            input.focus();
+        }
+        function uiSlashKey(event) {
+            const pop = document.getElementById('ui-slash');
+            if (!pop || pop.hidden) return false;
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                uiSlashIndex = (uiSlashIndex + (event.key === 'ArrowDown' ? 1 : uiSlashItems.length - 1)) % uiSlashItems.length;
+                uiSlashCheck(event.target);
+                return true;
+            }
+            if (event.key === 'Enter' || event.key === 'Tab') { event.preventDefault(); uiApplySlash(uiSlashItems[uiSlashIndex]); return true; }
+            if (event.key === 'Escape') { pop.hidden = true; return true; }
+            return false;
+        }
+
+        // Quick replies manager.
+        function uiOpenQuickReplies() {
+            uiRenderQuickReplies();
+            uiResetQuickReplyForm();
+            document.getElementById('ui-qr').showModal();
+        }
+        function uiRenderQuickReplies() {
+            const list = document.getElementById('ui-qr-list');
+            list.replaceChildren();
+            if (!uiQuickReplies.length) {
+                const p = document.createElement('p'); p.className = 'ui-muted';
+                p.textContent = 'No saved replies yet. The default Greeting / Request received / Quote inquiry chips are shown until you add one.';
+                list.appendChild(p);
+                return;
+            }
+            uiQuickReplies.forEach(r => {
+                const row = document.createElement('div'); row.className = 'ui-qr-row';
+                const info = document.createElement('div');
+                const t = document.createElement('strong'); t.textContent = r.title + (r.shortcut ? '  /' + r.shortcut : '');
+                const b = document.createElement('p'); b.textContent = r.body;
+                info.append(t, b);
+                const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'ui-link-btn'; edit.textContent = 'Edit';
+                edit.onclick = () => {
+                    document.getElementById('ui-qr-id').value = r.id;
+                    document.getElementById('ui-qr-title').value = r.title;
+                    document.getElementById('ui-qr-shortcut').value = r.shortcut || '';
+                    document.getElementById('ui-qr-body').value = r.body;
+                };
+                const del = document.createElement('button'); del.type = 'button'; del.className = 'ui-link-btn ui-link-danger'; del.textContent = 'Delete';
+                del.onclick = () => uiDeleteQuickReply(r.id);
+                row.append(info, edit, del);
+                list.appendChild(row);
+            });
+        }
+        function uiResetQuickReplyForm() {
+            ['ui-qr-id', 'ui-qr-title', 'ui-qr-shortcut', 'ui-qr-body'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('ui-qr-error').hidden = true;
+        }
+        async function uiQrRequest(method, path, payload) {
+            const r = await fetch(UI_BASE + path, {
+                method,
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': UI_CSRF },
+                body: payload ? JSON.stringify(payload) : undefined
+            });
+            let data = {}; try { data = await r.json(); } catch (e) {}
+            return { ok: r.ok && data.success !== false, data };
+        }
+        async function uiSaveQuickReply() {
+            const id = document.getElementById('ui-qr-id').value;
+            const payload = {
+                title: document.getElementById('ui-qr-title').value.trim(),
+                shortcut: document.getElementById('ui-qr-shortcut').value.trim() || null,
+                body: document.getElementById('ui-qr-body').value.trim()
+            };
+            const { ok, data } = await uiQrRequest(id ? 'PUT' : 'POST', '/quick-replies' + (id ? '/' + id : ''), payload);
+            if (ok) { window.location.reload(); return; }
+            const err = document.getElementById('ui-qr-error');
+            err.hidden = false;
+            err.textContent = data.message || data.error || 'Could not save the reply.';
+        }
+        async function uiDeleteQuickReply(id) {
+            if (!confirm('Delete this saved reply?')) return;
+            const { ok, data } = await uiQrRequest('DELETE', '/quick-replies/' + id);
+            if (ok) window.location.reload();
+            else alert(data.message || data.error || 'Could not delete the reply.');
+        }
+
+        // Attachments (WhatsApp Cloud API media).
+        let uiPendingFile = null;
+        function uiPickAttachment(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            if (file.size > 16 * 1024 * 1024) { alert('Files up to 16 MB can be sent.'); input.value = ''; return; }
+            uiPendingFile = file;
+            document.getElementById('ui-attach-name').textContent = file.name + ' · ' + Math.ceil(file.size / 1024) + ' KB (message text becomes the caption)';
+            document.getElementById('ui-attach-preview').hidden = false;
+        }
+        function uiClearAttachment() {
+            uiPendingFile = null;
+            const input = document.getElementById('ui-attach-input');
+            if (input) input.value = '';
+            document.getElementById('ui-attach-preview').hidden = true;
+        }
+        async function uiSendAttachment(id) {
+            const input = document.getElementById('message-input');
+            const button = document.getElementById('send-button');
+            const form = new FormData();
+            form.append('file', uiPendingFile);
+            form.append('caption', input.value.trim());
+            button.disabled = true;
+            try {
+                const r = await fetch(UI_BASE + '/conversations/' + id + '/attachments', {
+                    method: 'POST', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': UI_CSRF }, body: form
+                });
+                let data = {}; try { data = await r.json(); } catch (e) {}
+                if (r.ok && data.success) { window.location.reload(); return; }
+                alert(data.error || data.message || 'Could not send the attachment.');
+            } catch (e) {
+                alert('Network error while sending the attachment.');
+            } finally {
+                button.disabled = false;
+            }
+        }
 
         function escapeHtml(text) {
             const div = document.createElement('div');

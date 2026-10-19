@@ -468,7 +468,7 @@ class LeadController extends Controller
         } catch (\Exception $exception) {
             return response()->json([
                 'message' => trans('admin::app.leads.destroy-failed'),
-            ]);
+            ], 400);
         }
     }
 
