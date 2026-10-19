@@ -33,6 +33,8 @@ Route::middleware(['web', 'admin_locale', 'user'])
     ->group(function () {
         // Main Unified Inbox view
         Route::get('unified-inbox', [InboxController::class, 'index'])->name('index');
+        Route::get('unified-inbox/compose/templates', [InboxController::class, 'composeTemplates'])->name('compose.templates');
+        Route::post('unified-inbox/compose', [InboxController::class, 'compose'])->name('compose.store');
         Route::get('unified-inbox/{id}', [InboxController::class, 'show'])->whereNumber('id')->name('show');
 
         Route::get('unified-inbox/crm-search', [InboxController::class, 'crmSearch'])->name('crm_search');

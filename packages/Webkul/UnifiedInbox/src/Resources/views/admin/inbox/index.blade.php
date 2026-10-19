@@ -6,9 +6,10 @@
     @include('unified_inbox::partials.styles')
 
     @php
-        $waConn = $connections->firstWhere('channel', 'whatsapp');
-        $msgConn = $connections->firstWhere('channel', 'messenger');
-        $igConn = $connections->firstWhere('channel', 'instagram');
+        $connectionPicker = app(\Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository::class);
+        $waConn = $connectionPicker->preferredForChannel($connections, 'whatsapp');
+        $msgConn = $connectionPicker->preferredForChannel($connections, 'messenger');
+        $igConn = $connectionPicker->preferredForChannel($connections, 'instagram');
 
         // "Linked" = a ChannelConnection row for this tenant with status 'connected'
         $uiLinked = $connections->where('status', 'connected')->pluck('channel')->unique()->values();
@@ -415,7 +416,7 @@
                         <a class="secondary-button" href="{{ route('admin.unified_inbox.index', request()->only('channel')) }}">Clear filters</a>
                     @else
                         <h2>No conversations yet</h2>
-                        <p class="ui-muted">Your channels are connected. New messages will show up here automatically.</p>
+                        <p class="ui-muted">New messages show up here. Use the new-contact control beside search to message a WhatsApp number or a Messenger or Instagram contact.</p>
                     @endif
                 </section>
             @endif
@@ -423,7 +424,217 @@
         @endif
     </div>
 
+    <dialog id="ui-compose" class="ui-compose">
+        <form id="ui-compose-form">
+            <header class="ui-compose-head">
+                <div>
+                    <p class="ui-compose-kicker">Add new contact</p>
+                    <h2 id="ui-compose-title">New message</h2>
+                </div>
+                <button type="button" class="ui-compose-close" onclick="uiCloseCompose()" aria-label="Close">×</button>
+            </header>
+            <div class="ui-compose-body">
+                <div id="ui-compose-channels" class="ui-compose-channels" role="radiogroup" aria-label="Channel"></div>
+                <p class="ui-compose-help" id="ui-compose-help"></p>
+                <label>
+                    <span id="ui-compose-recipient-label">Recipient</span>
+                    <input id="ui-compose-recipient" name="recipient" autocomplete="off" required>
+                </label>
+                <label id="ui-compose-name-field">
+                    Display name
+                    <input id="ui-compose-name" name="name" maxlength="191" placeholder="Shown in the conversation list">
+                </label>
+                <div id="ui-compose-wa">
+                    <label>
+                        Approved template
+                        <select id="ui-compose-template" required></select>
+                    </label>
+                    <div id="ui-compose-params" class="ui-compose-params"></div>
+                </div>
+                <label id="ui-compose-text">
+                    Message
+                    <textarea id="ui-compose-body" maxlength="4096" placeholder="Write a message"></textarea>
+                </label>
+                <p class="ui-compose-error" id="ui-compose-error" hidden></p>
+            </div>
+            <div class="ui-compose-actions">
+                <button type="button" class="secondary-button" onclick="uiCloseCompose()">Cancel</button>
+                <button type="submit" class="primary-button" id="ui-compose-send">Send</button>
+            </div>
+        </form>
+    </dialog>
+
     @pushOnce('scripts')
+    <script>
+        const uiComposeTemplatesUrl = @js(route('admin.unified_inbox.compose.templates'));
+        const uiComposeStoreUrl = @js(route('admin.unified_inbox.compose.store'));
+        const uiComposeChannels = @js(collect($channels)->filter(fn ($channel, $key) => ($uiLinked ?? collect())->contains($key))->map(fn ($channel, $key) => ['key' => $key, 'label' => $channel['label'] ?? ucfirst($key)])->values());
+        let uiComposeChannel = null;
+        let uiComposeSlots = [];
+
+        function uiApplyComposeChannel(channel) {
+            uiComposeChannel = channel;
+            const whatsapp = channel === 'whatsapp';
+            document.getElementById('ui-compose-title').textContent = whatsapp ? 'Message a WhatsApp number' : (channel === 'instagram' ? 'Message an Instagram contact' : 'Message a Messenger contact');
+            document.getElementById('ui-compose-help').textContent = whatsapp
+                ? 'Send an approved template. Enter the number with the country code and digits only.'
+                : 'Meta delivers this only to someone who has already messaged this account. Enter their contact ID.';
+            document.getElementById('ui-compose-recipient-label').textContent = whatsapp ? 'WhatsApp number' : 'Contact ID';
+            document.getElementById('ui-compose-recipient').placeholder = whatsapp ? '15125550100' : 'Contact ID';
+            document.getElementById('ui-compose-wa').hidden = !whatsapp;
+            document.getElementById('ui-compose-text').hidden = whatsapp;
+            document.getElementById('ui-compose-name-field').hidden = whatsapp;
+            document.getElementById('ui-compose-template').required = whatsapp;
+            document.getElementById('ui-compose-body').required = !whatsapp;
+            document.querySelectorAll('.ui-compose-channel').forEach(button => {
+                const selected = button.dataset.channel === channel;
+                button.classList.toggle('is-selected', selected);
+                button.setAttribute('aria-checked', selected ? 'true' : 'false');
+            });
+            if (whatsapp) {
+                uiLoadTemplates();
+            }
+        }
+
+        function uiOpenCompose(channel) {
+            const dialog = document.getElementById('ui-compose');
+            const holder = document.getElementById('ui-compose-channels');
+            holder.replaceChildren();
+            uiComposeChannels.forEach(item => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'ui-compose-channel';
+                button.dataset.channel = item.key;
+                button.setAttribute('role', 'radio');
+                button.textContent = item.label;
+                button.addEventListener('click', () => uiApplyComposeChannel(item.key));
+                holder.appendChild(button);
+            });
+            holder.hidden = uiComposeChannels.length < 2;
+            document.getElementById('ui-compose-recipient').value = '';
+            document.getElementById('ui-compose-name').value = '';
+            document.getElementById('ui-compose-body').value = '';
+            document.getElementById('ui-compose-error').hidden = true;
+            const fallback = uiComposeChannels[0] ? uiComposeChannels[0].key : null;
+            const selected = uiComposeChannels.some(item => item.key === channel) ? channel : fallback;
+            if (!selected) {
+                return;
+            }
+            uiApplyComposeChannel(selected);
+            if (!dialog.open) {
+                dialog.showModal();
+            }
+            document.getElementById('ui-compose-recipient').focus();
+        }
+
+        function uiCloseCompose() {
+            document.getElementById('ui-compose').close();
+        }
+
+        async function uiLoadTemplates() {
+            const select = document.getElementById('ui-compose-template');
+            const error = document.getElementById('ui-compose-error');
+            select.innerHTML = '<option value="">Loading templates...</option>';
+            document.getElementById('ui-compose-params').innerHTML = '';
+            uiComposeSlots = [];
+            try {
+                const response = await fetch(uiComposeTemplatesUrl, { headers: { 'Accept': 'application/json' } });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not load templates.');
+                }
+                const templates = (data.templates || []).filter(template => template.name && !template.media);
+                select.replaceChildren();
+                if (!templates.length) {
+                    const empty = document.createElement('option');
+                    empty.value = '';
+                    empty.textContent = 'No approved text templates';
+                    select.appendChild(empty);
+                    return;
+                }
+                templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.name + '\n' + template.language;
+                    option.textContent = template.name + ' (' + template.language + ')';
+                    select.appendChild(option);
+                });
+                select.dataset.templates = JSON.stringify(templates);
+                uiRenderTemplateSlots();
+                select.onchange = uiRenderTemplateSlots;
+            } catch (err) {
+                select.innerHTML = '<option value="">Templates unavailable</option>';
+                error.hidden = false;
+                error.textContent = err.message;
+            }
+        }
+
+        function uiRenderTemplateSlots() {
+            const select = document.getElementById('ui-compose-template');
+            const templates = JSON.parse(select.dataset.templates || '[]');
+            const parts = (select.value || '').split('\n');
+            const name = parts[0] || '';
+            const language = parts[1] || '';
+            const template = templates.find(item => item.name === name && item.language === language);
+            uiComposeSlots = (template && template.slots || []).filter(slot => !slot.media);
+            const holder = document.getElementById('ui-compose-params');
+            holder.replaceChildren();
+            uiComposeSlots.forEach((slot, index) => {
+                const label = document.createElement('label');
+                const caption = document.createElement('span');
+                caption.textContent = slot.component.charAt(0).toUpperCase() + slot.component.slice(1) + ' variable ' + slot.index;
+                const input = document.createElement('input');
+                input.setAttribute('data-template-param', String(index));
+                input.required = true;
+                input.maxLength = 1000;
+                input.placeholder = 'Value ' + slot.index;
+                label.appendChild(caption);
+                label.appendChild(input);
+                holder.appendChild(label);
+            });
+        }
+
+        document.getElementById('ui-compose-form').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const button = document.getElementById('ui-compose-send');
+            const error = document.getElementById('ui-compose-error');
+            error.hidden = true;
+            button.disabled = true;
+            const payload = {
+                channel: uiComposeChannel,
+                recipient: document.getElementById('ui-compose-recipient').value.trim(),
+                name: document.getElementById('ui-compose-name').value.trim(),
+                body: document.getElementById('ui-compose-body').value.trim()
+            };
+            if (uiComposeChannel === 'whatsapp') {
+                const parts = (document.getElementById('ui-compose-template').value || '').split('\n');
+                const name = parts[0] || '';
+                const language = parts[1] || '';
+                payload.template = name || '';
+                payload.language = language || '';
+                payload.parameters = Array.from(document.querySelectorAll('[data-template-param]')).map(input => input.value);
+            }
+            try {
+                const response = await fetch(uiComposeStoreUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': "{{ csrf_token() }}"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Could not send the message.');
+                }
+                window.location.assign(data.url);
+            } catch (err) {
+                error.hidden = false;
+                error.textContent = err.message;
+                button.disabled = false;
+            }
+        });
+    </script>
     <script>
         function insertCanned(text) {
             const input = document.getElementById('message-input');

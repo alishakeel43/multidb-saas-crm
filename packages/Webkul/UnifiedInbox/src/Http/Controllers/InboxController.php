@@ -2,27 +2,28 @@
 
 namespace Webkul\UnifiedInbox\Http\Controllers;
 
-use Webkul\UnifiedInbox\Exceptions\MetaGraphException;
-
 use App\Http\Controllers\Controller;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
 use Webkul\Activity\Models\ActivityProxy;
 use Webkul\Activity\Repositories\ActivityRepository;
 use Webkul\Contact\Repositories\OrganizationRepository;
 use Webkul\Contact\Repositories\PersonRepository;
 use Webkul\Lead\Repositories\LeadRepository;
 use Webkul\Lead\Repositories\PipelineRepository;
+use Webkul\UnifiedInbox\Exceptions\MetaGraphException;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Repositories\ConversationRepository;
 use Webkul\UnifiedInbox\Repositories\MessageRepository;
+use Webkul\UnifiedInbox\Services\AI\ReplySuggestionService;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
 use Webkul\UnifiedInbox\Services\MetaGraphClient;
+use Webkul\UnifiedInbox\Support\WhatsAppTemplateComposer;
 use Webkul\User\Models\UserProxy;
 
 class InboxController extends Controller
@@ -51,12 +52,25 @@ class InboxController extends Controller
 
         $connections = $this->channelRepository->all();
         $linkedChannels = $connections->where('status', 'connected')->pluck('channel')->unique()->values()->all();
+        $activeConnections = $connections->where('status', 'connected')->values();
 
-        // Only conversations from linked (connected) channels; keeps pagination/totals/auto-select consistent with the view.
+        // Only conversations for the account that is connected now, so an older disconnected number cannot hide the live one.
         $query = $this->conversationRepository->getModel()->newQuery()
             ->with(['person', 'lead', 'user', 'organization'])
-            ->whereIn('channel', $linkedChannels ?: ['__none__'])
             ->orderByDesc('last_message_at');
+
+        if ($activeConnections->isEmpty()) {
+            $query->whereRaw('1 = 0');
+        } else {
+            $query->where(function ($outer) use ($activeConnections) {
+                foreach ($activeConnections as $connection) {
+                    $outer->orWhere(function ($inner) use ($connection) {
+                        $inner->where('channel', $connection->channel)
+                            ->where('account_id', $connection->external_id);
+                    });
+                }
+            });
+        }
 
         if ($channelFilter && in_array($channelFilter, ['whatsapp', 'messenger', 'instagram'])) {
             $query->where('channel', $channelFilter);
@@ -232,7 +246,9 @@ class InboxController extends Controller
                 );
                 $externalMessageId = $result['messages'][0]['id'] ?? null;
             } else {
-                $targetId = (string) ($credentials['page_id'] ?? $credentials['instagram_id'] ?? $connection->external_id);
+                $targetId = $conversation->channel === 'instagram'
+                    ? (string) ($credentials['instagram_id'] ?? $connection->external_id)
+                    : (string) ($credentials['page_id'] ?? $connection->external_id);
                 $result = $this->metaClient->sendPageMessage(
                     $targetId,
                     $conversation->external_id,
@@ -608,6 +624,229 @@ class InboxController extends Controller
     /**
      * Human-readable reason for a Meta send failure (common Graph error codes).
      */
+    public function composeTemplates(Request $request): JsonResponse
+    {
+        $connection = $this->connectedChannel('whatsapp');
+
+        if (! $connection || ! $connection->usable()) {
+            return response()->json(['templates' => [], 'error' => 'Connect WhatsApp before choosing a template.'], 422);
+        }
+
+        $credentials = $connection->credentials ?? [];
+        $wabaId = (string) ($credentials['waba_id'] ?? '');
+        $token = (string) ($credentials['access_token'] ?? '');
+
+        if ($wabaId === '' || $token === '') {
+            return response()->json(['templates' => [], 'error' => 'The WhatsApp connection has no business account token.'], 422);
+        }
+
+        try {
+            $rows = $this->metaClient->getWhatsAppTemplates($wabaId, $token);
+        } catch (MetaGraphException $e) {
+            return response()->json(['templates' => [], 'error' => $this->metaSendErrorMessage($e)], 502);
+        }
+
+        $templates = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $components = is_array($row['components'] ?? null) ? $row['components'] : [];
+            $slots = WhatsAppTemplateComposer::slots($components);
+            $templates[] = [
+                'name' => (string) ($row['name'] ?? ''),
+                'language' => (string) ($row['language'] ?? ''),
+                'category' => (string) ($row['category'] ?? ''),
+                'media' => WhatsAppTemplateComposer::requiresMedia($components),
+                'slots' => array_map(fn ($slot) => [
+                    'component' => $slot['component'],
+                    'index' => $slot['index'],
+                    'media' => $slot['media'] ?? null,
+                ], $slots),
+            ];
+        }
+
+        return response()->json(['templates' => $templates]);
+    }
+
+    public function compose(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'channel' => 'required|in:whatsapp,messenger,instagram',
+            'recipient' => 'required|string|max:40',
+            'name' => 'nullable|string|max:191',
+            'body' => 'nullable|string|max:4096',
+            'template' => 'nullable|string|max:512',
+            'language' => 'nullable|string|max:16',
+            'parameters' => 'nullable|array|max:20',
+            'parameters.*' => 'nullable|string|max:1000',
+        ]);
+
+        $channel = $validated['channel'];
+        $connection = $this->connectedChannel($channel);
+
+        if (! $connection || ! $connection->usable()) {
+            return response()->json(['success' => false, 'error' => 'Connect '.$channel.' before starting a conversation.'], 422);
+        }
+
+        $credentials = $connection->credentials ?? [];
+        $token = (string) ($credentials['access_token'] ?? '');
+
+        if ($token === '' || str_starts_with((string) $connection->external_id, 'demo-')) {
+            return response()->json(['success' => false, 'error' => 'This channel is not a live Meta account.'], 422);
+        }
+
+        try {
+            if ($channel === 'whatsapp') {
+                [$recipient, $body, $externalMessageId] = $this->sendWhatsAppTemplate($connection, $credentials, $token, $validated);
+            } else {
+                [$recipient, $body, $externalMessageId] = $this->sendContactMessage($connection, $credentials, $token, $validated);
+            }
+        } catch (MetaGraphException $e) {
+            return response()->json(['success' => false, 'error' => $this->metaSendErrorMessage($e)], 502);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
+        }
+
+        $conversation = $this->conversationRepository->getModel()->newQuery()->firstOrCreate(
+            [
+                'channel' => $channel,
+                'account_id' => (string) $connection->external_id,
+                'external_id' => $recipient,
+            ],
+            [
+                'customer_name' => trim((string) ($validated['name'] ?? '')) ?: $recipient,
+                'status' => 'open',
+                'unread_count' => 0,
+            ]
+        );
+
+        $message = $this->messageRepository->create([
+            'conversation_id' => $conversation->id,
+            'direction' => 'outbound',
+            'external_id' => $externalMessageId,
+            'body' => $body,
+            'status' => 'sent',
+            'occurred_at' => now(),
+        ]);
+
+        $conversation->update([
+            'last_message_preview' => $body,
+            'last_message_at' => $message->occurred_at,
+            'status' => 'open',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'url' => route('admin.unified_inbox.index', [
+                'channel' => $channel,
+                'conversation_id' => $conversation->id,
+            ]),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array{0: string, 1: string, 2: string}
+     */
+    protected function sendWhatsAppTemplate($connection, array $credentials, string $token, array $validated): array
+    {
+        $recipient = WhatsAppTemplateComposer::phone((string) $validated['recipient']);
+        $templateName = (string) ($validated['template'] ?? '');
+        $language = (string) ($validated['language'] ?? '');
+
+        if (! preg_match('/^\d{8,15}$/', $recipient)) {
+            throw new \InvalidArgumentException('Enter the WhatsApp number with country code, digits only.');
+        }
+
+        if (! preg_match('/^[a-z0-9_]+$/', $templateName) || $language === '') {
+            throw new \InvalidArgumentException('Choose an approved WhatsApp template.');
+        }
+
+        $wabaId = (string) ($credentials['waba_id'] ?? '');
+        $templates = $wabaId === '' ? [] : $this->metaClient->getWhatsAppTemplates($wabaId, $token);
+        $template = collect($templates)->first(fn ($row) => is_array($row)
+            && ($row['name'] ?? '') === $templateName
+            && ($row['language'] ?? '') === $language);
+
+        if (! is_array($template)) {
+            throw new \InvalidArgumentException('That template is not approved on the connected WhatsApp account.');
+        }
+
+        $components = is_array($template['components'] ?? null) ? $template['components'] : [];
+
+        if (WhatsAppTemplateComposer::requiresMedia($components)) {
+            throw new \InvalidArgumentException('This template needs a media header. Choose a text template.');
+        }
+
+        $slots = array_values(array_filter(
+            WhatsAppTemplateComposer::slots($components),
+            fn ($slot) => empty($slot['media'])
+        ));
+        $parameters = array_values((array) ($validated['parameters'] ?? []));
+
+        if (count($parameters) < count($slots) || collect($parameters)->contains(fn ($value) => trim((string) $value) === '')) {
+            throw new \InvalidArgumentException('Fill every template variable before sending.');
+        }
+
+        $result = $this->metaClient->sendWhatsAppTemplate(
+            (string) ($credentials['phone_number_id'] ?? $connection->external_id),
+            $recipient,
+            $templateName,
+            $language,
+            WhatsAppTemplateComposer::components($slots, $parameters),
+            $token
+        );
+        $externalMessageId = (string) ($result['messages'][0]['id'] ?? '');
+
+        if ($externalMessageId === '') {
+            throw new \InvalidArgumentException('WhatsApp did not confirm the template message.');
+        }
+
+        return [$recipient, WhatsAppTemplateComposer::preview($templateName, $parameters), $externalMessageId];
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array{0: string, 1: string, 2: string}
+     */
+    protected function sendContactMessage($connection, array $credentials, string $token, array $validated): array
+    {
+        $recipient = trim((string) $validated['recipient']);
+        $body = trim((string) ($validated['body'] ?? ''));
+
+        if (! preg_match('/^\d{5,32}$/', $recipient)) {
+            throw new \InvalidArgumentException('Enter the contact ID Meta assigned after they messaged this account.');
+        }
+
+        if ($body === '') {
+            throw new \InvalidArgumentException('Write the message to send.');
+        }
+
+        $targetId = $connection->channel === 'instagram'
+            ? (string) ($credentials['instagram_id'] ?? $connection->external_id)
+            : (string) ($credentials['page_id'] ?? $connection->external_id);
+
+        $result = $this->metaClient->sendPageMessage($targetId, $recipient, $body, $token);
+        $externalMessageId = (string) ($result['message_id'] ?? '');
+
+        if ($externalMessageId === '') {
+            throw new \InvalidArgumentException('Meta did not confirm the message.');
+        }
+
+        return [$recipient, $body, $externalMessageId];
+    }
+
+    protected function connectedChannel(string $channel): mixed
+    {
+        return $this->channelRepository->preferredForChannel(
+            $this->channelRepository->all(),
+            $channel
+        );
+    }
+
     private function metaSendErrorMessage(MetaGraphException $e): string
     {
         $code = $e->graphCode;
@@ -635,7 +874,7 @@ class InboxController extends Controller
             return response()->json(['suggestions' => [], 'error' => 'Conversation not found.'], 404);
         }
 
-        $service = app(\Webkul\UnifiedInbox\Services\AI\ReplySuggestionService::class);
+        $service = app(ReplySuggestionService::class);
 
         if (! $service->isConfigured()) {
             return response()->json(['suggestions' => [], 'configured' => false, 'error' => 'AI not configured']);

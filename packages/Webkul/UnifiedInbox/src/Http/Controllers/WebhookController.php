@@ -67,13 +67,9 @@ class WebhookController extends Controller
         $entries = (array) ($payload['entry'] ?? []);
 
         foreach ($entries as $entry) {
-            // 1. WhatsApp Events
-            if ($object === 'whatsapp_business_account' || isset($entry['changes'])) {
+            if ($object === 'whatsapp_business_account') {
                 $this->routeAndProcessWhatsAppEntry($entry);
-            }
-
-            // 2. Messenger / Instagram Events
-            if (in_array($object, ['page', 'instagram']) || isset($entry['messaging'])) {
+            } elseif (in_array($object, ['page', 'instagram'], true)) {
                 $this->routeAndProcessMessagingEntry($entry, $object);
             }
         }
@@ -325,9 +321,14 @@ class WebhookController extends Controller
             }
 
             $personId = null;
-            if ($channel === 'whatsapp' && preg_match('/^\+?\d+$/', $externalSenderId) && class_exists(PersonProxy::class)) {
-                $personId = PersonProxy::modelClass()::whereJsonContains('contact_numbers', ['value' => $externalSenderId])
-                    ->value('id');
+
+            try {
+                if ($channel === 'whatsapp' && preg_match('/^\+?\d+$/', $externalSenderId) && class_exists(PersonProxy::class)) {
+                    $personId = PersonProxy::modelClass()::whereJsonContains('contact_numbers', ['value' => $externalSenderId])
+                        ->value('id');
+                }
+            } catch (\Throwable) {
+                $personId = null;
             }
 
             $this->messageRepository->create([

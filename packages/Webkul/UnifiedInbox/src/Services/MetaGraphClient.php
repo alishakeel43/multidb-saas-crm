@@ -2,6 +2,7 @@
 
 namespace Webkul\UnifiedInbox\Services;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Webkul\UnifiedInbox\Exceptions\MetaGraphException;
@@ -23,6 +24,31 @@ class MetaGraphClient
             ? $request->get($url, $params)
             : $request->send(strtoupper($method), $url, ['json' => $params]);
 
+        return $this->payload($response);
+    }
+
+    /**
+     * Form-encoded Graph call. Webhook subscription endpoints ignore a JSON body.
+     */
+    public function sendForm(string $method, string $path, array $params = [], ?string $token = null): array
+    {
+        $version = (string) config('unified-inbox.meta.version', 'v21.0');
+        $url = 'https://graph.facebook.com/'.$version.'/'.ltrim($path, '/');
+        $request = Http::acceptJson()->asForm();
+
+        if ($token) {
+            $request = $request->withToken($token);
+        }
+
+        $response = strtolower($method) === 'get'
+            ? $request->get($url, $params)
+            : $request->post($url, $params);
+
+        return $this->payload($response);
+    }
+
+    protected function payload(Response $response): array
+    {
         $payload = $response->json() ?? [];
 
         if ($response->failed() || isset($payload['error'])) {
@@ -109,9 +135,83 @@ class MetaGraphClient
     /**
      * Subscribe app to WhatsApp Business Account webhooks.
      */
-    public function subscribeWabaApps(string $wabaId, string $token): array
+    public function subscribeWabaApps(string $wabaId, string $token, ?string $callbackUrl = null, ?string $verifyToken = null): array
     {
-        return $this->request('post', $wabaId.'/subscribed_apps', [], $token);
+        $params = [];
+
+        if ($callbackUrl) {
+            $params['override_callback_uri'] = $callbackUrl;
+            $params['verify_token'] = (string) $verifyToken;
+        }
+
+        return $this->sendForm('post', $wabaId.'/subscribed_apps', $params, $token);
+    }
+
+    /**
+     * Point this Meta app's WhatsApp, Page, and Instagram webhooks at the CRM.
+     */
+    public function registerPlatformWebhooks(string $callbackUrl, string $verifyToken): void
+    {
+        $appId = (string) config('unified-inbox.meta.app_id');
+        $secret = (string) config('unified-inbox.meta.app_secret');
+
+        if ($appId === '' || $secret === '' || $callbackUrl === '' || $verifyToken === '') {
+            throw new RuntimeException('Meta app webhook settings are incomplete.');
+        }
+
+        $objects = [
+            'whatsapp_business_account' => 'messages',
+            'page' => 'messages,messaging_postbacks,message_deliveries,message_reads,message_echoes',
+            'instagram' => 'messages,messaging_postbacks,messaging_seen,message_reactions',
+        ];
+
+        foreach ($objects as $object => $fields) {
+            $this->sendForm('post', $appId.'/subscriptions', [
+                'object' => $object,
+                'callback_url' => $callbackUrl,
+                'verify_token' => $verifyToken,
+                'fields' => $fields,
+                'access_token' => $appId.'|'.$secret,
+            ]);
+        }
+    }
+
+    public function getWhatsAppTemplates(string $wabaId, string $token): array
+    {
+        return $this->rows($wabaId.'/message_templates', [
+            'status' => 'APPROVED',
+            'limit' => 100,
+            'fields' => 'name,language,status,category,components',
+        ], $token);
+    }
+
+    public function sendWhatsAppTemplate(string $phoneNumberId, string $to, string $name, string $language, array $components, string $token): array
+    {
+        $template = [
+            'name' => $name,
+            'language' => ['code' => $language],
+        ];
+
+        if ($components !== []) {
+            $template['components'] = $components;
+        }
+
+        return $this->request('post', $phoneNumberId.'/messages', [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $to,
+            'type' => 'template',
+            'template' => $template,
+        ], $token);
+    }
+
+    public function getPageConversations(string $pageId, string $platform, string $token): array
+    {
+        return $this->rows($pageId.'/conversations', [
+            'platform' => $platform,
+            'limit' => 25,
+            'fields' => 'id,updated_time,participants,messages.limit(20){id,message,from,created_time}',
+        ], $token);
     }
 
     /**

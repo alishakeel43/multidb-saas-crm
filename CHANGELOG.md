@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Deliver WhatsApp, Messenger, and Instagram events to this inbox by registering the CRM webhook and a WhatsApp account callback, and sync recent Messenger and Instagram threads after connect.
+- Place the inbox new-contact control beside the conversation search bar, and use a compose dialog with a channel choice, recipient, and template or message fields.
+- Start a conversation from the inbox: an approved WhatsApp template to any number, or a Messenger or Instagram message to someone who already contacted that account.
+- Show the latest connected Meta account on the channel card. A newer Embedded Signup no longer stays hidden behind an older disconnected row for the same channel.
+- Fix lead import sample download returning an empty CSV after the tenant storage disk no longer contains the shared sample file.
+
+- Show a “No records found” message in the task form when a related lead, person, organization, or quote search has no matches.
+- Save tasks when the due time includes seconds or a related record was not chosen, and return to the task list so the new task is visible.
+- Add tenant-database task management: tasks and kanban stages live in each tenant database, with list and board views, lead/person/organization/quote links, and per-tenant due reminders.
+
+- Fix Roles create/edit crashing when the Telephony ACL tree omitted intermediate parent keys (`telephony.call_logs`, `telephony.settings`).
+- Fix desktop admin sidebar scrolling so every menu item stays reachable when the list is taller than the viewport, using the CRM thin custom scrollbar instead of the browser default.
+- Fix admin logo and favicon uploads on tenant configuration: nested files no longer crash the storage quota check, failed image writes are no longer stored as `0`, and the saved image is served from the current tenant host.
+- Add an all-features tenant demo seeder, with a Super Admin button, that inserts linked dummy data for products, inventory, mail, marketing, automation, web forms, telephony, knowledge, and unified inbox channels.
+- Add tenant-scoped AI knowledge retrieval to Unified Inbox reply suggestions so relevant indexed document chunks inform WhatsApp and other channel responses.
+- Integrate Marketing Automation tools under the existing Marketing campaigns and Workflows settings screens using package view hooks; keep its backend services active without a separate Marketing Automation menu or dashboard.
 - Route SaaS tenant domains through single-level `*-saas.zaristech.com` hosts compatible with the existing wildcard certificate and Apache tenant vhost.
 - Fix tenant maintenance commands calling the removed MAMP-only database guard.
 - Allow tenant database provisioning on explicitly allowlisted production MySQL/MariaDB hosts and ports while protecting the configured landlord and base tenant databases.
