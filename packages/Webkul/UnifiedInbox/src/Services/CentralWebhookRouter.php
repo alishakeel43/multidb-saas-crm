@@ -15,7 +15,7 @@ class CentralWebhookRouter
     {
         $explicit = config('unified-inbox.webhook_url');
         if (filled($explicit)) {
-            return (string) $explicit;
+            return (string) preg_replace('#/(unified-inbox/meta|api/whatsapp)/webhook$#', '/api/meta/webhook', (string) $explicit);
         }
 
         $appUrl = (string) config('app.url', '');
@@ -31,10 +31,10 @@ class CentralWebhookRouter
                 $scheme = $parsed['scheme'] ?? 'http';
                 $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
 
-                return "{$scheme}://{$tenantBaseDomain}{$port}/unified-inbox/meta/webhook";
+                return "{$scheme}://{$tenantBaseDomain}{$port}/api/meta/webhook";
             }
 
-            return rtrim($appUrl, '/').'/unified-inbox/meta/webhook';
+            return rtrim($appUrl, '/').'/api/meta/webhook';
         }
 
         if (request()) {
@@ -48,10 +48,10 @@ class CentralWebhookRouter
 
             $portStr = ($port && ! in_array($port, [80, 443])) ? ":{$port}" : '';
 
-            return "{$scheme}://{$base}{$portStr}/unified-inbox/meta/webhook";
+            return "{$scheme}://{$base}{$portStr}/api/meta/webhook";
         }
 
-        return 'http://localhost/unified-inbox/meta/webhook';
+        return 'http://localhost/api/meta/webhook';
     }
 
     /**

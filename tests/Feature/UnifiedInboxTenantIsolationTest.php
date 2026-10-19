@@ -165,7 +165,7 @@ it('routes a signed webhook to its mapped tenant database and deduplicates retri
         ];
         $body = json_encode($payload, JSON_THROW_ON_ERROR);
         $signature = 'sha256='.hash_hmac('sha256', $body, 'two-tenant-test-secret');
-        $request = Request::create('/unified-inbox/meta/webhook', 'POST', [], [], [], [
+        $request = Request::create('/api/meta/webhook', 'POST', [], [], [], [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_HUB_SIGNATURE_256' => $signature,
         ], $body);

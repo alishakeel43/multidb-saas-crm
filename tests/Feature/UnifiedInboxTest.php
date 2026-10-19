@@ -84,7 +84,7 @@ it('renders the messaging channels settings page', function () {
 it('verifies Meta webhook challenge handshake', function () {
     config()->set('unified-inbox.meta.verify_token', 'test_meta_token_123');
 
-    $response = $this->get('/unified-inbox/meta/webhook?hub_mode=subscribe&hub_verify_token=test_meta_token_123&hub_challenge=CHALLENGE_ACCEPTED_999');
+    $response = $this->get('/api/meta/webhook?hub_mode=subscribe&hub_verify_token=test_meta_token_123&hub_challenge=CHALLENGE_ACCEPTED_999');
 
     $response->assertStatus(200);
     expect($response->getContent())->toBe('CHALLENGE_ACCEPTED_999');
@@ -93,7 +93,7 @@ it('verifies Meta webhook challenge handshake', function () {
 it('rejects Meta webhook verification with an incorrect verify token', function () {
     config()->set('unified-inbox.meta.verify_token', 'test_meta_token_123');
 
-    $response = $this->get('/unified-inbox/meta/webhook?hub_mode=subscribe&hub_verify_token=wrong-token&hub_challenge=CHALLENGE_ACCEPTED_999');
+    $response = $this->get('/api/meta/webhook?hub_mode=subscribe&hub_verify_token=wrong-token&hub_challenge=CHALLENGE_ACCEPTED_999');
 
     $response->assertForbidden();
 });
@@ -101,7 +101,7 @@ it('rejects Meta webhook verification with an incorrect verify token', function 
 it('rejects unsigned Meta webhook payloads', function () {
     config()->set('unified-inbox.meta.app_secret', 'test_meta_app_secret');
 
-    $response = $this->postJson('/unified-inbox/meta/webhook', ['object' => 'page', 'entry' => []]);
+    $response = $this->postJson('/api/meta/webhook', ['object' => 'page', 'entry' => []]);
 
     $response->assertForbidden();
 });
@@ -163,11 +163,11 @@ it('receives an inbound WhatsApp message via Meta webhook and creates conversati
     $body = json_encode($payload, JSON_THROW_ON_ERROR);
     $signature = 'sha256='.hash_hmac('sha256', $body, 'test_meta_app_secret');
 
-    $response = $this->call('POST', '/unified-inbox/meta/webhook', [], [], [], [
+    $response = $this->call('POST', '/api/meta/webhook', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_HUB_SIGNATURE_256' => $signature,
     ], $body);
-    $duplicateResponse = $this->call('POST', '/unified-inbox/meta/webhook', [], [], [], [
+    $duplicateResponse = $this->call('POST', '/api/meta/webhook', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_HUB_SIGNATURE_256' => $signature,
     ], $body);
@@ -218,7 +218,7 @@ it('does not process an unmapped webhook in the request current tenant', functio
     $body = json_encode($payload, JSON_THROW_ON_ERROR);
     $signature = 'sha256='.hash_hmac('sha256', $body, 'test_meta_app_secret');
 
-    $response = $this->call('POST', '/unified-inbox/meta/webhook', [], [], [], [
+    $response = $this->call('POST', '/api/meta/webhook', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_HUB_SIGNATURE_256' => $signature,
     ], $body);
@@ -273,7 +273,7 @@ it('updates delivery status only for the routed messaging account and conversati
     $body = json_encode($payload, JSON_THROW_ON_ERROR);
     $signature = 'sha256='.hash_hmac('sha256', $body, 'test_meta_app_secret');
 
-    $response = $this->call('POST', '/unified-inbox/meta/webhook', [], [], [], [
+    $response = $this->call('POST', '/api/meta/webhook', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_HUB_SIGNATURE_256' => $signature,
     ], $body);
@@ -478,14 +478,14 @@ it('ensures central webhook URL always targets the root platform domain and stri
 
     // Default configured app.url
     $url = $router->getCentralWebhookUrl();
-    expect($url)->toBe('http://krayinsaas.localhost:8888/unified-inbox/meta/webhook')
+    expect($url)->toBe('http://krayinsaas.localhost:8888/api/meta/webhook')
         ->and($url)->not->toContain('demo.');
 
     // When tenant subdomain exists in app.url, it is stripped to root domain
     config(['app.url' => 'http://demo.krayinsaas.localhost:8888']);
     config(['multitenancy.tenant_base_domain' => 'krayinsaas.localhost']);
     $strippedUrl = $router->getCentralWebhookUrl();
-    expect($strippedUrl)->toBe('http://krayinsaas.localhost:8888/unified-inbox/meta/webhook')
+    expect($strippedUrl)->toBe('http://krayinsaas.localhost:8888/api/meta/webhook')
         ->and($strippedUrl)->not->toContain('demo.');
 });
 

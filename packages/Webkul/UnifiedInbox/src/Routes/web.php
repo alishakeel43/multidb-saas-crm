@@ -11,17 +11,6 @@ use Webkul\UnifiedInbox\Http\Controllers\WebhookController;
 | Public Meta Webhook Routes
 |--------------------------------------------------------------------------
 */
-Route::middleware(['web'])
-    ->withoutMiddleware([
-        ValidateCsrfToken::class,
-    ])
-    ->prefix('unified-inbox/meta')
-    ->name('unified_inbox.webhook.')
-    ->group(function () {
-        Route::get('webhook', [WebhookController::class, 'verify'])->name('verify');
-        Route::post('webhook', [WebhookController::class, 'handle'])->name('handle');
-    });
-
 // One common Meta webhook for WhatsApp, Messenger and Instagram (register this URL once in Meta).
 Route::middleware(['web'])
     ->withoutMiddleware([
