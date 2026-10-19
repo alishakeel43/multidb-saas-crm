@@ -114,6 +114,10 @@ it('provisions an isolated tenant, migration/seed work, inherited plan features,
         ->once()
         ->with('db:seed', Mockery::on(fn (array $arguments) => $arguments['--database'] === 'tenant' && $arguments['--force']))
         ->andReturn(0);
+    Artisan::shouldReceive('call')
+        ->once()
+        ->with('crm:lead-ai-fields', Mockery::on(fn (array $arguments) => $arguments['--database'] === 'tenant' && $arguments['--force']))
+        ->andReturn(0);
 
     $path = storage_path('tenants/demo');
     File::shouldReceive('exists')->once()->with($path)->andReturnFalse();
@@ -222,7 +226,7 @@ it('removes newly created storage and landlord records when activation fails aft
     $this->databaseManager
         ->shouldReceive('dropDatabase')->once()->with($slug);
 
-    Artisan::shouldReceive('call')->twice()->andReturn(0);
+    Artisan::shouldReceive('call')->times(3)->andReturn(0);
     File::shouldReceive('exists')->once()->with($path)->andReturnFalse();
     File::shouldReceive('ensureDirectoryExists')->once()->with($path);
     File::shouldReceive('isDirectory')->once()->with($path)->andReturnTrue();

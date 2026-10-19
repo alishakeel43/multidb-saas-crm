@@ -103,6 +103,12 @@ class TenantProvisioningService
                 '--no-interaction' => true,
             ], 'safe CRM baseline seeding');
 
+            $this->runArtisan('crm:lead-ai-fields', [
+                '--database' => 'tenant',
+                '--force' => true,
+                '--no-interaction' => true,
+            ], 'AI lead fields setup');
+
             $this->createTenantAdministrator($adminName, $adminEmail, $adminPassword);
 
             $storageCreated = true;
