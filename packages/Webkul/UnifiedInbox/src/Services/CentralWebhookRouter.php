@@ -140,7 +140,7 @@ class CentralWebhookRouter
      */
     public function getMetaWebhookUrl(): string
     {
-        return preg_replace('#/unified-inbox/meta/webhook$#', '/api/meta/webhook', $this->getCentralWebhookUrl());
+        return $this->getCentralWebhookUrl();
     }
 
     /**
@@ -148,7 +148,7 @@ class CentralWebhookRouter
      */
     public function getWhatsAppWebhookUrl(): string
     {
-        return preg_replace('#/unified-inbox/meta/webhook$#', '/api/meta/webhook', $this->getCentralWebhookUrl());
+        return $this->getCentralWebhookUrl();
     }
 
     protected function hasColumn(string $column): bool
