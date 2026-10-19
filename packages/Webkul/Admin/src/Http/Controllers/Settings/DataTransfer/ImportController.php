@@ -468,7 +468,9 @@ class ImportController extends Controller
     {
         $importer = config('importers.'.$type);
 
-        $content = Storage::get($importer['sample_path']);
+        abort_unless(is_array($importer), 404);
+
+        $content = $this->readSampleCsv($importer['sample_path']);
 
         /**
          * Append the user defined attribute codes as extra columns so the downloaded sample always
@@ -490,6 +492,21 @@ class ImportController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="'.basename($importer['sample_path']).'"',
         ]);
+    }
+
+    /**
+     * Sample files live in the shared public storage tree. The tenant storage
+     * switch points the public disk at the tenant folder, which does not contain them.
+     */
+    protected function readSampleCsv(string $samplePath): string
+    {
+        $sharedPath = storage_path('app/public/'.$samplePath);
+
+        if (is_file($sharedPath)) {
+            return (string) file_get_contents($sharedPath);
+        }
+
+        return (string) (Storage::disk('public')->get($samplePath) ?? '');
     }
 
     /**

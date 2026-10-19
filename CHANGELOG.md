@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix lead import sample download returning an empty CSV after the tenant storage disk no longer contains the shared sample file.
+
 - Show a “No records found” message in the task form when a related lead, person, organization, or quote search has no matches.
 - Save tasks when the due time includes seconds or a related record was not chosen, and return to the task list so the new task is visible.
 - Add tenant-database task management: tasks and kanban stages live in each tenant database, with list and board views, lead/person/organization/quote links, and per-tenant due reminders.
