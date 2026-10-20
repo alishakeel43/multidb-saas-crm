@@ -252,10 +252,27 @@ class WebhookController extends Controller
         foreach ($messagingEvents as $event) {
             if (! empty($event['message'])) {
                 $senderId = (string) ($event['sender']['id'] ?? '');
+                $messageData = (array) $event['message'];
+                $messageId = (string) ($messageData['mid'] ?? '');
+                $isEcho = (bool) ($messageData['is_echo'] ?? false);
 
-                if ($senderId && $senderId !== $pageId && ! ($event['message']['is_echo'] ?? false)) {
-                    $messageData = (array) $event['message'];
-                    $messageId = (string) ($messageData['mid'] ?? '');
+                // The customer unsent this message on Messenger / Instagram.
+                if (! empty($messageData['is_deleted'])) {
+                    $this->markUnsentMessage($channel, $pageId, $messageId);
+
+                    continue;
+                }
+
+                if ($isEcho && $messageId !== '') {
+                    $this->updateOutboundOccurredAt(
+                        $channel,
+                        $pageId,
+                        $messageId,
+                        $this->timestamp($event['timestamp'] ?? null, milliseconds: true),
+                    );
+                }
+
+                if ($senderId && $senderId !== $pageId && ! $isEcho) {
                     $body = (string) ($messageData['text'] ?? '');
                     $attachments = [];
 
@@ -449,7 +466,6 @@ class WebhookController extends Controller
             if (
                 $avatarUrl
                 && Schema::hasColumn($conversation->getTable(), 'avatar_url')
-                && blank($conversation->avatar_url)
             ) {
                 $conversation->avatar_url = $avatarUrl;
             }
@@ -535,11 +551,60 @@ class WebhookController extends Controller
         }
     }
 
+    /**
+     * Meta echoes an outgoing Messenger/Instagram message with its own event timestamp.
+     * Use that platform timestamp instead of the CRM server clock.
+     */
+    protected function updateOutboundOccurredAt(string $channel, string $accountId, string $messageId, Carbon $occurredAt): void
+    {
+        $message = $this->messageRepository->getModel()->newQuery()
+            ->where('external_id', $messageId)
+            ->where('direction', 'outbound')
+            ->whereHas('conversation', fn ($query) => $query
+                ->where('channel', $channel)
+                ->where('account_id', $accountId))
+            ->first();
+
+        if (! $message) {
+            return;
+        }
+
+        $message->update(['occurred_at' => $occurredAt]);
+
+        $latest = $message->conversation->messages()->orderByDesc('occurred_at')->first();
+
+        if ($latest) {
+            $message->conversation->update([
+                'last_message_preview' => $latest->body,
+                'last_message_at' => $latest->occurred_at,
+            ]);
+        }
+    }
+
+    protected function markUnsentMessage(string $channel, string $accountId, string $messageId): void
+    {
+        if ($messageId === '') {
+            return;
+        }
+
+        $message = $this->messageRepository->getModel()->newQuery()
+            ->where('external_id', $messageId)
+            ->whereHas('conversation', fn ($query) => $query
+                ->where('channel', $channel)
+                ->where('account_id', $accountId))
+            ->first();
+
+        if ($message) {
+            $this->messageRepository->markDeleted($message, 'customer');
+        }
+    }
+
     protected function applyDeliveryStatus(Model $message, string $status): void
     {
         $priority = [
             'pending' => 0,
             'unknown' => 1,
+            'accepted' => 1,
             'sent' => 2,
             'delivered' => 3,
             'read' => 4,
@@ -560,6 +625,8 @@ class WebhookController extends Controller
         $timestamp = (int) $value;
         $timestamp = $milliseconds ? (int) floor($timestamp / 1000) : $timestamp;
 
-        return Carbon::createFromTimestampUTC($timestamp)->min(now());
+        return Carbon::createFromTimestampUTC($timestamp)
+            ->min(now()->utc())
+            ->setTimezone(config('app.timezone'));
     }
 }

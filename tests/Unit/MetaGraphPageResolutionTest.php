@@ -14,6 +14,23 @@ beforeEach(function () {
     ]);
 });
 
+it('reads an instagram messaging profile picture from profile_pic', function () {
+    Http::fake([
+        'graph.facebook.com/*' => Http::response([
+            'name' => 'Ali',
+            'username' => 'ali.shakeel.35',
+            'profile_pic' => 'https://cdn.example.test/ig.jpg',
+        ]),
+    ]);
+
+    $profile = app(MetaGraphClient::class)->messagingUserProfile('1664347248679585', 'page-token', 'instagram');
+
+    expect($profile['name'])->toBe('Ali')
+        ->and($profile['profile_pic'])->toBe('https://cdn.example.test/ig.jpg');
+
+    Http::assertSent(fn ($request) => str_contains(urldecode($request->url()), 'profile_pic'));
+});
+
 it('reads page ids from facebook login for business granular scopes', function () {
     Http::fake([
         'graph.facebook.com/*debug_token*' => Http::response([

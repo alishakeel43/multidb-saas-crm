@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Delete WhatsApp, Messenger, and Instagram messages from the Unified Inbox via a hover action on each bubble. The message content and any locally stored attachment are removed and the bubble shows "You deleted this message"; the row stays as a tombstone so webhooks and history sync never re-import it. Meta has no unsend API for businesses, so the customer's copy is unchanged. Messages a customer unsends on Messenger or Instagram (`is_deleted` webhook) now show as "This message was deleted" instead of being stored as a new "New message".
+- Fix WhatsApp Embedded Signup failing with “Error validating verification code … redirect_uri”: send the `FB.login` popup code to the tenant Channels callback instead of the central OAuth route, stop passing `fallback_redirect_uri` for WhatsApp, and exchange the code with `redirect_uri` omitted (falling back to an empty value, then the central `/api/meta/oauth/callback` URL, only on a redirect mismatch).
+- Refresh Unified Inbox channel tabs, conversation rows, and the active chat in the background so incoming WhatsApp, Messenger, and Instagram messages appear without a browser-page reload.
+- Store incoming Meta webhook/history timestamps as the provider's actual event time, reconcile sent Messenger/Instagram messages with Meta's API history, and update them again from outgoing-message echo events so channel chronology is not skewed by the CRM timezone.
+- Ask Meta again for a missing Instagram or Messenger profile photo when the inbox opens. Instagram still shows the initial when Meta returns “User consent is required” for that sender.
+- Stop Unified Inbox Messenger and Instagram replies outside Meta's 24-hour window before they are stored, show any message Meta still refuses as a red "Not delivered" bubble instead of a normal one, and report Meta error `#10 / 2534022` as a closed reply window rather than a permission problem.
+- Mark outgoing Instagram messages as accepted by Meta rather than delivered, until a provider receipt confirms their actual delivery or read status.
+- Show channel-specific Meta messaging rules on every Unified Inbox channel card, and refresh Instagram customer avatar URLs when Meta supplies a new short-lived profile URL.
 - Show a pending Meta account selector inside its matching WhatsApp, Messenger, or Instagram channel card instead of below all channel cards.
 - Remove the redundant Unified Inbox number-history table from the Channels page; connection history remains available in each channel's dedicated log.
 - Show each Unified Inbox channel tab as Connected or Disconnected from the live account, and badge the tab with that channel’s conversation count (unread highlighted) instead of an unread total that stays at 0.

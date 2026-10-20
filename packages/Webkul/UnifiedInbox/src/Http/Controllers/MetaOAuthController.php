@@ -55,8 +55,7 @@ class MetaOAuthController extends Controller
         }
 
         try {
-            $redirectUri = $this->oauth->getCentralOAuthRedirectUrl();
-            $tokenData = $this->metaClient->exchangeCodeForToken($code, $redirectUri);
+            $tokenData = $this->metaClient->exchangeSignupCode($code, $this->oauth->getCentralOAuthRedirectUrl());
             $accessToken = (string) ($tokenData['access_token'] ?? '');
 
             if ($accessToken === '') {

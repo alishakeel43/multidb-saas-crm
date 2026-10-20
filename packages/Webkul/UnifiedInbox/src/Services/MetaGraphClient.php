@@ -77,20 +77,43 @@ class MetaGraphClient
     /**
      * Exchange short-lived auth code from Facebook Login / Embedded Signup for an access token.
      *
-     * For FB.login({ response_type: 'code' }) the JS SDK does not use a normal redirect URI.
-     * Meta requires an explicit empty redirect_uri on exchange (omit vs "" is not the same).
+     * Meta treats an omitted redirect_uri (null) and an explicit empty one ('') differently.
      */
     public function exchangeCodeForToken(string $code, ?string $redirectUri = ''): array
     {
-        $appId = (string) config('unified-inbox.meta.app_id');
-        $appSecret = (string) config('unified-inbox.meta.app_secret');
-
-        return $this->request('get', 'oauth/access_token', [
-            'client_id' => $appId,
-            'client_secret' => $appSecret,
+        $params = [
+            'client_id' => (string) config('unified-inbox.meta.app_id'),
+            'client_secret' => (string) config('unified-inbox.meta.app_secret'),
             'code' => $code,
-            'redirect_uri' => $redirectUri ?? '',
-        ]);
+        ];
+
+        if ($redirectUri !== null) {
+            $params['redirect_uri'] = $redirectUri;
+        }
+
+        return $this->request('get', 'oauth/access_token', $params);
+    }
+
+    /**
+     * WhatsApp Embedded Signup codes need redirect_uri omitted; Messenger/Instagram popup codes are
+     * bound to the fallback_redirect_uri. Each candidate is tried only on a redirect_uri mismatch.
+     */
+    public function exchangeSignupCode(string $code, string $fallbackRedirectUri): array
+    {
+        $candidates = $fallbackRedirectUri === '' ? [null, ''] : [null, '', $fallbackRedirectUri];
+        $last = array_key_last($candidates);
+
+        foreach ($candidates as $index => $redirectUri) {
+            try {
+                return $this->exchangeCodeForToken($code, $redirectUri);
+            } catch (MetaGraphException $e) {
+                if ($index === $last || ($e->graphSubcode !== 36008 && ! str_contains($e->getMessage(), 'redirect_uri'))) {
+                    throw $e;
+                }
+            }
+        }
+
+        return [];
     }
 
     /**

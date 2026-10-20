@@ -10,7 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Webkul\UnifiedInbox\Exceptions\MetaGraphException;
 use Webkul\UnifiedInbox\Models\Conversation;
+use Webkul\UnifiedInbox\Models\Message;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
 use Webkul\UnifiedInbox\Services\InboxHistorySync;
@@ -117,11 +119,7 @@ class ChannelController extends Controller
         }
 
         try {
-            // Prefer the single central OAuth redirect URI (same for every tenant/channel).
-            $tokenData = $this->metaClient->exchangeCodeForToken(
-                $code,
-                $this->oauth->getCentralOAuthRedirectUrl()
-            );
+            $tokenData = $this->metaClient->exchangeSignupCode($code, $this->oauth->getCentralOAuthRedirectUrl());
             $accessToken = (string) ($tokenData['access_token'] ?? '');
 
             if (! $accessToken) {
@@ -130,6 +128,11 @@ class ChannelController extends Controller
 
             return $this->finishAuthorizedConnect($request, $currentTenant, $channel, $accessToken);
         } catch (Exception $e) {
+            Log::warning('Meta signup code exchange failed.', array_merge(
+                ['channel' => $channel],
+                $e instanceof MetaGraphException ? $e->context() : ['reason' => $e->getMessage()],
+            ));
+
             session()->flash('error', 'Failed to connect Meta channels: '.$e->getMessage());
         }
 
@@ -408,14 +411,14 @@ class ChannelController extends Controller
             fn ($row) => $row['channel'] === $channel
         ));
 
-        $events = \Webkul\UnifiedInbox\Models\Message::query()
+        $events = Message::query()
             ->with('conversation:id,channel,account_id,customer_name')
             ->whereHas('conversation', fn ($q) => $q->where('channel', $channel))
             ->orderByDesc('occurred_at')
             ->orderByDesc('id')
             ->paginate(50);
 
-        $stats = \Webkul\UnifiedInbox\Models\Message::query()
+        $stats = Message::query()
             ->whereHas('conversation', fn ($q) => $q->where('channel', $channel))
             ->selectRaw('direction, status, COUNT(*) as total')
             ->groupBy('direction', 'status')

@@ -145,17 +145,27 @@
                                     <div class="ui-day"><span>{{ $uiDay }}</span></div>
                                     @php $uiLastDay = $uiDay; @endphp
                                 @endif
-                                <article class="ui-message ui-message-{{ $message->direction }}" data-message-id="{{ $message->id }}">
-                                    @if (! empty($message->attachments))
-                                        @include('unified_inbox::partials.attachments', ['message' => $message])
+                                @php $uiDeleted = $message->isDeleted(); @endphp
+                                <article class="ui-message ui-message-{{ $message->direction }} {{ ! $uiDeleted && $message->direction === 'outbound' && $message->status === 'failed' ? 'ui-message-failed' : '' }} {{ $uiDeleted ? 'ui-message-deleted' : '' }}" data-message-id="{{ $message->id }}">
+                                    @if ($uiDeleted)
+                                        <p class="ui-message-deleted-text">{{ ($message->metadata['deleted_source'] ?? 'agent') === 'customer' ? 'This message was deleted' : 'You deleted this message' }}</p>
+                                    @else
+                                        @if (! empty($message->attachments))
+                                            @include('unified_inbox::partials.attachments', ['message' => $message])
+                                        @endif
+                                        <p v-pre class="whitespace-pre-wrap break-words">{!! str_replace(["\r\n", "\r", "\n"], '<br>', e($message->body)) !!}</p>
                                     @endif
-                                    <p v-pre class="whitespace-pre-wrap break-words">{!! str_replace(["\r\n", "\r", "\n"], '<br>', e($message->body)) !!}</p>
                                     <div class="ui-message-meta">
                                         <span title="{{ $message->occurred_at?->format('d M Y, H:i') }}">{{ $message->occurred_at?->format('H:i') }}</span>
-                                        @if ($message->direction === 'outbound')
+                                        @if ($message->direction === 'outbound' && ! $uiDeleted)
                                             @include('unified_inbox::partials.tick', ['status' => (string) $message->status])
                                         @endif
                                     </div>
+                                    @unless ($uiDeleted)
+                                        <button type="button" class="ui-message-delete" title="Delete message" aria-label="Delete message" onclick="uiDeleteMessage({{ $activeConversation->id }}, {{ $message->id }}, this)">
+                                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v4.5M9.2 6.5v4.5"/></svg>
+                                        </button>
+                                    @endunless
                                 </article>
                             @empty
                                 <div class="ui-history-empty">
@@ -909,6 +919,24 @@
                     history.appendChild(article);
                     history.scrollTop = history.scrollHeight;
                 } else {
+                    if (data.message && data.message.status === 'failed') {
+                        // Meta refused it and the row was saved as failed: show it as "Not delivered" right away.
+                        const history = document.getElementById('chat-messages-container');
+                        const failed = document.createElement('article');
+                        failed.className = 'ui-message ui-message-outbound ui-message-failed';
+                        const t = new Date();
+                        const stamp = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+                        failed.innerHTML = `
+                            <p class="whitespace-pre-wrap break-words">${escapeHtml(body)}</p>
+                            <div class="ui-message-meta">
+                                <span>${stamp}</span>
+                                ${uiTickSvg('failed')}
+                            </div>
+                        `;
+                        history.querySelector('.ui-history-empty')?.remove();
+                        history.appendChild(failed);
+                        history.scrollTop = history.scrollHeight;
+                    }
                     alert(data.error || 'Failed to send message.');
                     if (data.window_closed) window.location.reload();
                 }
@@ -1194,7 +1222,8 @@
         const uiQuickReplies = @js(($quickReplies ?? collect())->values());
 
         function uiTickSvg(status) {
-            if (status === 'failed') return '<span class="ui-tick ui-tick-failed" title="Failed">!</span>';
+            if (status === 'failed') return '<span class="ui-tick ui-tick-failed" title="Failed"><span class="ui-failed-label"><span class="ui-failed-bang">!</span> Not delivered</span></span>';
+            if (status === 'accepted') return '<span class="ui-tick ui-tick-pending" title="Accepted by Meta — delivery not confirmed"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2 1.5"/></svg></span>';
             if (status === 'sent') return '<span class="ui-tick ui-tick-sent" title="Sent"><svg viewBox="0 0 16 11" width="15" height="11" fill="currentColor"><path d="M11.07.65 4.6 7.12 1.93 4.45.87 5.51l3.73 3.73L12.13 1.7z"/></svg></span>';
             return '<span class="ui-tick ui-tick-pending" title="Sending"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2 1.5"/></svg></span>';
         }
@@ -1392,6 +1421,25 @@
             err.hidden = false;
             err.textContent = data.message || data.error || 'Could not save the reply.';
         }
+        async function uiDeleteMessage(conversationId, messageId, button) {
+            if (!confirm('Delete this message from the inbox? Meta does not allow businesses to unsend messages, so the customer still sees it on WhatsApp, Messenger or Instagram.')) return;
+            button.disabled = true;
+            const { ok, data } = await uiQrRequest('DELETE', '/conversations/' + conversationId + '/messages/' + messageId);
+            if (!ok) {
+                button.disabled = false;
+                alert(data.message || data.error || 'Could not delete the message.');
+                return;
+            }
+            const article = button.closest('.ui-message');
+            article.classList.remove('ui-message-failed');
+            article.classList.add('ui-message-deleted');
+            article.querySelectorAll(':scope > :not(.ui-message-meta)').forEach(node => node.remove());
+            article.querySelectorAll('.ui-message-meta .ui-tick').forEach(node => node.remove());
+            const placeholder = document.createElement('p');
+            placeholder.className = 'ui-message-deleted-text';
+            placeholder.textContent = 'You deleted this message';
+            article.prepend(placeholder);
+        }
         async function uiDeleteQuickReply(id) {
             if (!confirm('Delete this saved reply?')) return;
             const { ok, data } = await uiQrRequest('DELETE', '/quick-replies/' + id);
@@ -1443,6 +1491,61 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // Keep every channel current without navigating or reloading the browser page.
+        // Meta delivers webhooks server-side; this lightweight poll paints those saved rows into the open inbox.
+        (function () {
+            let refreshing = false;
+
+            async function refreshInbox() {
+                if (refreshing || document.hidden) return;
+
+                const search = document.querySelector('.ui-list-search input[name="search"]');
+                if (search === document.activeElement) return;
+
+                refreshing = true;
+
+                try {
+                    const response = await fetch(window.location.href, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+
+                    if (!response.ok) return;
+
+                    const documentSnapshot = new DOMParser().parseFromString(await response.text(), 'text/html');
+                    const nextTabs = documentSnapshot.querySelector('.ui-tabs');
+                    const nextList = documentSnapshot.querySelector('.ui-list');
+                    const nextHistory = documentSnapshot.getElementById('chat-messages-container');
+                    const tabs = document.querySelector('.ui-tabs');
+                    const list = document.querySelector('.ui-list');
+                    const history = document.getElementById('chat-messages-container');
+
+                    if (nextTabs && tabs) tabs.replaceWith(nextTabs);
+                    if (nextList && list) list.replaceWith(nextList);
+
+                    if (nextHistory && history) {
+                        const previousIds = new Set(Array.from(history.querySelectorAll('[data-message-id]'), row => row.dataset.messageId));
+                        const hasNewMessage = Array.from(nextHistory.querySelectorAll('[data-message-id]'))
+                            .some(row => !previousIds.has(row.dataset.messageId));
+                        const nearBottom = history.scrollHeight - history.scrollTop - history.clientHeight < 80;
+
+                        history.innerHTML = nextHistory.innerHTML;
+
+                        if (hasNewMessage && nearBottom) history.scrollTop = history.scrollHeight;
+                    }
+                } catch (error) {
+                    // A temporary network failure must not interrupt typing or replying.
+                } finally {
+                    refreshing = false;
+                }
+            }
+
+            setInterval(refreshInbox, 8000);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) refreshInbox();
+            });
+        })();
 
         document.addEventListener('DOMContentLoaded', function () {
             const history = document.getElementById('chat-messages-container');

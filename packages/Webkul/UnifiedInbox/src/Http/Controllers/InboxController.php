@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +26,7 @@ use Webkul\UnifiedInbox\Repositories\ConversationRepository;
 use Webkul\UnifiedInbox\Repositories\MessageRepository;
 use Webkul\UnifiedInbox\Services\AI\ReplySuggestionService;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
+use Webkul\UnifiedInbox\Services\InboxHistorySync;
 use Webkul\UnifiedInbox\Services\MetaGraphClient;
 use Webkul\UnifiedInbox\Support\WhatsAppTemplateComposer;
 use Webkul\User\Models\UserProxy;
@@ -41,7 +43,8 @@ class InboxController extends Controller
         protected PipelineRepository $pipelineRepository,
         protected CentralWebhookRouter $router,
         protected OrganizationRepository $organizationRepository,
-        protected ActivityRepository $activityRepository
+        protected ActivityRepository $activityRepository,
+        protected InboxHistorySync $historySync,
     ) {}
 
     public function index(Request $request): View
@@ -171,6 +174,14 @@ class InboxController extends Controller
             $activeConversation = $conversations->first();
         }
 
+        $avatarRows = $conversations->getCollection();
+
+        if ($activeConversation && ! $avatarRows->contains(fn ($row) => (int) $row->id === (int) $activeConversation->id)) {
+            $avatarRows->push($activeConversation);
+        }
+
+        $this->refreshMissingAvatars($avatarRows, $connections);
+
         $activeMessages = collect();
         if ($activeConversation) {
             $activeMessages = $activeConversation->messages()
@@ -228,6 +239,69 @@ class InboxController extends Controller
                 : null,
             'channelTabStats' => $this->channelTabStats($connections, $historyConnections, $hasFolders),
         ]);
+    }
+
+    /**
+     * Messenger and Instagram photos are not in the thread list. Ask Graph for a missing
+     * picture, and remember a refusal for 30 minutes so the inbox does not call Meta on every refresh.
+     */
+    protected function refreshMissingAvatars($conversations, $connections): void
+    {
+        if (! Schema::hasColumn('unified_inbox_conversations', 'avatar_url')) {
+            return;
+        }
+
+        $checked = 0;
+
+        foreach ($conversations as $conversation) {
+            if ($checked >= 5 || ! in_array($conversation->channel, ['messenger', 'instagram'], true) || filled($conversation->avatar_url)) {
+                continue;
+            }
+
+            $metadata = is_array($conversation->metadata) ? $conversation->metadata : [];
+            $lastCheck = $metadata['avatar_checked_at'] ?? null;
+
+            if (is_string($lastCheck) && Carbon::parse($lastCheck)->gt(now()->subMinutes(30))) {
+                continue;
+            }
+
+            $checked++;
+            $connection = $connections->first(function ($connection) use ($conversation) {
+                if ($connection->status !== 'connected' || $connection->channel !== $conversation->channel) {
+                    return false;
+                }
+
+                $credentials = $connection->credentials ?? [];
+
+                return $connection->external_id === $conversation->account_id
+                    || (string) ($credentials['instagram_id'] ?? '') === $conversation->account_id
+                    || (string) ($credentials['page_id'] ?? '') === $conversation->account_id;
+            });
+            $token = (string) (($connection->credentials ?? [])['access_token'] ?? '');
+            $metadata['avatar_checked_at'] = now()->toIso8601String();
+
+            if ($token !== '') {
+                try {
+                    $picture = (string) ($this->metaClient->messagingUserProfile(
+                        (string) $conversation->external_id,
+                        $token,
+                        $conversation->channel,
+                    )['profile_pic'] ?? '');
+
+                    if ($picture !== '') {
+                        $conversation->avatar_url = $picture;
+                    }
+                } catch (\Throwable $e) {
+                    Log::info('Unified Inbox could not refresh '.$conversation->channel.' avatar.', [
+                        'conversation_id' => $conversation->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $conversation->metadata = $metadata;
+            $conversation->save();
+        }
     }
 
     /**
@@ -632,6 +706,32 @@ class InboxController extends Controller
     }
 
     /**
+     * Delete a WhatsApp, Messenger or Instagram message from this inbox.
+     * Meta offers no unsend API for business messages, so only the CRM copy is removed.
+     */
+    public function destroyMessage(int $id, int $messageId): JsonResponse
+    {
+        $conversation = $this->conversationRepository->find($id);
+
+        if (! $conversation) {
+            return response()->json(['error' => 'Conversation not found.'], 404);
+        }
+
+        $message = $conversation->messages()->whereKey($messageId)->first();
+
+        if (! $message) {
+            return response()->json(['error' => 'Message not found.'], 404);
+        }
+
+        $this->messageRepository->markDeleted($message, 'agent', auth()->guard('user')->id());
+
+        return response()->json([
+            'success' => true,
+            'message' => $message->fresh(),
+        ]);
+    }
+
+    /**
      * Send an outbound reply message.
      */
     public function send(Request $request, int $id): JsonResponse
@@ -657,6 +757,16 @@ class InboxController extends Controller
                 'success' => false,
                 'window_closed' => true,
                 'error' => 'The 24-hour reply window has closed for this customer. Send an approved WhatsApp template instead.',
+            ], 422);
+        }
+
+        // Messenger / Instagram "RESPONSE" messages are only allowed within 24h of the customer's last message.
+        // Reject up front so a message Meta is certain to refuse is never stored in the thread.
+        if (in_array($conversation->channel, ['messenger', 'instagram'], true) && $conversation->last_incoming_at && ! $conversation->serviceWindowOpen()) {
+            return response()->json([
+                'success' => false,
+                'window_closed' => true,
+                'error' => 'The 24-hour reply window has closed for this customer. They must message you again before you can reply.',
             ], 422);
         }
 
@@ -749,12 +859,19 @@ class InboxController extends Controller
 
         $message->update([
             'external_id' => $externalMessageId,
-            'status' => 'sent',
+            // Instagram returns a message ID when Meta accepts the request; it is not a recipient-delivery receipt.
+            'status' => $conversation->channel === 'instagram' ? 'accepted' : 'sent',
         ]);
         $conversation->update([
             'last_message_preview' => $body,
             'last_message_at' => $message->occurred_at,
         ]);
+
+        if (in_array($conversation->channel, ['messenger', 'instagram'], true)) {
+            // The send response has no timestamp. Reconcile it with Meta's conversation history,
+            // which supplies the provider-created time for inbound and outbound messages.
+            $this->historySync->sync($connection);
+        }
 
         return response()->json([
             'success' => true,
@@ -1382,7 +1499,7 @@ class InboxController extends Controller
 
         return match (true) {
             $code === 190 => 'The channel access token is invalid or expired. Reconnect this channel in Manage Channels.'.$suffix,
-            $code === 131047, $code === 10 && $sub === 2018278, $sub === 2018278 => 'The 24-hour reply window has closed for this customer. They must message you again (or use an approved WhatsApp template).'.$suffix,
+            $code === 131047, $code === 10 && in_array($sub, [2018278, 2534022], true), in_array($sub, [2018278, 2534022], true) => 'The 24-hour reply window has closed for this customer. They must message you again (or use an approved WhatsApp template).'.$suffix,
             in_array($code, [131026, 131030], true), $code === 100 && $sub === 2018001 => 'Meta could not deliver to this recipient (invalid or not on the allowed list).'.$suffix,
             in_array($code, [10, 200, 3], true) => 'The connected app lacks permission to send on this channel. Reconnect and grant messaging permissions.'.$suffix,
             in_array($code, [4, 80007, 130429, 131048, 131056], true) => 'Meta rate limit reached. Wait a moment before retrying.'.$suffix,

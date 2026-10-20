@@ -33,7 +33,26 @@
     .ui-tick svg{display:block}
     .ui-tick-read{color:#34b7f1}
     .ui-tick-failed{color:#e5484d;font-weight:700}
+    /* Outbound message Meta refused: clearly marked, never styled like a delivered bubble */
+    .ui-message.ui-message-outbound.ui-message-failed,.ui-thread .ui-message.ui-message-outbound.ui-message-failed{background:#fff1f1 !important;color:#7a1f1f !important;border:1px solid #f3b4b4}
+    .ui-message-failed .ui-message-meta{opacity:1 !important;color:#b42318 !important}
+    .ui-failed-label{display:inline-flex;align-items:center;gap:4px;color:#b42318;font-weight:600}
+    .ui-failed-bang{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:999px;background:#e5484d;color:#fff;font-size:10px;line-height:1;font-weight:700}
     .ui-tick-pending{color:#8696a0}
+    /* Delete message: hover action beside the bubble, and the WhatsApp-style "deleted" placeholder */
+    .ui-message{position:relative}
+    .ui-message-delete{position:absolute;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;border:1px solid #e4e7ec;background:#fff;color:#667085;cursor:pointer;opacity:0;transition:opacity .15s}
+    .ui-message-inbound .ui-message-delete{right:-34px}
+    .ui-message-outbound .ui-message-delete{left:-34px}
+    .ui-message:hover .ui-message-delete,.ui-message-delete:focus-visible{opacity:1}
+    .ui-message-delete:hover{color:#b42318;border-color:#f3b4b4;background:#fff1f1}
+    .ui-message-delete:disabled{cursor:wait;opacity:.5}
+    .ui-message.ui-message-deleted,.ui-thread .ui-message.ui-message-deleted{background:transparent !important;color:#667085 !important;border:1px dashed #d0d5dd;box-shadow:none}
+    .ui-message-deleted .ui-message-meta{color:#98a2b3 !important;opacity:1}
+    .ui-message-deleted-text{font-style:italic}
+    .ui-message-deleted-text::before{content:"\2298";margin-right:6px;font-style:normal}
+    .dark .ui-message-delete{background:#1f2937;border-color:#374151;color:#9ca3af}
+    .dark .ui-message.ui-message-deleted,.dark .ui-thread .ui-message.ui-message-deleted{color:#9ca3af !important;border-color:#4b5563}
     /* Header quick actions */
     .ui-flag-btn{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 10px;border-radius:8px;border:1px solid var(--ui-line,#e7eaf2);background:#fff;font-size:12px;cursor:pointer;color:var(--ui-ink,#101c38)}
     .ui-flag-btn:hover{border-color:var(--ui-accent,#444cf4)}
@@ -95,6 +114,7 @@
     .ui-channel-picker{margin-top:16px;padding:14px;border:1px solid #bfd7ff;border-radius:10px;background:#f5f9ff}
     .ui-channel-picker h4{margin:0 0 4px;font-size:14px}
     .ui-channel-picker p{margin:0 0 12px;font-size:12px;line-height:1.45;color:var(--ui-muted,#74809a)}
+    .ui-channel-policy{margin:12px 0 0;padding:8px 10px;border-inline-start:3px solid var(--ui-accent,#444cf4);border-radius:0 6px 6px 0;background:var(--ui-soft,#f6f7fb);font-size:12px;line-height:1.45;color:var(--ui-muted,#74809a)}
     .ui-channel-picker-form{display:flex;flex-direction:column;gap:10px}
     .ui-channel-picker-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:#334155}
     .ui-channel-picker-form select{width:100%;font-weight:500;border:1px solid var(--ui-line,#e7eaf2);border-radius:8px;padding:8px 10px;background:#fff}

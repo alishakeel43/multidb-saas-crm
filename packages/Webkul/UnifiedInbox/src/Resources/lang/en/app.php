@@ -50,6 +50,9 @@ return [
         'picker-select' => 'Account',
         'picker-confirm' => 'Connect account',
         'picker-cancel' => 'Cancel',
+        'whatsapp-policy' => 'Start a new chat with an approved template. Free-form replies are available for 24 hours after the customer messages you.',
+        'messenger-policy' => 'The customer must contact your Facebook Page first. Reply within Meta\'s allowed messaging window.',
+        'instagram-policy' => 'The customer must message your Instagram professional account first. Normal replies are available for 24 hours; human-agent replies can be sent for up to 7 days.',
     ],
 
     'inbox' => [

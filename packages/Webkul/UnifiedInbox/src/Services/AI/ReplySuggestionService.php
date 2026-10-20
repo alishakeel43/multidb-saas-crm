@@ -5,6 +5,7 @@ namespace Webkul\UnifiedInbox\Services\AI;
 use RuntimeException;
 use Webkul\AiKnowledge\Services\KnowledgeRetrievalService;
 use Webkul\UnifiedInbox\Contracts\AiReplyProvider;
+use Webkul\UnifiedInbox\Models\Message;
 
 class ReplySuggestionService
 {
@@ -26,6 +27,7 @@ class ReplySuggestionService
         $messages = $conversation->messages()
             ->whereNotNull('body')
             ->where('body', '!=', '')
+            ->where('body', '!=', Message::DELETED_BODY)
             ->orderByDesc('occurred_at')
             ->limit($limit)
             ->get()

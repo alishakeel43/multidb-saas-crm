@@ -133,13 +133,21 @@ class InboxHistorySync
 
             $externalId = (string) ($row['id'] ?? '');
 
-            if ($externalId === '' || $conversation->messages()->where('external_id', $externalId)->exists()) {
+            if ($externalId === '') {
                 continue;
             }
 
             $fromId = (string) ($row['from']['id'] ?? '');
             $occurredAt = $this->time($row['created_time'] ?? null);
             $body = trim((string) ($row['message'] ?? ''));
+            $existing = $conversation->messages()->where('external_id', $externalId)->first();
+
+            if ($existing) {
+                // The conversation API is authoritative for existing imported messages too.
+                $existing->update(['occurred_at' => $occurredAt]);
+
+                continue;
+            }
 
             if ($body === '') {
                 $body = '['.ucfirst($connection->channel).' message]';
@@ -162,6 +170,13 @@ class InboxHistorySync
             }
         }
 
+        $latest = $conversation->messages()->orderByDesc('occurred_at')->first();
+
+        if ($latest) {
+            $conversation->last_message_preview = $latest->body;
+            $conversation->last_message_at = $latest->occurred_at;
+        }
+
         if ($conversation->customer_name === '' || str_ends_with($conversation->customer_name, ' User')) {
             $conversation->customer_name = $customerName;
         }
@@ -169,7 +184,6 @@ class InboxHistorySync
         if (
             $avatarUrl !== ''
             && Schema::hasColumn($conversation->getTable(), 'avatar_url')
-            && blank($conversation->avatar_url)
         ) {
             $conversation->avatar_url = $avatarUrl;
         }
@@ -181,10 +195,24 @@ class InboxHistorySync
 
     protected function time(mixed $value): Carbon
     {
-        if (! is_string($value) || $value === '') {
+        if ((! is_string($value) && ! is_numeric($value)) || $value === '') {
             return now();
         }
 
-        return Carbon::parse($value)->min(now());
+        if (is_numeric($value)) {
+            $timestamp = (int) $value;
+
+            if ($timestamp > 9999999999) {
+                $timestamp = (int) floor($timestamp / 1000);
+            }
+
+            return Carbon::createFromTimestampUTC($timestamp)
+                ->min(now()->utc())
+                ->setTimezone(config('app.timezone'));
+        }
+
+        return Carbon::parse($value)
+            ->min(now()->utc())
+            ->setTimezone(config('app.timezone'));
     }
 }

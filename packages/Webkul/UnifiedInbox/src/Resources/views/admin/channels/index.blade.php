@@ -48,6 +48,7 @@
                                 @endif
 
                                 <p class="ui-channels-desc">{{ $channel['desc'] }}</p>
+                                <p class="ui-channel-policy">{{ __('unified_inbox::app.channels.'.$key.'-policy') }}</p>
 
                                 @if (! empty($pendingSelection) && $pendingSelection['channel'] === $key && ! empty($pendingSelection['assets']))
                                     <div class="ui-channel-picker" aria-label="{{ __('unified_inbox::app.channels.picker-title') }}">
@@ -110,6 +111,7 @@
         const useDevScopesLogin = @js((bool) ($allowManualConnect ?? false));
         const metaOAuthStates = @js($oauthStates);
         const metaCallbackUrl = @js($centralOAuthRedirectUrl ?? route('unified_inbox.meta_webhook.oauth.callback'));
+        const metaTenantCallbackUrl = @js(route('admin.unified_inbox.channels.meta.callback'));
         const metaAcceptTokenUrl = @js(route('admin.unified_inbox.channels.accept_token'));
         const metaCsrfToken = @js(csrf_token());
         let activeMetaSignup = null;
@@ -266,7 +268,7 @@
             if (activeMetaSignup.finishTimer) {
                 clearTimeout(activeMetaSignup.finishTimer);
             }
-            window.location.assign(metaCallbackUrl + '?' + params.toString());
+            window.location.assign(metaTenantCallbackUrl + '?' + params.toString());
         }
 
         function scheduleMessagingFinishFallback() {
@@ -339,12 +341,13 @@
                         config_id: configId,
                         response_type: 'code',
                         override_default_response_type: true,
-                        extras: {
+                        extras: Object.assign({
                             setup: {},
-                            sessionInfoVersion: '3',
+                            sessionInfoVersion: '3'
+                        }, channel === 'whatsapp' ? {} : {
                             // One central URI for every tenant — register once in Meta App.
                             fallback_redirect_uri: metaCallbackUrl
-                        }
+                        })
                     };
 
                 FB.login(function(response) {
