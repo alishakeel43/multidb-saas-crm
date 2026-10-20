@@ -256,6 +256,24 @@ it('changes the inbox update version when a message arrives or its status change
     expect($version())->not->toBe($afterCreate);
 });
 
+it('renders an empty conversation list after the last chat of a channel is deleted', function () {
+    $conversation = uiP1Setup();
+
+    $this->actingAs($this->user, 'user')
+        ->deleteJson(route('admin.unified_inbox.conversations.destroy', $conversation->id))
+        ->assertSuccessful();
+
+    $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.index', ['channel' => 'whatsapp']))
+        ->assertSuccessful()
+        ->assertSee('No conversations yet in WhatsApp');
+
+    $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.index', ['channel' => 'whatsapp', 'folder' => 'unread']))
+        ->assertSuccessful()
+        ->assertSee('Clear filters');
+});
+
 it('returns not found when deleting an unknown chat', function () {
     $this->actingAs($this->user, 'user')
         ->deleteJson(route('admin.unified_inbox.conversations.destroy', 999999))

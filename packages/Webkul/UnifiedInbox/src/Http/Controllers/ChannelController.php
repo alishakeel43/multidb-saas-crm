@@ -264,7 +264,7 @@ class ChannelController extends Controller
                     $hint = $this->metaPageDiscoveryHint($accessToken);
 
                     throw new Exception($channel === 'messenger'
-                        ? 'No Facebook Pages with messaging access were found for this login. Confirm pages_show_list, pages_messaging, pages_manage_metadata (and business_management if needed) are granted.'.$hint
+                        ? 'No Facebook Pages with messaging access were found for this login. Confirm pages_show_list, pages_messaging, pages_manage_metadata are granted.'.$hint
                         : 'No Instagram professional accounts linked to a Facebook Page were found for this login. Link IG in Meta Business Suite, then reconnect.'.$hint);
                 }
 

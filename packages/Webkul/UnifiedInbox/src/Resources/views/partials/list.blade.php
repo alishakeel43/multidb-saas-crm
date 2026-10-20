@@ -118,7 +118,9 @@
             </a>
         @empty
             @php
-                $uiFiltered = $uiStatus || $uiUnread || request('search');
+                $uiStatus = $statusFilter ?? request('status');
+                $uiUnread = ($unreadFilter ?? false) || $uiFolder === 'unread';
+                $uiFiltered = $uiStatus || $uiUnread || $uiFolder || $uiLabel || request('search');
                 $uiTabLabel = request('channel') ? ($channels[request('channel')]['label'] ?? ucfirst(request('channel'))) : null;
             @endphp
             <div class="ui-list-empty">

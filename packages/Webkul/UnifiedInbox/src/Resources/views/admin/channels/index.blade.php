@@ -332,8 +332,8 @@
                         // Popup returns accessToken (no per-tenant redirect). Meta App still
                         // only needs the one central Valid OAuth Redirect URI below for code flows.
                         scope: channel === 'instagram'
-                            ? 'pages_show_list,pages_messaging,pages_manage_metadata,business_management,instagram_basic,instagram_manage_messages'
-                            : 'pages_show_list,pages_messaging,pages_manage_metadata,business_management',
+                            ? 'pages_show_list,pages_messaging,pages_manage_metadata,instagram_basic,instagram_manage_messages'
+                            : 'pages_show_list,pages_messaging,pages_manage_metadata',
                         return_scopes: true,
                         auth_type: 'rerequest'
                     }
