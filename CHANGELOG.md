@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show a pending Meta account selector inside its matching WhatsApp, Messenger, or Instagram channel card instead of below all channel cards.
+- Remove the redundant Unified Inbox number-history table from the Channels page; connection history remains available in each channel's dedicated log.
 - Show each Unified Inbox channel tab as Connected or Disconnected from the live account, and badge the tab with that channel’s conversation count (unread highlighted) instead of an unread total that stays at 0.
 - Restyle Unified Inbox like Meta Business Suite: drop the left folders rail and move Inbox / Unread / Follow up / Done / Spam (plus labels) into Meta-style filter pills under the conversation search; keep channel tabs on top and a clean list + chat + profile layout.
 - Fix Unified Inbox chat header overlap (Messenger / Assignee / flags) with a two-row identity + actions layout, and clip `avatar_url` avatars for all channels.

@@ -102,22 +102,6 @@ it('keeps the old number and its history when WhatsApp is disconnected and a new
         ->assertSee('via old +92 300 1111111');
 });
 
-it('lists current and past numbers with dates and conversation counts on the channels page', function () {
-    [$old] = nhOldAndNew();
-    $old->update(['status' => 'disconnected']);
-    ChannelConnection::create(['channel' => 'whatsapp', 'external_id' => 'PHONE_NEW_2', 'name' => 'New WA', 'status' => 'connected',
-        'credentials' => ['access_token' => 'y', 'display_phone_number' => '+92 300 2222222']]);
-
-    $this->actingAs($this->user, 'user')
-        ->get(route('admin.unified_inbox.channels.index'))
-        ->assertSuccessful()
-        ->assertSee('Number history')
-        ->assertSee('+92 300 1111111')
-        ->assertSee('+92 300 2222222')
-        ->assertSee('Archived')
-        ->assertSee('Current');
-});
-
 it('continues the same customer history when they message the new number', function () {
     config()->set('unified-inbox.meta.app_secret', 'test_meta_app_secret');
     [$old, $oldConversation] = nhOldAndNew();

@@ -92,6 +92,13 @@
     .ui-sandbox-token{grid-column:1/-1}
     .ui-sandbox-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
     .ui-asset-picker{border:1px solid #bfd7ff;background:#f5f9ff}
+    .ui-channel-picker{margin-top:16px;padding:14px;border:1px solid #bfd7ff;border-radius:10px;background:#f5f9ff}
+    .ui-channel-picker h4{margin:0 0 4px;font-size:14px}
+    .ui-channel-picker p{margin:0 0 12px;font-size:12px;line-height:1.45;color:var(--ui-muted,#74809a)}
+    .ui-channel-picker-form{display:flex;flex-direction:column;gap:10px}
+    .ui-channel-picker-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:#334155}
+    .ui-channel-picker-form select{width:100%;font-weight:500;border:1px solid var(--ui-line,#e7eaf2);border-radius:8px;padding:8px 10px;background:#fff}
+    .ui-channel-picker-actions{display:flex;flex-wrap:wrap;gap:8px}
     @media (max-width:720px){.ui-sandbox-grid{grid-template-columns:1fr}}
     .ui-channels-foot .ui-channels-logs{display:flex;justify-content:center;width:100%;margin-top:8px}
     .ui-logs-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}

@@ -48,6 +48,38 @@
                                 @endif
 
                                 <p class="ui-channels-desc">{{ $channel['desc'] }}</p>
+
+                                @if (! empty($pendingSelection) && $pendingSelection['channel'] === $key && ! empty($pendingSelection['assets']))
+                                    <div class="ui-channel-picker" aria-label="{{ __('unified_inbox::app.channels.picker-title') }}">
+                                        <h4>{{ __('unified_inbox::app.channels.picker-title') }}</h4>
+                                        <p>
+                                            {{ $key === 'instagram'
+                                                ? __('unified_inbox::app.channels.picker-help-instagram')
+                                                : __('unified_inbox::app.channels.picker-help-messenger') }}
+                                        </p>
+
+                                        <form method="POST" action="{{ route('admin.unified_inbox.channels.complete_selection') }}" class="ui-channel-picker-form">
+                                            @csrf
+                                            <input type="hidden" name="selection_id" value="{{ $pendingSelection['selection_id'] }}">
+                                            <label>
+                                                <span>{{ __('unified_inbox::app.channels.picker-select') }}</span>
+                                                <select name="asset_id" required>
+                                                    @foreach ($pendingSelection['assets'] as $asset)
+                                                        <option value="{{ $asset['id'] }}">{{ $asset['name'] }} ({{ $asset['id'] }})</option>
+                                                    @endforeach
+                                                </select>
+                                            </label>
+                                            <div class="ui-channel-picker-actions">
+                                                <button type="submit" class="ui-channels-btn ui-channels-connect">
+                                                    {{ __('unified_inbox::app.channels.picker-confirm') }}
+                                                </button>
+                                                <button type="submit" formaction="{{ route('admin.unified_inbox.channels.cancel_selection') }}" class="ui-channels-btn ui-channels-disconnect">
+                                                    {{ __('unified_inbox::app.channels.picker-cancel') }}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="ui-channels-foot">
@@ -66,71 +98,6 @@
                 </div>
             </div>
 
-            @if (! empty($pendingSelection) && ! empty($pendingSelection['assets']))
-                <section class="ui-channels ui-sandbox ui-asset-picker" aria-label="{{ __('unified_inbox::app.channels.picker-title') }}">
-                    <div class="ui-channels-head">
-                        <h2>{{ __('unified_inbox::app.channels.picker-title') }}</h2>
-                        <p>
-                            {{ $pendingSelection['channel'] === 'instagram'
-                                ? __('unified_inbox::app.channels.picker-help-instagram')
-                                : __('unified_inbox::app.channels.picker-help-messenger') }}
-                        </p>
-                    </div>
-
-                    <form method="POST" action="{{ route('admin.unified_inbox.channels.complete_selection') }}" class="ui-sandbox-form">
-                        @csrf
-                        <input type="hidden" name="selection_id" value="{{ $pendingSelection['selection_id'] }}">
-                        <div class="ui-sandbox-grid">
-                            <label class="ui-sandbox-token">
-                                <span>{{ __('unified_inbox::app.channels.picker-select') }}</span>
-                                <select name="asset_id" required>
-                                    @foreach ($pendingSelection['assets'] as $asset)
-                                        <option value="{{ $asset['id'] }}">{{ $asset['name'] }} ({{ $asset['id'] }})</option>
-                                    @endforeach
-                                </select>
-                            </label>
-                        </div>
-                        <div class="ui-sandbox-actions">
-                            <button type="submit" class="ui-channels-btn ui-channels-connect">
-                                {{ __('unified_inbox::app.channels.picker-confirm') }}
-                            </button>
-                            <button type="submit" form="ui-cancel-meta-selection" class="ui-channels-btn ui-channels-disconnect">
-                                {{ __('unified_inbox::app.channels.picker-cancel') }}
-                            </button>
-                        </div>
-                    </form>
-                    <form id="ui-cancel-meta-selection" method="POST" action="{{ route('admin.unified_inbox.channels.cancel_selection') }}" class="hidden">
-                        @csrf
-                    </form>
-                </section>
-            @endif
-
-            @if (! empty($numberHistory) && count($numberHistory))
-                <section class="ui-channels ui-numhist" aria-label="Number history">
-                    <div class="ui-channels-head">
-                        <h2>Number history</h2>
-                        <p>Every number and account this workspace has connected. Conversations from old numbers stay in the inbox.</p>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr><th>Channel</th><th>Number / account</th><th>ID</th><th>Status</th><th>Connected</th><th>Disconnected</th><th>Conversations</th></tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($numberHistory as $row)
-                                <tr>
-                                    <td>{{ ucfirst($row['channel']) }}</td>
-                                    <td>{{ $row['label'] }}</td>
-                                    <td class="font-mono">{{ $row['external_id'] }}@if ($row['waba_id']) <span class="ui-muted">· WABA {{ $row['waba_id'] }}</span>@endif</td>
-                                    <td class="{{ $row['current'] ? 'is-current' : 'ui-muted' }}">{{ $row['current'] ? 'Current' : 'Archived' }}</td>
-                                    <td>{{ $row['connected_at']?->format('d M Y, H:i') ?? '—' }}</td>
-                                    <td>{{ $row['disconnected_at']?->format('d M Y, H:i') ?? ($row['current'] ? '—' : 'Unknown') }}</td>
-                                    <td><a href="{{ route('admin.unified_inbox.index', ['channel' => $row['channel']]) }}">{{ $row['conversations'] }}</a></td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </section>
-            @endif
         </div>
     </div>
 

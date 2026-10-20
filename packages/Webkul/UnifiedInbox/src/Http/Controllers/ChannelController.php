@@ -89,7 +89,6 @@ class ChannelController extends Controller
             'channels' => $channels,
             'centralWebhookUrl' => $this->router->getCentralWebhookUrl(),
             'centralOAuthRedirectUrl' => $this->oauth->getCentralOAuthRedirectUrl(),
-            'numberHistory' => $this->numberHistory($connections),
             'oauthStates' => $oauthStates,
             'pendingSelection' => $this->pendingSelectionForView($currentTenant),
             'allowManualConnect' => (bool) config('unified-inbox.meta.allow_manual_connect'),
