@@ -73,16 +73,25 @@
                 },
                 mounted() {
                     this.refresh();
-                    this._timer = setInterval(this.refresh, 60000);
+                    this._timer = setInterval(() => {
+                        if (! document.hidden) this.refresh();
+                    }, 15000);
                     document.addEventListener('click', this.onDocClick);
+                    document.addEventListener('visibilitychange', this.onVisible);
+                    window.addEventListener('crm-notifications:refresh', this.refresh);
                 },
                 beforeUnmount() {
                     clearInterval(this._timer);
                     document.removeEventListener('click', this.onDocClick);
+                    document.removeEventListener('visibilitychange', this.onVisible);
+                    window.removeEventListener('crm-notifications:refresh', this.refresh);
                 },
                 methods: {
                     onDocClick(e) {
                         if (! this.$el.contains(e.target)) this.open = false;
+                    },
+                    onVisible() {
+                        if (! document.hidden) this.refresh();
                     },
                     toggle() {
                         this.open = ! this.open;

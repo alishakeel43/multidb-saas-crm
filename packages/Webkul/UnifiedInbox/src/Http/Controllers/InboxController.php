@@ -28,6 +28,7 @@ use Webkul\UnifiedInbox\Repositories\MessageRepository;
 use Webkul\UnifiedInbox\Services\AI\ReplySuggestionService;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
 use Webkul\UnifiedInbox\Services\InboxHistorySync;
+use Webkul\UnifiedInbox\Services\InboxNotifier;
 use Webkul\UnifiedInbox\Services\MetaGraphClient;
 use Webkul\UnifiedInbox\Support\WhatsAppTemplateComposer;
 use Webkul\User\Models\UserProxy;
@@ -203,6 +204,8 @@ class InboxController extends Controller
             if ($activeConversation->unread_count > 0) {
                 $activeConversation->update(['unread_count' => 0]);
             }
+
+            app(InboxNotifier::class)->markConversationRead((int) auth()->guard('user')->id(), (int) $activeConversation->id);
         }
 
         $crmRelated = $activeConversation ? $this->relatedRecords($activeConversation) : null;
@@ -786,6 +789,8 @@ class InboxController extends Controller
         if ($conversation->unread_count > 0) {
             $conversation->update(['unread_count' => 0]);
         }
+
+        app(InboxNotifier::class)->markConversationRead((int) auth()->guard('user')->id(), (int) $conversation->id);
 
         $messages = $conversation->visibleMessages()
             ->orderBy('occurred_at', 'asc')

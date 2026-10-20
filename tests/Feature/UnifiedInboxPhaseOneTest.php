@@ -6,11 +6,13 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Webkul\Notification\Models\UserNotification;
 use Webkul\UnifiedInbox\Models\ChannelConnection;
 use Webkul\UnifiedInbox\Models\Conversation;
 use Webkul\UnifiedInbox\Models\Message;
 use Webkul\UnifiedInbox\Models\QuickReply;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
+use Webkul\UnifiedInbox\Services\InboxNotifier;
 use Webkul\User\Models\Role;
 use Webkul\User\Models\User;
 
@@ -289,6 +291,39 @@ it('alerts new customer messages from every channel since the last seen message'
         ->and($alerts->firstWhere('channel', 'instagram')['customer_name'])->toBe('Instagram Customer');
 
     $updates((int) $response->json('latest_inbound_id'))->assertJsonPath('alerts', []);
+});
+
+it('keeps one navbar notification per chat and marks it read when the chat is opened', function () {
+    $agent = User::create([
+        'name' => 'Inbox Agent',
+        'email' => 'inbox_agent_'.uniqid().'@example.com',
+        'password' => bcrypt('secret123'),
+        'status' => 1,
+        'role_id' => Role::where('permission_type', 'all')->value('id'),
+        'view_permission' => 'global',
+    ]);
+    $conversation = uiP1Setup();
+    $conversation->update(['user_id' => $agent->id, 'unread_count' => 2]);
+
+    $notifier = app(InboxNotifier::class);
+    $notifier->notifyInbound($conversation, 'First message');
+    $notifier->notifyInbound($conversation, 'Second message');
+
+    $unread = fn () => UserNotification::where('user_id', $agent->id)
+        ->where('type', InboxNotifier::TYPE)
+        ->where('entity_id', $conversation->id)
+        ->whereNull('read_at');
+
+    expect($unread()->count())->toBe(1)
+        ->and($unread()->value('body'))->toBe('Second message')
+        ->and($unread()->value('title'))->toBe('New WhatsApp message from Phase One Pat')
+        ->and($unread()->value('link'))->toContain('conversation_id='.$conversation->id);
+
+    $this->actingAs($agent, 'user')
+        ->get(route('admin.unified_inbox.index', ['channel' => 'whatsapp', 'conversation_id' => $conversation->id]))
+        ->assertSuccessful();
+
+    expect($unread()->count())->toBe(0);
 });
 
 it('renders an empty conversation list after the last chat of a channel is deleted', function () {

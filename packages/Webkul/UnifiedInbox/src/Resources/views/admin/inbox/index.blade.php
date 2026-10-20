@@ -887,6 +887,10 @@
             el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden';
         }
 
+        function uiHasMessage(history, message) {
+            return Boolean(history && message?.id && history.querySelector('[data-message-id="' + message.id + '"]'));
+        }
+
         async function sendMessage(conversationId) {
             const input = document.getElementById('message-input');
             const button = document.getElementById('send-button');
@@ -915,26 +919,38 @@
                     input.value = '';
                     uiAutoGrow(input);
                     const history = document.getElementById('chat-messages-container');
-                    const article = document.createElement('article');
-                    article.className = 'ui-message ui-message-outbound';
-                    const now = new Date();
-                    const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-                    article.innerHTML = `
-                        <p class="whitespace-pre-wrap break-words">${escapeHtml(body)}</p>
-                        <div class="ui-message-meta">
-                            <span>${hhmm}</span>
-                            ${uiTickSvg('sent')}
-                        </div>
-                    `;
-                    history.querySelector('.ui-history-empty')?.remove();
-                    history.appendChild(article);
+                    // The background refresh may already show this message (it is stored before Meta replies).
+                    if (!uiHasMessage(history, data.message)) {
+                        const article = document.createElement('article');
+                        article.className = 'ui-message ui-message-outbound';
+                        if (data.message?.id) {
+                            article.dataset.messageId = data.message.id;
+                            article.dataset.local = '1';
+                        }
+                        const now = new Date();
+                        const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+                        article.innerHTML = `
+                            <p class="whitespace-pre-wrap break-words">${escapeHtml(body)}</p>
+                            <div class="ui-message-meta">
+                                <span>${hhmm}</span>
+                                ${uiTickSvg('sent')}
+                            </div>
+                        `;
+                        history.querySelector('.ui-history-empty')?.remove();
+                        history.appendChild(article);
+                    }
                     history.scrollTop = history.scrollHeight;
                 } else {
+                    const history = document.getElementById('chat-messages-container');
+                    if (data.message && data.message.status === 'failed' && uiHasMessage(history, data.message)) {
+                        history.querySelector('[data-message-id="' + data.message.id + '"]').remove();
+                    }
                     if (data.message && data.message.status === 'failed') {
                         // Meta refused it and the row was saved as failed: show it as "Not delivered" right away.
-                        const history = document.getElementById('chat-messages-container');
                         const failed = document.createElement('article');
                         failed.className = 'ui-message ui-message-outbound ui-message-failed';
+                        failed.dataset.messageId = data.message.id;
+                        failed.dataset.local = '1';
                         const t = new Date();
                         const stamp = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
                         failed.innerHTML = `
@@ -1556,8 +1572,15 @@
                         const hasNewMessage = Array.from(nextHistory.querySelectorAll('[data-message-id]'))
                             .some(row => !previousIds.has(row.dataset.messageId));
                         const nearBottom = history.scrollHeight - history.scrollTop - history.clientHeight < 80;
+                        // A just-sent bubble stays until a snapshot that already contains it arrives.
+                        const pendingLocal = Array.from(history.querySelectorAll('[data-local="1"]'))
+                            .filter(row => !nextHistory.querySelector('[data-message-id="' + row.dataset.messageId + '"]'));
 
                         history.innerHTML = nextHistory.innerHTML;
+                        if (pendingLocal.length) {
+                            history.querySelector('.ui-history-empty')?.remove();
+                            pendingLocal.forEach(row => history.appendChild(row));
+                        }
 
                         if (hasNewMessage && nearBottom) history.scrollTop = history.scrollHeight;
                     }
@@ -1650,7 +1673,12 @@
                 }
 
                 // Timestamps are per second, so a full refresh every 30s catches two changes inside the same second.
-                if ((pending || Date.now() - lastRefresh > 30000) && await refreshInbox()) pending = false;
+                if (pending && await refreshInbox()) {
+                    pending = false;
+                    window.dispatchEvent(new Event('crm-notifications:refresh'));
+                } else if (Date.now() - lastRefresh > 30000) {
+                    await refreshInbox();
+                }
                 checking = false;
             }
 

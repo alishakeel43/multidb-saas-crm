@@ -57,6 +57,10 @@ return [
         'instagram-policy' => 'The customer must message your Instagram professional account first. Normal replies are available for 24 hours; human-agent replies can be sent for up to 7 days.',
     ],
 
+    'notifications' => [
+        'new-message' => 'New :channel message from :name',
+    ],
+
     'inbox' => [
         'title' => 'Unified Inbox',
         'all-channels' => 'All Channels',

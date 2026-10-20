@@ -17,6 +17,7 @@ use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Repositories\ConversationRepository;
 use Webkul\UnifiedInbox\Repositories\MessageRepository;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
+use Webkul\UnifiedInbox\Services\InboxNotifier;
 use Webkul\UnifiedInbox\Services\MetaGraphClient;
 
 class WebhookController extends Controller
@@ -392,7 +393,7 @@ class WebhookController extends Controller
     ): void {
         $occurredAt ??= now();
 
-        DB::transaction(function () use ($channel, $accountId, $externalSenderId, $customerName, $externalMessageId, $body, $attachments, $occurredAt, $avatarUrl) {
+        $stored = DB::transaction(function () use ($channel, $accountId, $externalSenderId, $customerName, $externalMessageId, $body, $attachments, $occurredAt, $avatarUrl) {
             // Same customer on an older/other number of this tenant: carry CRM links into the new
             // number's conversation and remember the previous thread (its history stays untouched).
             $previous = $this->conversationRepository->getModel()->newQuery()
@@ -423,7 +424,7 @@ class WebhookController extends Controller
                 ->findOrFail($conversation->id);
 
             if ($conversation->messages()->where('external_id', $externalMessageId)->exists()) {
-                return;
+                return null;
             }
 
             $personId = null;
@@ -471,7 +472,20 @@ class WebhookController extends Controller
             }
 
             $conversation->save();
+
+            return $conversation;
         }, 3);
+
+        if ($stored) {
+            try {
+                app(InboxNotifier::class)->notifyInbound($stored, $body, $attachments !== []);
+            } catch (\Throwable $e) {
+                Log::warning('Unified Inbox could not create the new message notification.', [
+                    'conversation_id' => $stored->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
