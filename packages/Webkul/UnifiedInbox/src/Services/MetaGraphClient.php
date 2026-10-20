@@ -76,23 +76,37 @@ class MetaGraphClient
 
     /**
      * Exchange short-lived auth code from Facebook Login / Embedded Signup for an access token.
+     *
+     * For FB.login({ response_type: 'code' }) the JS SDK does not use a normal redirect URI.
+     * Meta requires an explicit empty redirect_uri on exchange (omit vs "" is not the same).
      */
-    public function exchangeCodeForToken(string $code, ?string $redirectUri = null): array
+    public function exchangeCodeForToken(string $code, ?string $redirectUri = ''): array
     {
         $appId = (string) config('unified-inbox.meta.app_id');
         $appSecret = (string) config('unified-inbox.meta.app_secret');
 
-        $params = [
+        return $this->request('get', 'oauth/access_token', [
             'client_id' => $appId,
             'client_secret' => $appSecret,
             'code' => $code,
-        ];
+            'redirect_uri' => $redirectUri ?? '',
+        ]);
+    }
 
-        if ($redirectUri) {
-            $params['redirect_uri'] = $redirectUri;
-        }
+    /**
+     * Upgrade a short-lived user token from FB.login to a long-lived token.
+     */
+    public function exchangeShortLivedToken(string $shortLivedToken): array
+    {
+        $appId = (string) config('unified-inbox.meta.app_id');
+        $appSecret = (string) config('unified-inbox.meta.app_secret');
 
-        return $this->request('get', 'oauth/access_token', $params);
+        return $this->request('get', 'oauth/access_token', [
+            'grant_type' => 'fb_exchange_token',
+            'client_id' => $appId,
+            'client_secret' => $appSecret,
+            'fb_exchange_token' => $shortLivedToken,
+        ]);
     }
 
     /**
@@ -216,12 +230,184 @@ class MetaGraphClient
 
     /**
      * Retrieve Facebook pages managed by the user along with connected Instagram business accounts.
+     *
+     * Facebook Login for Business / New Pages Experience often returns an empty /me/accounts list.
+     * Fallbacks: Embedded Signup page_ids, debug_token granular_scopes, /me/assigned_pages,
+     * and Business Manager owned/client pages.
+     *
+     * @param  list<string>  $preferredPageIds  Optional Page IDs from Embedded Signup session info.
      */
-    public function getFacebookPages(string $userToken): array
+    public function getFacebookPages(string $userToken, array $preferredPageIds = []): array
     {
-        return $this->rows('me/accounts', [
-            'fields' => 'id,name,access_token,tasks,instagram_business_account{id,username,name,profile_picture_url}',
-        ], $userToken);
+        $fields = 'id,name,access_token,tasks,instagram_business_account{id,username,name,profile_picture_url}';
+        $preferredPageIds = array_values(array_unique(array_filter(array_map('strval', $preferredPageIds))));
+        $seen = [];
+        $merged = [];
+
+        $append = function (array $pages) use (&$merged, &$seen): void {
+            foreach ($pages as $page) {
+                $id = (string) ($page['id'] ?? '');
+
+                if ($id === '' || isset($seen[$id])) {
+                    continue;
+                }
+
+                $seen[$id] = true;
+                $merged[] = $page;
+            }
+        };
+
+        if ($preferredPageIds !== []) {
+            $append($this->fetchPagesByIds($preferredPageIds, $fields, $userToken));
+        }
+
+        if ($merged === []) {
+            $append($this->rows('me/accounts', ['fields' => $fields], $userToken));
+        }
+
+        if ($merged === []) {
+            try {
+                $append($this->rows('me/assigned_pages', ['fields' => $fields], $userToken));
+            } catch (MetaGraphException) {
+                // Permission may be missing; continue with other fallbacks.
+            }
+        }
+
+        if ($merged === []) {
+            $append($this->fetchPagesByIds($this->pageIdsFromGranularScopes($userToken), $fields, $userToken));
+        }
+
+        if ($merged === []) {
+            $append($this->pagesFromBusinesses($fields, $userToken));
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Summarize token grants for connect-error diagnostics (no secrets).
+     *
+     * @return array{scopes: list<string>, granular: list<array{scope: string, targets: int}>}
+     */
+    public function describeTokenAssets(string $userToken): array
+    {
+        $debug = $this->debugToken($userToken);
+        $scopes = array_values(array_filter(array_map('strval', (array) ($debug['scopes'] ?? []))));
+        $granular = [];
+
+        foreach ((array) ($debug['granular_scopes'] ?? []) as $scope) {
+            if (! is_array($scope)) {
+                continue;
+            }
+
+            $granular[] = [
+                'scope' => (string) ($scope['scope'] ?? ''),
+                'targets' => count((array) ($scope['target_ids'] ?? [])),
+            ];
+        }
+
+        return [
+            'scopes' => $scopes,
+            'granular' => $granular,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function pageIdsFromGranularScopes(string $userToken): array
+    {
+        $debug = $this->debugToken($userToken);
+        $pageIds = [];
+
+        foreach ((array) ($debug['granular_scopes'] ?? []) as $scope) {
+            if (! is_array($scope)) {
+                continue;
+            }
+
+            $scopeName = (string) ($scope['scope'] ?? '');
+
+            // Prefer pages_* target IDs; also accept bare target_ids on messaging configs.
+            $useTargets = $scopeName === ''
+                || str_starts_with($scopeName, 'pages_')
+                || in_array($scopeName, ['pages_messaging', 'pages_manage_metadata', 'pages_show_list', 'pages_read_engagement'], true);
+
+            if (! $useTargets) {
+                continue;
+            }
+
+            foreach ((array) ($scope['target_ids'] ?? []) as $id) {
+                $id = (string) $id;
+
+                if ($id !== '') {
+                    $pageIds[$id] = true;
+                }
+            }
+        }
+
+        // PHP casts numeric string keys to ints; normalize back to strings for Graph IDs.
+        return array_map('strval', array_keys($pageIds));
+    }
+
+    /**
+     * @param  list<string>  $pageIds
+     * @return list<array<string, mixed>>
+     */
+    protected function fetchPagesByIds(array $pageIds, string $fields, string $userToken): array
+    {
+        $pages = [];
+
+        foreach ($pageIds as $pageId) {
+            try {
+                $page = $this->request('get', $pageId, ['fields' => $fields], $userToken);
+
+                if (! empty($page['id']) && isset($page['access_token'])) {
+                    $pages[] = $page;
+                } elseif (! empty($page['id'])) {
+                    // Some tokens return the Page without an embedded page token; still usable with user token.
+                    $page['access_token'] = $page['access_token'] ?? $userToken;
+                    $pages[] = $page;
+                }
+            } catch (MetaGraphException $e) {
+                // Skip non-page target IDs or assets the token cannot read.
+            }
+        }
+
+        return $pages;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function pagesFromBusinesses(string $fields, string $userToken): array
+    {
+        $pages = [];
+
+        try {
+            $businesses = $this->rows('me/businesses', ['fields' => 'id,name'], $userToken);
+        } catch (MetaGraphException) {
+            return [];
+        }
+
+        foreach ($businesses as $business) {
+            $businessId = (string) ($business['id'] ?? '');
+
+            if ($businessId === '') {
+                continue;
+            }
+
+            foreach (['owned_pages', 'client_pages'] as $edge) {
+                try {
+                    foreach ($this->rows($businessId.'/'.$edge, ['fields' => $fields], $userToken) as $page) {
+                        $pages[] = $page;
+                    }
+                } catch (MetaGraphException) {
+                    continue;
+                }
+            }
+        }
+
+        return $pages;
     }
 
     /**
@@ -319,6 +505,39 @@ class MetaGraphClient
             'type' => $type,
             $type => $media,
         ], $token);
+    }
+
+    /**
+     * Resolve a Messenger PSID or Instagram-scoped ID to a display name via the Page token.
+     *
+     * @return array{name: string, username: string, profile_pic: string}
+     */
+    public function messagingUserProfile(string $userId, string $pageToken, string $channel = 'messenger'): array
+    {
+        $fields = $channel === 'instagram'
+            ? 'name,username,profile_pic'
+            : 'name,first_name,last_name,profile_pic';
+
+        $payload = $this->request('get', $userId, ['fields' => $fields], $pageToken);
+
+        $name = trim((string) ($payload['name'] ?? ''));
+
+        if ($name === '') {
+            $name = trim(collect([
+                $payload['first_name'] ?? null,
+                $payload['last_name'] ?? null,
+            ])->filter()->implode(' '));
+        }
+
+        if ($name === '') {
+            $name = trim((string) ($payload['username'] ?? ''));
+        }
+
+        return [
+            'name' => $name,
+            'username' => (string) ($payload['username'] ?? ''),
+            'profile_pic' => (string) ($payload['profile_pic'] ?? ''),
+        ];
     }
 
     /**

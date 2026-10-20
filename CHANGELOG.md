@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Show each Unified Inbox channel tab as Connected or Disconnected from the live account, and badge the tab with that channel’s conversation count (unread highlighted) instead of an unread total that stays at 0.
+- Restyle Unified Inbox like Meta Business Suite: drop the left folders rail and move Inbox / Unread / Follow up / Done / Spam (plus labels) into Meta-style filter pills under the conversation search; keep channel tabs on top and a clean list + chat + profile layout.
+- Fix Unified Inbox chat header overlap (Messenger / Assignee / flags) with a two-row identity + actions layout, and clip `avatar_url` avatars for all channels.
+- Keep one shared inbox “Add new contact” dialog for WhatsApp/Messenger/Instagram, and for Messenger/Instagram add contact search by display name, Contact ID, or linked CRM person email — limited to people who already messaged the connected account (Meta does not allow searching arbitrary Facebook users).
+- Use one central Meta OAuth redirect URI (`/api/meta/oauth/callback` on the platform host) for every tenant and channel—same pattern as the single `/api/meta/webhook`—so Valid OAuth Redirect URIs only need one entry in the Meta app.
+- Fix Meta Development login failing with redirect_uri mismatch by accepting the FB.login user access token (long-lived exchange) instead of a JS SDK authorization code; keep Page/Instagram dropdown selection and the single central `/api/meta/webhook` route.
+- After Messenger/Instagram Meta login, show a Page/Instagram account dropdown to finish connect (Development scopes login when `UNIFIED_INBOX_ALLOW_MANUAL_CONNECT` is enabled); keep the existing single central `/api/meta/webhook` route.
+- Add a Sandbox / App Review manual channel connect form (gated by `UNIFIED_INBOX_ALLOW_MANUAL_CONNECT`) so Messenger, Instagram, and WhatsApp can be connected with a Graph API Page/WABA token while Meta permissions are still in Development.
+- Fix Messenger/Instagram Embedded Signup failing with “Meta did not return an account”: wait for Messaging sessionInfo `page_ids`, resolve Pages from Login for Business `granular_scopes`, `/me/assigned_pages`, and Business Manager owned/client pages when `/me/accounts` is empty, surface token-scope diagnostics, and require a Page or linked Instagram account for the chosen channel.
 - Add `crm:lead-ai-fields` and `tenants:lead-ai-fields` commands that create (or with `--remove` delete) the AI-sales lead fields (fit score, personalization notes, intent, confidence, recommended product, human approval, etc.) as regular user-defined Attributes, so they stay editable and deletable from Settings → Attributes. New tenants get these fields automatically during provisioning.
 - Continue old-number WhatsApp chats on the current number via an approved template: require an open 24-hour customer service window on the current number before sending free text or attachments, and copy CRM links when starting the continuation thread.
 - Deliver WhatsApp, Messenger, and Instagram events to this inbox by registering the CRM webhook and a WhatsApp account callback, and sync recent Messenger and Instagram threads after connect.

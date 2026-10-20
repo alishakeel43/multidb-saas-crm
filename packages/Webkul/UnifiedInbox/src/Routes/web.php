@@ -4,14 +4,16 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
 use Webkul\UnifiedInbox\Http\Controllers\ChannelController;
 use Webkul\UnifiedInbox\Http\Controllers\InboxController;
+use Webkul\UnifiedInbox\Http\Controllers\MetaOAuthController;
 use Webkul\UnifiedInbox\Http\Controllers\WebhookController;
 
 /*
 |--------------------------------------------------------------------------
-| Public Meta Webhook Routes
+| Public Meta Webhook + OAuth Routes
 |--------------------------------------------------------------------------
 */
 // One common Meta webhook for WhatsApp, Messenger and Instagram (register this URL once in Meta).
+// One common OAuth redirect for every tenant/channel (register this URL once in Meta Valid OAuth Redirect URIs).
 Route::middleware(['web'])
     ->withoutMiddleware([
         ValidateCsrfToken::class,
@@ -21,6 +23,7 @@ Route::middleware(['web'])
     ->group(function () {
         Route::get('webhook', [WebhookController::class, 'verify'])->name('verify');
         Route::post('webhook', [WebhookController::class, 'handle'])->name('handle');
+        Route::get('oauth/callback', [MetaOAuthController::class, 'callback'])->name('oauth.callback');
     });
 
 /*
@@ -35,6 +38,7 @@ Route::middleware(['web', 'admin_locale', 'user'])
         // Main Unified Inbox view
         Route::get('unified-inbox', [InboxController::class, 'index'])->name('index');
         Route::get('unified-inbox/compose/templates', [InboxController::class, 'composeTemplates'])->name('compose.templates');
+        Route::get('unified-inbox/compose/contacts', [InboxController::class, 'composeContacts'])->name('compose.contacts');
         Route::post('unified-inbox/compose', [InboxController::class, 'compose'])->name('compose.store');
         Route::get('unified-inbox/{id}', [InboxController::class, 'show'])->whereNumber('id')->name('show');
 
@@ -68,6 +72,9 @@ Route::middleware(['web', 'admin_locale', 'user'])
         Route::prefix('settings/channels')->name('channels.')->group(function () {
             Route::get('', [ChannelController::class, 'index'])->name('index');
             Route::get('callback', [ChannelController::class, 'callback'])->name('meta.callback');
+            Route::post('accept-token', [ChannelController::class, 'acceptUserToken'])->name('accept_token');
+            Route::post('complete-selection', [ChannelController::class, 'completeSelection'])->name('complete_selection');
+            Route::post('cancel-selection', [ChannelController::class, 'cancelSelection'])->name('cancel_selection');
             Route::post('manual', [ChannelController::class, 'manualConnect'])->name('manual');
             Route::post('{id}/disconnect', [ChannelController::class, 'disconnect'])->name('disconnect');
         });

@@ -11,9 +11,13 @@
     .ui-rail-icon{flex:0 0 16px}
     .ui-rail-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .ui-rail-count{font-size:11px;padding:0 6px;border-radius:999px;background:#fff;border:1px solid var(--ui-line,#e7eaf2);color:var(--ui-muted,#74809a)}
-    @media(min-width:1024px){
-        .ui-inbox .ui-columns.ui-has-rail{grid-template-columns:184px 300px minmax(0,1fr)}
+    /* Folders rail when the workspace (after app sidebar) has room */
+    @media(min-width:1280px){
+        .ui-inbox .ui-columns.ui-has-rail{grid-template-columns:160px minmax(260px,290px) minmax(0,1fr)}
         .ui-inbox .ui-columns.ui-has-rail .ui-rail{display:flex}
+    }
+    @media(min-width:1600px){
+        .ui-inbox .ui-columns.ui-has-rail{grid-template-columns:184px 300px minmax(0,1fr)}
     }
     .ui-label-dot{width:10px;height:10px;border-radius:999px;flex:0 0 10px;background:hsl(var(--ui-label-hue,230) 70% 55%)}
     .ui-labels{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
@@ -21,7 +25,8 @@
     .ui-label button{border:0;background:none;color:inherit;cursor:pointer;font-size:12px;line-height:1;padding:0}
     .ui-label-editor{display:flex;flex-direction:column;gap:8px}
     .ui-label-editor input{border:1px solid var(--ui-line,#e7eaf2);border-radius:8px;padding:6px 8px;font-size:13px}
-    .ui-avatar-img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+    .ui-avatar{overflow:hidden;position:relative;isolation:isolate}
+    .ui-avatar-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;max-width:none}
     .ui-unread-dot{width:9px;height:9px;border-radius:999px;background:var(--ui-accent,#444cf4);flex:0 0 9px}
     /* WhatsApp-style ticks */
     .ui-tick{display:inline-flex;align-items:center;color:#8696a0}
@@ -79,5 +84,14 @@
     .ui-numhist table{width:100%;border-collapse:collapse;font-size:13px}
     .ui-numhist th,.ui-numhist td{padding:8px 10px;border-bottom:1px solid var(--ui-line,#e7eaf2);text-align:left}
     .ui-numhist .is-current{color:#11733b;font-weight:600}
+    .ui-sandbox{margin-top:24px}
+    .ui-sandbox-form{display:flex;flex-direction:column;gap:14px;max-width:920px}
+    .ui-sandbox-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .ui-sandbox-grid label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#334155}
+    .ui-sandbox-grid input,.ui-sandbox-grid select,.ui-sandbox-grid textarea{font-weight:500;border:1px solid var(--ui-line,#e7eaf2);border-radius:10px;padding:10px 12px;background:#fff}
+    .ui-sandbox-token{grid-column:1/-1}
+    .ui-sandbox-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .ui-asset-picker{border:1px solid #bfd7ff;background:#f5f9ff}
+    @media (max-width:720px){.ui-sandbox-grid{grid-template-columns:1fr}}
 </style>
 @endPushOnce

@@ -15,10 +15,18 @@ return [
         // Facebook Login for Business configuration IDs (Embedded Signup).
         'whatsapp_config_id' => env('UNIFIED_INBOX_WHATSAPP_CONFIG_ID'),
         'messaging_config_id' => env('UNIFIED_INBOX_MESSAGING_CONFIG_ID'),
+        // Manual Page/WABA token connect for Development / App Review demos.
+        'allow_manual_connect' => filter_var(
+            env('UNIFIED_INBOX_ALLOW_MANUAL_CONNECT', env('APP_ENV') !== 'production' ? 'true' : 'false'),
+            FILTER_VALIDATE_BOOLEAN
+        ),
     ],
 
     // Explicit central webhook override (defaults to root app.url)
     'webhook_url' => env('UNIFIED_INBOX_WEBHOOK_URL'),
+
+    // One Valid OAuth Redirect URI for all tenants/channels (defaults beside the webhook URL).
+    'oauth_redirect_url' => env('UNIFIED_INBOX_OAUTH_REDIRECT_URL'),
 
     // AI reply suggestions (OpenAI-compatible /chat/completions).
     // provider: grok (xAI) | custom (local Ollama/LM Studio/etc.) | openai

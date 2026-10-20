@@ -226,7 +226,61 @@ class InboxController extends Controller
             'continuation' => $activeConversation && isset($oldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id])
                 ? $this->continuationFor($activeConversation)
                 : null,
+            'channelTabStats' => $this->channelTabStats($connections, $historyConnections, $hasFolders),
         ]);
+    }
+
+    /**
+     * Per-channel tab state: live connection (not archived history) plus conversation and unread totals
+     * for every account this tenant has connected, including old numbers.
+     *
+     * @return array<string, array{connected: bool, conversations: int, unread: int}>
+     */
+    protected function channelTabStats($connections, $historyConnections, bool $hasFolders): array
+    {
+        $channels = array_keys(config('unified-inbox.channels', [
+            'whatsapp' => [],
+            'messenger' => [],
+            'instagram' => [],
+        ]));
+
+        $counts = collect();
+
+        if ($historyConnections->isNotEmpty()) {
+            $query = $this->conversationRepository->getModel()->newQuery();
+            $query->where(function ($outer) use ($historyConnections) {
+                foreach ($historyConnections as $connection) {
+                    $outer->orWhere(function ($inner) use ($connection) {
+                        $inner->where('channel', $connection->channel)
+                            ->where('account_id', $connection->external_id);
+                    });
+                }
+            });
+
+            if ($hasFolders) {
+                $query->where(fn ($inner) => $inner->whereNull('is_spam')->orWhere('is_spam', false));
+            }
+
+            $counts = $query->toBase()
+                ->selectRaw('channel, COUNT(*) as conversations, COALESCE(SUM(unread_count), 0) as unread')
+                ->groupBy('channel')
+                ->get()
+                ->keyBy('channel');
+        }
+
+        $connected = $connections->where('status', 'connected')->pluck('channel')->unique();
+        $stats = [];
+
+        foreach ($channels as $channel) {
+            $row = $counts->get($channel);
+            $stats[$channel] = [
+                'connected' => $connected->contains($channel),
+                'conversations' => (int) ($row->conversations ?? 0),
+                'unread' => (int) ($row->unread ?? 0),
+            ];
+        }
+
+        return $stats;
     }
 
     /**
@@ -1026,11 +1080,55 @@ class InboxController extends Controller
     }
 
     /**
-     * Related CRM graph via real Krayin relations: lead -> person -> organization, person -> leads.
+     * Search existing Messenger/Instagram contacts already known to this inbox by
+     * display name, Contact ID, or linked CRM person name/email.
+     * Meta does not allow searching arbitrary Facebook users — only people who messaged the Page.
      */
-    /**
-     * Human-readable reason for a Meta send failure (common Graph error codes).
-     */
+    public function composeContacts(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'channel' => 'required|in:whatsapp,messenger,instagram',
+            'q' => 'nullable|string|max:100',
+        ]);
+
+        $channel = $validated['channel'];
+        $query = trim((string) ($validated['q'] ?? ''));
+        $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $query).'%';
+
+        $rows = $this->conversationRepository->getModel()->newQuery()
+            ->with('person:id,name,emails')
+            ->where('channel', $channel)
+            ->when($query !== '', function ($builder) use ($like) {
+                $builder->where(function ($inner) use ($like) {
+                    $inner->where('customer_name', 'like', $like)
+                        ->orWhere('external_id', 'like', $like)
+                        ->orWhere('last_message_preview', 'like', $like)
+                        ->orWhereHas('person', function ($person) use ($like) {
+                            $person->where('name', 'like', $like)
+                                ->orWhere('emails', 'like', $like);
+                        });
+                });
+            })
+            ->orderByDesc('last_message_at')
+            ->limit(15)
+            ->get(['id', 'external_id', 'customer_name', 'last_message_preview', 'last_message_at', 'person_id']);
+
+        return response()->json([
+            'contacts' => $rows->map(function ($row) {
+                $email = collect($row->person?->emails)->pluck('value')->filter()->first();
+                $name = (string) ($row->customer_name ?: $row->person?->name ?: $row->external_id);
+
+                return [
+                    'id' => (string) $row->external_id,
+                    'name' => $name,
+                    'email' => $email ? (string) $email : '',
+                    'preview' => (string) ($row->last_message_preview ?? ''),
+                    'conversation_id' => (int) $row->id,
+                ];
+            })->values(),
+        ]);
+    }
+
     public function composeTemplates(Request $request): JsonResponse
     {
         $connection = $this->connectedChannel('whatsapp');

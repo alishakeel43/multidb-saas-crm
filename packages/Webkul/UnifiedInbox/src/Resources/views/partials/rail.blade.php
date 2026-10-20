@@ -12,18 +12,6 @@
     ];
 @endphp
 <nav class="ui-rail" aria-label="Inbox folders" v-pre>
-    <p class="ui-rail-head">Channels</p>
-    <a class="ui-rail-item" href="{{ $uiRail(['channel' => null]) }}" @if(! request('channel')) aria-current="page" @endif>
-        <span class="ui-channel" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => 'all'])</span>
-        <span class="ui-rail-label">All</span>
-    </a>
-    @foreach ($channels as $key => $channel)
-        <a class="ui-rail-item" href="{{ $uiRail(['channel' => $key]) }}" @if(request('channel') === $key) aria-current="page" @endif>
-            <span class="ui-channel ui-channel-{{ $key }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $key])</span>
-            <span class="ui-rail-label">{{ $channel['label'] ?? ucfirst($key) }}</span>
-        </a>
-    @endforeach
-
     <p class="ui-rail-head">Folders</p>
     @foreach ($uiFolders as $key => [$label, $icon])
         <a class="ui-rail-item" href="{{ $uiRail(['folder' => $uiFolder === $key ? null : $key]) }}" @if($uiFolder === $key) aria-current="page" @endif>

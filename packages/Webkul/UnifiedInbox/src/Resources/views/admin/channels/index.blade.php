@@ -65,6 +65,45 @@
                 </div>
             </div>
 
+            @if (! empty($pendingSelection) && ! empty($pendingSelection['assets']))
+                <section class="ui-channels ui-sandbox ui-asset-picker" aria-label="{{ __('unified_inbox::app.channels.picker-title') }}">
+                    <div class="ui-channels-head">
+                        <h2>{{ __('unified_inbox::app.channels.picker-title') }}</h2>
+                        <p>
+                            {{ $pendingSelection['channel'] === 'instagram'
+                                ? __('unified_inbox::app.channels.picker-help-instagram')
+                                : __('unified_inbox::app.channels.picker-help-messenger') }}
+                        </p>
+                    </div>
+
+                    <form method="POST" action="{{ route('admin.unified_inbox.channels.complete_selection') }}" class="ui-sandbox-form">
+                        @csrf
+                        <input type="hidden" name="selection_id" value="{{ $pendingSelection['selection_id'] }}">
+                        <div class="ui-sandbox-grid">
+                            <label class="ui-sandbox-token">
+                                <span>{{ __('unified_inbox::app.channels.picker-select') }}</span>
+                                <select name="asset_id" required>
+                                    @foreach ($pendingSelection['assets'] as $asset)
+                                        <option value="{{ $asset['id'] }}">{{ $asset['name'] }} ({{ $asset['id'] }})</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        </div>
+                        <div class="ui-sandbox-actions">
+                            <button type="submit" class="ui-channels-btn ui-channels-connect">
+                                {{ __('unified_inbox::app.channels.picker-confirm') }}
+                            </button>
+                            <button type="submit" form="ui-cancel-meta-selection" class="ui-channels-btn ui-channels-disconnect">
+                                {{ __('unified_inbox::app.channels.picker-cancel') }}
+                            </button>
+                        </div>
+                    </form>
+                    <form id="ui-cancel-meta-selection" method="POST" action="{{ route('admin.unified_inbox.channels.cancel_selection') }}" class="hidden">
+                        @csrf
+                    </form>
+                </section>
+            @endif
+
             @if (! empty($numberHistory) && count($numberHistory))
                 <section class="ui-channels ui-numhist" aria-label="Number history">
                     <div class="ui-channels-head">
@@ -100,8 +139,11 @@
         const metaVersion = "{{ config('unified-inbox.meta.version', 'v21.0') }}";
         const waConfigId = "{{ config('unified-inbox.meta.whatsapp_config_id') }}";
         const msgConfigId = "{{ config('unified-inbox.meta.messaging_config_id') }}";
+        const useDevScopesLogin = @js((bool) ($allowManualConnect ?? false));
         const metaOAuthStates = @js($oauthStates);
-        const metaCallbackUrl = @js(route('admin.unified_inbox.channels.meta.callback'));
+        const metaCallbackUrl = @js($centralOAuthRedirectUrl ?? route('unified_inbox.meta_webhook.oauth.callback'));
+        const metaAcceptTokenUrl = @js(route('admin.unified_inbox.channels.accept_token'));
+        const metaCsrfToken = @js(csrf_token());
         let activeMetaSignup = null;
 
         window.fbAsyncInit = function() {
@@ -135,7 +177,16 @@
                 return;
             }
 
-            if (!data || data.type !== 'WA_EMBEDDED_SIGNUP') {
+            if (!data || typeof data !== 'object') {
+                return;
+            }
+
+            // WhatsApp uses WA_EMBEDDED_SIGNUP; Messaging configs may omit type or reuse it.
+            const isWhatsAppEvent = data.type === 'WA_EMBEDDED_SIGNUP';
+            const isMessagingEvent = activeMetaSignup.channel !== 'whatsapp'
+                && (isWhatsAppEvent || data.type === undefined || data.type === null || data.type === 'FB_EMBEDDED_SIGNUP');
+
+            if (! isWhatsAppEvent && ! isMessagingEvent) {
                 return;
             }
 
@@ -149,14 +200,65 @@
                 const signupData = data.data && typeof data.data === 'object' ? data.data : data;
                 const wabaId = signupData.waba_id || signupData.wabaId;
                 const phoneNumberId = signupData.phone_number_id || signupData.phoneNumberId;
+                const rawPageIds = signupData.page_ids || signupData.pageIds || signupData.pages;
+                const singlePageId = signupData.page_id || signupData.pageId;
 
                 if (wabaId && phoneNumberId) {
                     activeMetaSignup.wabaId = String(wabaId);
                     activeMetaSignup.phoneNumberId = String(phoneNumberId);
-                    finishMetaSignup();
                 }
+
+                let pageIds = [];
+                if (Array.isArray(rawPageIds)) {
+                    pageIds = rawPageIds.map(String).filter(Boolean);
+                } else if (rawPageIds && typeof rawPageIds === 'object') {
+                    pageIds = Object.values(rawPageIds).map(String).filter(Boolean);
+                }
+                if (singlePageId) {
+                    pageIds.push(String(singlePageId));
+                }
+                if (pageIds.length) {
+                    activeMetaSignup.pageIds = Array.from(new Set(pageIds));
+                }
+
+                activeMetaSignup.sessionFinished = true;
+                finishMetaSignup();
             }
         });
+
+        function submitMetaUserToken(accessToken) {
+            if (!activeMetaSignup || activeMetaSignup.redirected) {
+                return;
+            }
+
+            activeMetaSignup.redirected = true;
+            if (activeMetaSignup.finishTimer) {
+                clearTimeout(activeMetaSignup.finishTimer);
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = metaAcceptTokenUrl;
+            form.style.display = 'none';
+
+            const fields = {
+                _token: metaCsrfToken,
+                channel: activeMetaSignup.channel,
+                state: activeMetaSignup.state,
+                access_token: accessToken
+            };
+
+            Object.keys(fields).forEach(function (key) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = fields[key];
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        }
 
         function finishMetaSignup() {
             if (!activeMetaSignup || activeMetaSignup.redirected || !activeMetaSignup.code) {
@@ -164,6 +266,14 @@
             }
 
             if (activeMetaSignup.channel === 'whatsapp' && (!activeMetaSignup.wabaId || !activeMetaSignup.phoneNumberId)) {
+                return;
+            }
+
+            // Messaging: wait briefly for sessionInfo page_ids before redirecting.
+            if (activeMetaSignup.channel !== 'whatsapp'
+                && !activeMetaSignup.sessionFinished
+                && !activeMetaSignup.forceFinish
+            ) {
                 return;
             }
 
@@ -178,15 +288,51 @@
                 params.set('phone_number_id', activeMetaSignup.phoneNumberId);
             }
 
+            if (Array.isArray(activeMetaSignup.pageIds)) {
+                activeMetaSignup.pageIds.forEach(function (pageId) {
+                    params.append('page_ids[]', pageId);
+                });
+            }
+
             activeMetaSignup.redirected = true;
+            if (activeMetaSignup.finishTimer) {
+                clearTimeout(activeMetaSignup.finishTimer);
+            }
             window.location.assign(metaCallbackUrl + '?' + params.toString());
+        }
+
+        function scheduleMessagingFinishFallback() {
+            if (!activeMetaSignup || activeMetaSignup.channel === 'whatsapp') {
+                return;
+            }
+
+            if (activeMetaSignup.finishTimer) {
+                clearTimeout(activeMetaSignup.finishTimer);
+            }
+
+            activeMetaSignup.finishTimer = setTimeout(function () {
+                if (!activeMetaSignup || activeMetaSignup.redirected) {
+                    return;
+                }
+
+                activeMetaSignup.forceFinish = true;
+                finishMetaSignup();
+            }, 2500);
         }
 
         function launchMetaEmbeddedSignup(channel) {
             const configId = (channel === 'whatsapp') ? waConfigId : msgConfigId;
+            const usingScopes = channel !== 'whatsapp' && useDevScopesLogin;
 
             if (!metaAppId) {
                 alert('Meta App ID is not configured. Please set UNIFIED_INBOX_META_APP_ID in your environment.');
+                return;
+            }
+
+            if (! usingScopes && ! configId) {
+                alert(channel === 'whatsapp'
+                    ? 'Meta WhatsApp configuration ID is missing. Set UNIFIED_INBOX_WHATSAPP_CONFIG_ID in the environment.'
+                    : 'Meta Messaging configuration ID is missing. Set UNIFIED_INBOX_MESSAGING_CONFIG_ID in the environment.');
                 return;
             }
 
@@ -201,25 +347,61 @@
                 code: null,
                 wabaId: null,
                 phoneNumberId: null,
+                pageIds: [],
+                sessionFinished: false,
+                forceFinish: false,
+                finishTimer: null,
                 redirected: false
             };
 
             if (window.FB) {
+                // Development scopes: use short-lived access token (avoids JS SDK redirect_uri mismatch).
+                // Embedded Signup (WhatsApp / production messaging): authorization code + empty redirect_uri exchange.
+                const loginOptions = (channel !== 'whatsapp' && useDevScopesLogin)
+                    ? {
+                        // Popup returns accessToken (no per-tenant redirect). Meta App still
+                        // only needs the one central Valid OAuth Redirect URI below for code flows.
+                        scope: channel === 'instagram'
+                            ? 'pages_show_list,pages_messaging,pages_manage_metadata,business_management,instagram_basic,instagram_manage_messages'
+                            : 'pages_show_list,pages_messaging,pages_manage_metadata,business_management',
+                        return_scopes: true,
+                        auth_type: 'rerequest'
+                    }
+                    : {
+                        config_id: configId,
+                        response_type: 'code',
+                        override_default_response_type: true,
+                        extras: {
+                            setup: {},
+                            sessionInfoVersion: '3',
+                            // One central URI for every tenant — register once in Meta App.
+                            fallback_redirect_uri: metaCallbackUrl
+                        }
+                    };
+
                 FB.login(function(response) {
-                    if (response.authResponse && response.authResponse.code && activeMetaSignup) {
+                    if (!activeMetaSignup) {
+                        return;
+                    }
+
+                    if (usingScopes && response.authResponse && response.authResponse.accessToken) {
+                        submitMetaUserToken(response.authResponse.accessToken);
+                        return;
+                    }
+
+                    if (response.authResponse && response.authResponse.code) {
                         activeMetaSignup.code = response.authResponse.code;
-                        finishMetaSignup();
-                    } else {
-                        activeMetaSignup = null;
+                        if (activeMetaSignup.channel === 'whatsapp') {
+                            finishMetaSignup();
+                        } else {
+                            finishMetaSignup();
+                            scheduleMessagingFinishFallback();
+                        }
+                        return;
                     }
-                }, {
-                    config_id: configId,
-                    response_type: 'code',
-                    override_default_response_type: true,
-                    extras: {
-                        sessionInfoVersion: '3'
-                    }
-                });
+
+                    activeMetaSignup = null;
+                }, loginOptions);
             } else {
                 alert('Meta SDK is still loading. Please try again in a few moments.');
             }

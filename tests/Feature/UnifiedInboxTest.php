@@ -3,6 +3,7 @@
 use App\Models\Tenant;
 use App\Services\FeatureEntitlementService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Webkul\Lead\Models\Lead;
 use Webkul\UnifiedInbox\Models\ChannelConnection;
@@ -15,7 +16,7 @@ use Webkul\User\Models\User;
 uses(DatabaseTransactions::class);
 
 afterEach(function () {
-    $tenant = \Illuminate\Support\Facades\DB::connection('tenant');
+    $tenant = DB::connection('tenant');
     while ($tenant->transactionLevel() > 0) {
         $tenant->rollBack();
     }
@@ -29,13 +30,13 @@ beforeEach(function () {
 
     // Hard guard: makeCurrent() reconnects the tenant connection to the tenant's DB.
     // Never let this suite wipe real local data (it deletes all inbox rows below).
-    $tenantDb = (string) \Illuminate\Support\Facades\DB::connection('tenant')->getDatabaseName();
+    $tenantDb = (string) DB::connection('tenant')->getDatabaseName();
     if (in_array($tenantDb, ['tenant_demo', 'tenant_bootstrap'], true) || ! str_starts_with($tenantDb, 'tenant_test')) {
         throw new RuntimeException("UnifiedInboxTest refused to run against database [{$tenantDb}]. Use the isolated test DB (see phpunit.xml).");
     }
 
     // The reconnect above escapes DatabaseTransactions; wrap the tenant connection again.
-    \Illuminate\Support\Facades\DB::connection('tenant')->beginTransaction();
+    DB::connection('tenant')->beginTransaction();
 
     Message::query()->delete();
     Conversation::query()->delete();
@@ -457,6 +458,54 @@ it('can convert a conversation into a CRM lead', function () {
     expect($lead)->not->toBeNull()
         ->and($lead->title)->toBe('Big Beet Farm Deal')
         ->and((int) $lead->lead_value)->toBe(5000);
+});
+
+it('shows live connected status and conversation counts on inbox channel tabs', function () {
+    ChannelConnection::create([
+        'channel' => 'messenger',
+        'external_id' => 'PAGE_LIVE',
+        'name' => 'Live Page',
+        'status' => 'connected',
+        'credentials' => ['access_token' => 'token'],
+    ]);
+    ChannelConnection::create([
+        'channel' => 'whatsapp',
+        'external_id' => 'PHONE_OLD',
+        'name' => 'Old WhatsApp',
+        'status' => 'disconnected',
+        'credentials' => ['access_token' => 'token'],
+    ]);
+
+    foreach ([
+        ['messenger', 'PAGE_LIVE', 'Ayesha', 2],
+        ['messenger', 'PAGE_LIVE', 'Bilal', 0],
+        ['whatsapp', 'PHONE_OLD', 'Old Customer', 1],
+        ['whatsapp', 'PHONE_OTHER', 'Stray', 4],
+    ] as [$channel, $accountId, $name, $unread]) {
+        Conversation::create([
+            'channel' => $channel,
+            'account_id' => $accountId,
+            'external_id' => $name,
+            'customer_name' => $name,
+            'status' => 'open',
+            'unread_count' => $unread,
+            'last_message_at' => now(),
+        ]);
+    }
+
+    $response = $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.index'));
+
+    $response->assertSuccessful();
+    $html = $response->getContent();
+
+    expect($html)->toContain('data-ui-channel="all" data-ui-conversations="3"')
+        ->and($html)->toContain('data-ui-channel="messenger" data-ui-connected="1" data-ui-conversations="2"')
+        ->and($html)->toContain('data-ui-channel="whatsapp" data-ui-connected="0" data-ui-conversations="1"')
+        ->and($html)->toContain('data-ui-channel="instagram" data-ui-connected="0" data-ui-conversations="0"')
+        ->and($html)->toContain('>Connected<')
+        ->and($html)->toContain('>Disconnected<')
+        ->and($html)->toContain('>Connect<');
 });
 
 it('displays Connect Channels button and channel statuses in Unified Inbox view', function () {

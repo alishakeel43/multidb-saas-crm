@@ -10,10 +10,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Webkul\UnifiedInbox\Models\Conversation;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
 use Webkul\UnifiedInbox\Services\InboxHistorySync;
 use Webkul\UnifiedInbox\Services\MetaGraphClient;
+use Webkul\UnifiedInbox\Services\MetaOAuthCoordinator;
 
 class ChannelController extends Controller
 {
@@ -21,13 +23,21 @@ class ChannelController extends Controller
         protected ChannelConnectionRepository $channelRepository,
         protected MetaGraphClient $metaClient,
         protected CentralWebhookRouter $router,
-        protected InboxHistorySync $historySync
+        protected InboxHistorySync $historySync,
+        protected MetaOAuthCoordinator $oauth
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $currentTenant = $this->requireCurrentTenant();
+        $this->redeemMetaTicket($request, $currentTenant);
+
+        if ($request->filled('meta_error')) {
+            session()->flash('error', 'Failed to connect Meta channels: '.(string) $request->query('meta_error'));
+        }
+
         $oauthStates = [];
+        $returnUrl = $this->oauth->tenantChannelsReturnUrl($currentTenant);
 
         foreach (['whatsapp', 'messenger', 'instagram'] as $channel) {
             $state = Str::random(64);
@@ -37,6 +47,12 @@ class ChannelController extends Controller
                 'tenant_id' => $currentTenant->id,
                 'user_id' => auth()->guard('user')->id(),
                 'expires_at' => now()->addMinutes(10)->timestamp,
+            ]);
+            $this->oauth->putOAuthState($state, [
+                'tenant_id' => (int) $currentTenant->id,
+                'user_id' => (int) auth()->guard('user')->id(),
+                'channel' => $channel,
+                'return_url' => $returnUrl,
             ]);
         }
 
@@ -72,8 +88,11 @@ class ChannelController extends Controller
         return view('unified_inbox::admin.channels.index', [
             'channels' => $channels,
             'centralWebhookUrl' => $this->router->getCentralWebhookUrl(),
+            'centralOAuthRedirectUrl' => $this->oauth->getCentralOAuthRedirectUrl(),
             'numberHistory' => $this->numberHistory($connections),
             'oauthStates' => $oauthStates,
+            'pendingSelection' => $this->pendingSelectionForView($currentTenant),
+            'allowManualConnect' => (bool) config('unified-inbox.meta.allow_manual_connect'),
             'metaConfig' => [
                 'app_id' => (string) config('unified-inbox.meta.app_id'),
                 'version' => (string) config('unified-inbox.meta.version', 'v21.0'),
@@ -99,13 +118,57 @@ class ChannelController extends Controller
         }
 
         try {
-            $tokenData = $this->metaClient->exchangeCodeForToken($code);
+            // Prefer the single central OAuth redirect URI (same for every tenant/channel).
+            $tokenData = $this->metaClient->exchangeCodeForToken(
+                $code,
+                $this->oauth->getCentralOAuthRedirectUrl()
+            );
             $accessToken = (string) ($tokenData['access_token'] ?? '');
 
             if (! $accessToken) {
                 throw new Exception('No access token returned from Meta.');
             }
 
+            return $this->finishAuthorizedConnect($request, $currentTenant, $channel, $accessToken);
+        } catch (Exception $e) {
+            session()->flash('error', 'Failed to connect Meta channels: '.$e->getMessage());
+        }
+
+        return redirect()->route('admin.unified_inbox.channels.index');
+    }
+
+    /**
+     * Development / App Review path: FB.login returns a short-lived user token (no code/redirect_uri).
+     */
+    public function acceptUserToken(Request $request): RedirectResponse
+    {
+        abort_unless((bool) config('unified-inbox.meta.allow_manual_connect'), 403);
+
+        $currentTenant = $this->requireCurrentTenant();
+        $channel = $this->consumeOAuthState($request, $currentTenant);
+        $shortToken = (string) $request->input('access_token');
+
+        if ($shortToken === '' || $channel === 'whatsapp') {
+            session()->flash('error', 'Meta authorization token was missing.');
+
+            return redirect()->route('admin.unified_inbox.channels.index');
+        }
+
+        try {
+            $tokenData = $this->metaClient->exchangeShortLivedToken($shortToken);
+            $accessToken = (string) ($tokenData['access_token'] ?? $shortToken);
+
+            return $this->finishAuthorizedConnect($request, $currentTenant, $channel, $accessToken);
+        } catch (Exception $e) {
+            session()->flash('error', 'Failed to connect Meta channels: '.$e->getMessage());
+        }
+
+        return redirect()->route('admin.unified_inbox.channels.index');
+    }
+
+    protected function finishAuthorizedConnect(Request $request, Tenant $currentTenant, string $channel, string $accessToken): RedirectResponse
+    {
+        try {
             $this->ensureInboundDelivery();
 
             $wabaId = (string) $request->input('waba_id');
@@ -172,87 +235,41 @@ class ChannelController extends Controller
                 }
             }
 
-            // 2. Facebook Pages & Instagram Accounts
-            if ($channel !== 'whatsapp') {
+            // 2. Messenger / Instagram: list assets, then let the user pick from a dropdown.
+            if (in_array($channel, ['messenger', 'instagram'], true)) {
+                $preferredPageIds = collect($request->input('page_ids', []))
+                    ->merge([(string) $request->input('page_id', '')])
+                    ->map(fn ($id) => (string) $id)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
                 try {
-                    $pages = $this->metaClient->getFacebookPages($accessToken);
-                    $messengerIds = [];
-                    $instagramIds = [];
+                    $pages = $this->metaClient->getFacebookPages($accessToken, $preferredPageIds);
+                } catch (Exception $e) {
+                    Log::warning('Unified Inbox could not list Facebook Pages after Meta signup.', [
+                        'channel' => $channel,
+                        'reason' => $e->getMessage(),
+                    ]);
 
-                    foreach ($pages as $page) {
-                        $pageId = (string) ($page['id'] ?? '');
-                        $pageName = (string) ($page['name'] ?? 'Facebook Page');
-                        $pageToken = (string) ($page['access_token'] ?? $accessToken);
-
-                        if ($pageId) {
-                            $this->channelRepository->updateOrCreate(
-                                ['channel' => 'messenger', 'external_id' => $pageId],
-                                [
-                                    'name' => $pageName,
-                                    'status' => 'connected',
-                                    'credentials' => [
-                                        'access_token' => $pageToken,
-                                        'page_id' => $pageId,
-                                    ],
-                                    'metadata' => [
-                                        'page_name' => $pageName,
-                                    ],
-                                ]
-                            );
-
-                            $this->router->registerRoute($currentTenant->id, 'messenger', $pageId, null, $pageName);
-                            $messengerIds[] = $pageId;
-                            $connectedChannel = true;
-
-                            try {
-                                $this->metaClient->subscribePageApps($pageId, $pageToken);
-                            } catch (Exception $e) {
-                                Log::warning('Unified Inbox could not subscribe the Facebook Page to webhooks.', [
-                                    'reason' => $e->getMessage(),
-                                ]);
-                            }
-
-                            // Check connected Instagram business account
-                            $igAccount = $page['instagram_business_account'] ?? null;
-                            if (is_array($igAccount) && ! empty($igAccount['id'])) {
-                                $igId = (string) $igAccount['id'];
-                                $igUsername = (string) ($igAccount['username'] ?? $pageName);
-
-                                $this->channelRepository->updateOrCreate(
-                                    ['channel' => 'instagram', 'external_id' => $igId],
-                                    [
-                                        'name' => '@'.$igUsername,
-                                        'status' => 'connected',
-                                        'credentials' => [
-                                            'access_token' => $pageToken,
-                                            'instagram_id' => $igId,
-                                            'page_id' => $pageId,
-                                        ],
-                                        'metadata' => [
-                                            'username' => $igUsername,
-                                            'name' => $igAccount['name'] ?? $igUsername,
-                                        ],
-                                    ]
-                                );
-
-                                $this->router->registerRoute($currentTenant->id, 'instagram', $igId, null, '@'.$igUsername);
-                                $instagramIds[] = $igId;
-                                $connectedChannel = true;
-                            }
-                        }
-                    }
-
-                    if ($messengerIds !== []) {
-                        $this->retireOtherConnections($currentTenant, 'messenger', $messengerIds);
-                        $this->syncConnected('messenger', $messengerIds);
-                    }
-
-                    if ($instagramIds !== []) {
-                        $this->retireOtherConnections($currentTenant, 'instagram', $instagramIds);
-                        $this->syncConnected('instagram', $instagramIds);
-                    }
-                } catch (Exception) {
+                    throw new Exception('Could not load Facebook Pages from Meta: '.$e->getMessage(), 0, $e);
                 }
+
+                $assets = $this->oauth->buildSelectableAssets($channel, $pages, $accessToken);
+
+                if ($assets === []) {
+                    $hint = $this->metaPageDiscoveryHint($accessToken);
+
+                    throw new Exception($channel === 'messenger'
+                        ? 'No Facebook Pages with messaging access were found for this login. Confirm pages_show_list, pages_messaging, pages_manage_metadata (and business_management if needed) are granted.'.$hint
+                        : 'No Instagram professional accounts linked to a Facebook Page were found for this login. Link IG in Meta Business Suite, then reconnect.'.$hint);
+                }
+
+                $this->storePendingSelection($currentTenant, $channel, $assets);
+                session()->flash('success', 'Select a '.($channel === 'instagram' ? 'Instagram account' : 'Facebook Page').' to finish connecting.');
+
+                return redirect()->route('admin.unified_inbox.channels.index');
             }
 
             if (! $connectedChannel) {
@@ -268,10 +285,64 @@ class ChannelController extends Controller
     }
 
     /**
-     * Manual / Sandbox credential submission for dev / QA environments.
+     * Bind the Page / Instagram asset chosen from the post-OAuth dropdown.
+     */
+    public function completeSelection(Request $request): RedirectResponse
+    {
+        $currentTenant = $this->requireCurrentTenant();
+        $validated = $request->validate([
+            'selection_id' => 'required|string|size:64',
+            'asset_id' => 'required|string|max:64',
+        ]);
+
+        $pending = $this->pullPendingSelection($currentTenant, $validated['selection_id']);
+
+        if ($pending === null) {
+            session()->flash('error', 'This Meta connection session expired. Click Connect and try again.');
+
+            return redirect()->route('admin.unified_inbox.channels.index');
+        }
+
+        $selected = collect($pending['assets'])->firstWhere('id', (string) $validated['asset_id']);
+
+        if (! is_array($selected)) {
+            session()->flash('error', 'Selected account is not available. Click Connect and try again.');
+
+            return redirect()->route('admin.unified_inbox.channels.index');
+        }
+
+        try {
+            $this->ensureInboundDelivery();
+            $this->activateSelectedAsset($currentTenant, (string) $pending['channel'], $selected);
+            session()->flash('success', ucfirst((string) $pending['channel']).' channel connected successfully.');
+        } catch (Exception $e) {
+            session()->flash('error', 'Failed to connect Meta channels: '.$e->getMessage());
+        }
+
+        return redirect()->route('admin.unified_inbox.channels.index');
+    }
+
+    public function cancelSelection(Request $request): RedirectResponse
+    {
+        $currentTenant = $this->requireCurrentTenant();
+        $pending = session()->get('unified_inbox.meta_pending_selection');
+
+        if (is_array($pending) && (int) ($pending['tenant_id'] ?? 0) === (int) $currentTenant->id) {
+            session()->forget('unified_inbox.meta_pending_selection');
+        }
+
+        session()->flash('success', 'Meta account selection cancelled.');
+
+        return redirect()->route('admin.unified_inbox.channels.index');
+    }
+
+    /**
+     * Manual / Sandbox credential submission for Development mode and App Review demos.
      */
     public function manualConnect(Request $request): RedirectResponse
     {
+        abort_unless((bool) config('unified-inbox.meta.allow_manual_connect'), 403);
+
         $currentTenant = $this->requireCurrentTenant();
 
         $validated = $request->validate([
@@ -328,7 +399,7 @@ class ChannelController extends Controller
      */
     protected function numberHistory($connections): array
     {
-        $counts = \Webkul\UnifiedInbox\Models\Conversation::query()
+        $counts = Conversation::query()
             ->selectRaw('channel, account_id, COUNT(*) as total')
             ->groupBy('channel', 'account_id')
             ->get()
@@ -447,6 +518,200 @@ class ChannelController extends Controller
         foreach ($connections as $connection) {
             $this->historySync->sync($connection);
         }
+    }
+
+    protected function metaPageDiscoveryHint(string $accessToken): string
+    {
+        try {
+            $info = $this->metaClient->describeTokenAssets($accessToken);
+            $scopes = $info['scopes'] !== [] ? implode(', ', $info['scopes']) : 'none';
+            $granular = $info['granular'] !== []
+                ? collect($info['granular'])->map(fn ($row) => $row['scope'].'('.$row['targets'].')')->implode(', ')
+                : 'none';
+
+            Log::warning('Unified Inbox Messenger connect found no Pages.', [
+                'scopes' => $info['scopes'],
+                'granular' => $info['granular'],
+            ]);
+
+            return " Token scopes: {$scopes}. Granular targets: {$granular}.";
+        } catch (Exception $e) {
+            return ' Token inspection failed: '.$e->getMessage();
+        }
+    }
+
+    protected function redeemMetaTicket(Request $request, Tenant $tenant): void
+    {
+        $ticket = (string) $request->query('meta_ticket', '');
+
+        if ($ticket === '') {
+            return;
+        }
+
+        $payload = $this->oauth->pullSelectionTicket($ticket);
+
+        if (! is_array($payload)
+            || (int) ($payload['tenant_id'] ?? 0) !== (int) $tenant->id
+            || (int) ($payload['user_id'] ?? 0) !== (int) auth()->guard('user')->id()
+            || empty($payload['assets'])
+        ) {
+            session()->flash('error', 'Meta account selection expired. Click Connect and try again.');
+
+            return;
+        }
+
+        $this->storePendingSelection($tenant, (string) $payload['channel'], $payload['assets']);
+        session()->flash('success', 'Select a '.(((string) $payload['channel'] === 'instagram') ? 'Instagram account' : 'Facebook Page').' to finish connecting.');
+    }
+
+    /**
+     * @param  list<array{id: string, name: string, page_id: string, access_token: string, instagram_id?: string}>  $assets
+     */
+    protected function storePendingSelection(Tenant $tenant, string $channel, array $assets): void
+    {
+        session()->put('unified_inbox.meta_pending_selection', [
+            'selection_id' => bin2hex(random_bytes(32)),
+            'channel' => $channel,
+            'tenant_id' => $tenant->id,
+            'user_id' => auth()->guard('user')->id(),
+            'expires_at' => now()->addMinutes(10)->timestamp,
+            'assets' => $assets,
+        ]);
+    }
+
+    /**
+     * @return array{selection_id: string, channel: string, assets: list<array{id: string, name: string}>}|null
+     */
+    protected function pendingSelectionForView(Tenant $tenant): ?array
+    {
+        $pending = session()->get('unified_inbox.meta_pending_selection');
+
+        if (! is_array($pending)
+            || (int) ($pending['tenant_id'] ?? 0) !== (int) $tenant->id
+            || (int) ($pending['user_id'] ?? 0) !== (int) auth()->guard('user')->id()
+            || (int) ($pending['expires_at'] ?? 0) < now()->timestamp
+            || empty($pending['assets'])
+            || empty($pending['selection_id'])
+        ) {
+            if (is_array($pending)) {
+                session()->forget('unified_inbox.meta_pending_selection');
+            }
+
+            return null;
+        }
+
+        return [
+            'selection_id' => (string) $pending['selection_id'],
+            'channel' => (string) $pending['channel'],
+            'assets' => collect($pending['assets'])
+                ->map(fn ($asset) => [
+                    'id' => (string) ($asset['id'] ?? ''),
+                    'name' => (string) ($asset['name'] ?? $asset['id'] ?? ''),
+                ])
+                ->filter(fn ($asset) => $asset['id'] !== '')
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return array{selection_id: string, channel: string, assets: list<array<string, mixed>>}|null
+     */
+    protected function pullPendingSelection(Tenant $tenant, string $selectionId): ?array
+    {
+        $pending = session()->pull('unified_inbox.meta_pending_selection');
+
+        if (! is_array($pending)
+            || (string) ($pending['selection_id'] ?? '') !== $selectionId
+            || (int) ($pending['tenant_id'] ?? 0) !== (int) $tenant->id
+            || (int) ($pending['user_id'] ?? 0) !== (int) auth()->guard('user')->id()
+            || (int) ($pending['expires_at'] ?? 0) < now()->timestamp
+        ) {
+            return null;
+        }
+
+        return $pending;
+    }
+
+    /**
+     * @param  array{id: string, name: string, page_id: string, access_token: string, instagram_id?: string}  $selected
+     */
+    protected function activateSelectedAsset(Tenant $tenant, string $channel, array $selected): void
+    {
+        $token = (string) ($selected['access_token'] ?? '');
+        $pageId = (string) ($selected['page_id'] ?? '');
+        $name = (string) ($selected['name'] ?? $selected['id']);
+
+        if ($token === '' || $pageId === '') {
+            throw new Exception('Selected Meta account is missing credentials.');
+        }
+
+        if ($channel === 'messenger') {
+            $externalId = (string) $selected['id'];
+
+            $this->channelRepository->updateOrCreate(
+                ['channel' => 'messenger', 'external_id' => $externalId],
+                [
+                    'name' => $name,
+                    'status' => 'connected',
+                    'credentials' => [
+                        'access_token' => $token,
+                        'page_id' => $pageId,
+                    ],
+                    'metadata' => [
+                        'page_name' => $name,
+                        'mode' => 'oauth_selection',
+                    ],
+                ]
+            );
+
+            $this->router->registerRoute($tenant->id, 'messenger', $externalId, null, $name);
+            $this->retireOtherConnections($tenant, 'messenger', [$externalId]);
+
+            try {
+                $this->metaClient->subscribePageApps($pageId, $token);
+            } catch (Exception $e) {
+                Log::warning('Unified Inbox could not subscribe the Facebook Page to webhooks.', [
+                    'reason' => $e->getMessage(),
+                ]);
+            }
+
+            $this->syncConnected('messenger', [$externalId]);
+
+            return;
+        }
+
+        $igId = (string) ($selected['instagram_id'] ?? $selected['id']);
+
+        $this->channelRepository->updateOrCreate(
+            ['channel' => 'instagram', 'external_id' => $igId],
+            [
+                'name' => $name,
+                'status' => 'connected',
+                'credentials' => [
+                    'access_token' => $token,
+                    'instagram_id' => $igId,
+                    'page_id' => $pageId,
+                ],
+                'metadata' => [
+                    'username' => ltrim($name, '@'),
+                    'mode' => 'oauth_selection',
+                ],
+            ]
+        );
+
+        $this->router->registerRoute($tenant->id, 'instagram', $igId, null, $name);
+        $this->retireOtherConnections($tenant, 'instagram', [$igId]);
+
+        try {
+            $this->metaClient->subscribePageApps($pageId, $token);
+        } catch (Exception $e) {
+            Log::warning('Unified Inbox could not subscribe the Facebook Page to webhooks.', [
+                'reason' => $e->getMessage(),
+            ]);
+        }
+
+        $this->syncConnected('instagram', [$igId]);
     }
 
     protected function requireCurrentTenant(): Tenant

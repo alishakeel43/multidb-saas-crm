@@ -11,11 +11,13 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Webkul\Contact\Models\PersonProxy;
 use Webkul\UnifiedInbox\Repositories\ChannelConnectionRepository;
 use Webkul\UnifiedInbox\Repositories\ConversationRepository;
 use Webkul\UnifiedInbox\Repositories\MessageRepository;
 use Webkul\UnifiedInbox\Services\CentralWebhookRouter;
+use Webkul\UnifiedInbox\Services\MetaGraphClient;
 
 class WebhookController extends Controller
 {
@@ -23,7 +25,8 @@ class WebhookController extends Controller
         protected ConversationRepository $conversationRepository,
         protected MessageRepository $messageRepository,
         protected ChannelConnectionRepository $channelRepository,
-        protected CentralWebhookRouter $centralRouter
+        protected CentralWebhookRouter $centralRouter,
+        protected MetaGraphClient $metaGraph
     ) {}
 
     /**
@@ -268,15 +271,17 @@ class WebhookController extends Controller
                     }
 
                     if ($messageId !== '') {
+                        $profile = $this->resolveMessagingCustomerProfile($channel, $pageId, $senderId);
                         $this->storeInboundMessage(
                             channel: $channel,
                             accountId: $pageId,
                             externalSenderId: $senderId,
-                            customerName: ucfirst($channel).' User',
+                            customerName: $profile['name'],
                             externalMessageId: $messageId,
                             body: $body ?: 'New message',
                             attachments: $attachments,
-                            occurredAt: $this->timestamp($event['timestamp'] ?? null, milliseconds: true)
+                            occurredAt: $this->timestamp($event['timestamp'] ?? null, milliseconds: true),
+                            avatarUrl: $profile['profile_pic'] !== '' ? $profile['profile_pic'] : null,
                         );
                     }
                 }
@@ -290,15 +295,17 @@ class WebhookController extends Controller
                 $payload = (string) ($postback['payload'] ?? '');
 
                 if ($senderId !== '' && $senderId !== $pageId) {
+                    $profile = $this->resolveMessagingCustomerProfile($channel, $pageId, $senderId);
                     $this->storeInboundMessage(
                         channel: $channel,
                         accountId: $pageId,
                         externalSenderId: $senderId,
-                        customerName: ucfirst($channel).' User',
+                        customerName: $profile['name'],
                         externalMessageId: (string) ($postback['mid'] ?? '') ?: 'postback:'.sha1($senderId.'|'.($event['timestamp'] ?? '').'|'.$payload),
                         body: '[Button] '.($title !== '' ? $title : $payload),
                         attachments: [array_filter(['type' => 'postback', 'title' => $title ?: null, 'payload' => $payload !== '' ? mb_substr($payload, 0, 1000) : null])],
-                        occurredAt: $this->timestamp($event['timestamp'] ?? null, milliseconds: true)
+                        occurredAt: $this->timestamp($event['timestamp'] ?? null, milliseconds: true),
+                        avatarUrl: $profile['profile_pic'] !== '' ? $profile['profile_pic'] : null,
                     );
                 }
             }
@@ -363,11 +370,12 @@ class WebhookController extends Controller
         string $externalMessageId,
         string $body,
         array $attachments = [],
-        ?Carbon $occurredAt = null
+        ?Carbon $occurredAt = null,
+        ?string $avatarUrl = null,
     ): void {
         $occurredAt ??= now();
 
-        DB::transaction(function () use ($channel, $accountId, $externalSenderId, $customerName, $externalMessageId, $body, $attachments, $occurredAt) {
+        DB::transaction(function () use ($channel, $accountId, $externalSenderId, $customerName, $externalMessageId, $body, $attachments, $occurredAt, $avatarUrl) {
             // Same customer on an older/other number of this tenant: carry CRM links into the new
             // number's conversation and remember the previous thread (its history stays untouched).
             $previous = $this->conversationRepository->getModel()->newQuery()
@@ -434,12 +442,77 @@ class WebhookController extends Controller
                 $conversation->last_message_at = $occurredAt;
             }
 
-            if ($conversation->customer_name === 'WhatsApp User') {
+            if ($this->isPlaceholderCustomerName((string) $conversation->customer_name) && $customerName !== '') {
                 $conversation->customer_name = $customerName;
+            }
+
+            if (
+                $avatarUrl
+                && Schema::hasColumn($conversation->getTable(), 'avatar_url')
+                && blank($conversation->avatar_url)
+            ) {
+                $conversation->avatar_url = $avatarUrl;
             }
 
             $conversation->save();
         }, 3);
+    }
+
+    /**
+     * Fetch Messenger/Instagram sender profile from Graph (webhook payload has no name).
+     *
+     * @return array{name: string, profile_pic: string}
+     */
+    protected function resolveMessagingCustomerProfile(string $channel, string $accountId, string $senderId): array
+    {
+        $fallback = ['name' => ucfirst($channel).' User', 'profile_pic' => ''];
+
+        try {
+            $connection = $this->channelRepository->findOneWhere([
+                'channel' => $channel,
+                'external_id' => $accountId,
+                'status' => 'connected',
+            ]);
+
+            // Instagram rows sometimes store the Page ID in metadata while external_id is the IG account.
+            if (! $connection && $channel === 'instagram') {
+                $connection = $this->channelRepository->getModel()->newQuery()
+                    ->where('channel', 'instagram')
+                    ->where('status', 'connected')
+                    ->where(function ($query) use ($accountId) {
+                        $query->where('external_id', $accountId)
+                            ->orWhere('metadata->page_id', $accountId);
+                    })
+                    ->first();
+            }
+
+            $token = (string) (($connection?->credentials ?? [])['access_token'] ?? '');
+
+            if ($token === '' || $senderId === '') {
+                return $fallback;
+            }
+
+            $profile = $this->metaGraph->messagingUserProfile($senderId, $token, $channel);
+            $name = trim((string) ($profile['name'] ?? ''));
+
+            return [
+                'name' => $name !== '' ? $name : $fallback['name'],
+                'profile_pic' => (string) ($profile['profile_pic'] ?? ''),
+            ];
+        } catch (\Throwable $e) {
+            Log::info('Unified Inbox could not resolve '.$channel.' sender name.', [
+                'sender_id' => $senderId,
+                'account_id' => $accountId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $fallback;
+        }
+    }
+
+    protected function isPlaceholderCustomerName(string $name): bool
+    {
+        return in_array($name, ['', 'WhatsApp User', 'Messenger User', 'Instagram User'], true);
     }
 
     protected function updateDeliveryStatus(string $channel, string $accountId, string $recipientId, string $messageId, string $status): void

@@ -47,10 +47,7 @@
             <a class="primary-button" href="{{ route('admin.unified_inbox.channels.index') }}">@lang('unified_inbox::app.inbox.connect-channels')</a>
         </section>
         @else
-        <div class="ui-columns {{ ($hasFolders ?? false) ? 'ui-has-rail' : '' }}">
-            @if ($hasFolders ?? false)
-                @include('unified_inbox::partials.rail')
-            @endif
+        <div class="ui-columns">
             @include('unified_inbox::partials.list')
 
             @if ($activeConversation)
@@ -58,38 +55,25 @@
                     <!-- Center Chat Column -->
                     <section class="ui-chat ui-thread ui-thread-{{ $activeConversation->channel }}">
                         <header class="ui-chat-header">
-                            <a class="secondary-button ui-icon-btn ui-back" href="{{ route('admin.unified_inbox.index', request()->except('conversation_id')) }}" aria-label="Back">←</a>
-                            @php $displayName = $activeConversation->customer_name; @endphp
-                            <span class="ui-avatar">@if ($activeConversation->avatar_url)<img class="ui-avatar-img" src="{{ $activeConversation->avatar_url }}" alt="" referrerpolicy="no-referrer">@else{{ mb_strtoupper(mb_substr($displayName, 0, 1)) }}@endif</span>
-                            <div class="ui-chat-title">
-                                <h1 class="truncate">{{ $displayName }}</h1>
-                                <p class="ui-chat-sub">
-                                    <span class="ui-pill ui-pill-{{ $activeConversation->channel }}">
-                                        <span class="ui-channel ui-channel-{{ $activeConversation->channel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $activeConversation->channel])</span>
-                                        {{ $channels[$activeConversation->channel]['label'] ?? ucfirst($activeConversation->channel) }}
-                                    </span>
-                                    <span class="font-mono">{{ $activeConversation->external_id }}</span>
-                                    @if (isset($uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id]))
-                                        <span class="ui-pill ui-pill-oldnum" title="This conversation happened on a number that is no longer connected">via old number {{ $uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id] }}</span>
-                                    @endif
-                                    <span class="ui-pill ui-pill-status-{{ $activeConversation->status }}">{{ ucfirst($activeConversation->status) }}</span>
-                                </p>
+                            <div class="ui-chat-identity">
+                                <a class="secondary-button ui-icon-btn ui-back" href="{{ route('admin.unified_inbox.index', request()->except('conversation_id')) }}" aria-label="Back">←</a>
+                                @php $displayName = $activeConversation->customer_name; @endphp
+                                <span class="ui-avatar">@if ($activeConversation->avatar_url)<img class="ui-avatar-img" src="{{ $activeConversation->avatar_url }}" alt="" referrerpolicy="no-referrer">@else{{ mb_strtoupper(mb_substr($displayName, 0, 1)) }}@endif</span>
+                                <div class="ui-chat-title">
+                                    <h1 class="truncate">{{ $displayName }}</h1>
+                                    <p class="ui-chat-sub">
+                                        <span class="ui-pill ui-pill-{{ $activeConversation->channel }}">
+                                            <span class="ui-channel ui-channel-{{ $activeConversation->channel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $activeConversation->channel])</span>
+                                            {{ $channels[$activeConversation->channel]['label'] ?? ucfirst($activeConversation->channel) }}
+                                        </span>
+                                        @if (isset($uiOldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id]))
+                                            <span class="ui-pill ui-pill-oldnum" title="This conversation happened on a number that is no longer connected">via old number</span>
+                                        @endif
+                                        <span class="ui-pill ui-pill-status-{{ $activeConversation->status }}">{{ ucfirst($activeConversation->status) }}</span>
+                                    </p>
+                                </div>
                             </div>
                             <div class="ui-chat-actions">
-                                @php $assigneeName = $activeConversation->user?->name; @endphp
-                                <div class="ui-assignee-chip {{ $assigneeName ? 'is-assigned' : 'is-empty' }}" title="{{ $assigneeName ? 'Assigned to '.$assigneeName : 'No agent assigned' }}">
-                                    <span class="ui-assignee-chip-icon" aria-hidden="true">
-                                        @if ($assigneeName)
-                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.14 0-7.5 2.24-7.5 5v1.25c0 .41.34.75.75.75h13.5c.41 0 .75-.34.75-.75V19c0-2.76-3.36-5-7.5-5Z"/></svg>
-                                        @else
-                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1c0-3 3-5 7-5s7 2 7 5v1"/><path d="M19 8v6M16 11h6"/></svg>
-                                        @endif
-                                    </span>
-                                    <span class="ui-assignee-chip-copy">
-                                        <span class="ui-assignee-chip-label">{{ $assigneeName ? 'Assigned to' : 'Assignee' }}</span>
-                                        <span class="ui-assignee-chip-name">{{ $assigneeName ?? 'Unassigned' }}</span>
-                                    </span>
-                                </div>
                                 @if ($hasFolders ?? false)
                                     <button type="button" class="ui-flag-btn {{ $activeConversation->status === 'closed' ? 'is-on' : '' }}" onclick="updateConversationStatus({{ $activeConversation->id }}, '{{ $activeConversation->status === 'closed' ? 'open' : 'closed' }}')" title="{{ $activeConversation->status === 'closed' ? 'Move back to Inbox' : 'Mark done (moves to Done)' }}">✓ {{ $activeConversation->status === 'closed' ? 'Reopen' : 'Mark done' }}</button>
                                     <button type="button" class="ui-flag-btn {{ $activeConversation->is_follow_up ? 'is-on' : '' }}" onclick="uiSetFlag({{ $activeConversation->id }}, 'is_follow_up', {{ $activeConversation->is_follow_up ? 'false' : 'true' }})" aria-pressed="{{ $activeConversation->is_follow_up ? 'true' : 'false' }}">⚑ Follow up</button>
@@ -312,7 +296,7 @@
                             <div class="ui-side-panels">
                                 <div class="ui-side-panel" role="tabpanel" data-side-panel="overview">
                                     <section class="ui-profile-head">
-                                        <span class="ui-avatar ui-avatar-lg">{{ mb_strtoupper(mb_substr($c->customer_name, 0, 1)) }}</span>
+                                        <span class="ui-avatar ui-avatar-lg">@if ($c->avatar_url)<img class="ui-avatar-img" src="{{ $c->avatar_url }}" alt="" referrerpolicy="no-referrer" loading="lazy">@else{{ mb_strtoupper(mb_substr($c->customer_name, 0, 1)) }}@endif</span>
                                         <div class="ui-profile-head-copy">
                                             <h2>{{ $c->customer_name }}</h2>
                                             <span class="ui-pill ui-pill-{{ $c->channel }}">{{ $channels[$c->channel]['label'] ?? ucfirst($c->channel) }}</span>
@@ -562,6 +546,13 @@
             <div class="ui-compose-body">
                 <div id="ui-compose-channels" class="ui-compose-channels" role="radiogroup" aria-label="Channel"></div>
                 <p class="ui-compose-help" id="ui-compose-help"></p>
+                <div id="ui-compose-search-wrap" class="ui-compose-search" hidden>
+                    <label>
+                        Search contacts
+                        <input id="ui-compose-search" type="search" autocomplete="off" placeholder="Search by name, email, or ID">
+                    </label>
+                    <div id="ui-compose-search-results" class="ui-compose-search-results" hidden role="listbox"></div>
+                </div>
                 <label>
                     <span id="ui-compose-recipient-label">Recipient</span>
                     <input id="ui-compose-recipient" name="recipient" autocomplete="off" required>
@@ -617,25 +608,31 @@
     @pushOnce('scripts')
     <script>
         const uiComposeTemplatesUrl = @js(route('admin.unified_inbox.compose.templates'));
+        const uiComposeContactsUrl = @js(route('admin.unified_inbox.compose.contacts'));
         const uiComposeStoreUrl = @js(route('admin.unified_inbox.compose.store'));
         const uiComposeChannels = @js(collect($channels)->filter(fn ($channel, $key) => ($uiLinked ?? collect())->contains($key))->map(fn ($channel, $key) => ['key' => $key, 'label' => $channel['label'] ?? ucfirst($key)])->values());
         let uiComposeChannel = null;
         let uiComposeSlots = [];
+        let uiComposeSearchTimer = null;
 
         function uiApplyComposeChannel(channel) {
             uiComposeChannel = channel;
             const whatsapp = channel === 'whatsapp';
-            document.getElementById('ui-compose-title').textContent = whatsapp ? 'Message a WhatsApp number' : (channel === 'instagram' ? 'Message an Instagram contact' : 'Message a Messenger contact');
+            document.getElementById('ui-compose-title').textContent = 'New message';
             document.getElementById('ui-compose-help').textContent = whatsapp
-                ? 'Send an approved template. Enter the number with the country code and digits only.'
-                : 'Meta delivers this only to someone who has already messaged this account. Enter their contact ID.';
+                ? 'One dialog for all channels. WhatsApp: send an approved template to any number (country code, digits only).'
+                : 'Search by name or CRM email (or paste Contact ID). Meta only allows messaging people who already contacted this Page/account — not the whole Facebook directory.';
             document.getElementById('ui-compose-recipient-label').textContent = whatsapp ? 'WhatsApp number' : 'Contact ID';
-            document.getElementById('ui-compose-recipient').placeholder = whatsapp ? '15125550100' : 'Contact ID';
+            document.getElementById('ui-compose-recipient').placeholder = whatsapp ? '15125550100' : 'PSID / Instagram-scoped ID';
             document.getElementById('ui-compose-wa').hidden = !whatsapp;
             document.getElementById('ui-compose-text').hidden = whatsapp;
             document.getElementById('ui-compose-name-field').hidden = whatsapp;
+            document.getElementById('ui-compose-search-wrap').hidden = whatsapp;
             document.getElementById('ui-compose-template').required = whatsapp;
             document.getElementById('ui-compose-body').required = !whatsapp;
+            document.getElementById('ui-compose-search').value = '';
+            document.getElementById('ui-compose-search-results').hidden = true;
+            document.getElementById('ui-compose-search-results').replaceChildren();
             document.querySelectorAll('.ui-compose-channel').forEach(button => {
                 const selected = button.dataset.channel === channel;
                 button.classList.toggle('is-selected', selected);
@@ -643,6 +640,8 @@
             });
             if (whatsapp) {
                 uiLoadTemplates();
+            } else {
+                uiSearchComposeContacts('');
             }
         }
 
@@ -674,8 +673,63 @@
             if (!dialog.open) {
                 dialog.showModal();
             }
-            document.getElementById('ui-compose-recipient').focus();
+            const focusId = selected === 'whatsapp' ? 'ui-compose-recipient' : 'ui-compose-search';
+            document.getElementById(focusId).focus();
         }
+
+        async function uiSearchComposeContacts(query) {
+            if (!uiComposeChannel || uiComposeChannel === 'whatsapp') {
+                return;
+            }
+
+            const results = document.getElementById('ui-compose-search-results');
+            results.hidden = false;
+            results.textContent = 'Searching…';
+
+            try {
+                const url = uiComposeContactsUrl + '?channel=' + encodeURIComponent(uiComposeChannel) + '&q=' + encodeURIComponent(query || '');
+                const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const data = await response.json();
+                const contacts = data.contacts || [];
+                results.replaceChildren();
+
+                if (!contacts.length) {
+                    const empty = document.createElement('p');
+                    empty.className = 'ui-compose-search-empty';
+                    empty.textContent = query
+                        ? 'No matching contacts yet. Meta cannot search all Facebook users — only people who already messaged this account.'
+                        : 'No previous Messenger/Instagram contacts in this inbox yet. When someone messages your Page, they appear here.';
+                    results.appendChild(empty);
+                    return;
+                }
+
+                contacts.forEach(contact => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'ui-compose-search-item';
+                    button.setAttribute('role', 'option');
+                    button.innerHTML = '<strong></strong><span></span>';
+                    button.querySelector('strong').textContent = contact.name;
+                    const meta = [contact.email, contact.id, contact.preview].filter(Boolean).join(' · ');
+                    button.querySelector('span').textContent = meta;
+                    button.addEventListener('click', () => {
+                        document.getElementById('ui-compose-recipient').value = contact.id;
+                        document.getElementById('ui-compose-name').value = contact.name;
+                        results.hidden = true;
+                        document.getElementById('ui-compose-body').focus();
+                    });
+                    results.appendChild(button);
+                });
+            } catch (err) {
+                results.textContent = 'Could not search contacts.';
+            }
+        }
+
+        document.getElementById('ui-compose-search').addEventListener('input', function () {
+            clearTimeout(uiComposeSearchTimer);
+            const value = this.value.trim();
+            uiComposeSearchTimer = setTimeout(() => uiSearchComposeContacts(value), 250);
+        });
 
         function uiCloseCompose() {
             document.getElementById('ui-compose').close();

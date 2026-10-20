@@ -1,10 +1,23 @@
 @php
-    $uiBase = request()->only('search', 'channel', 'status', 'unread', 'folder', 'label');
+    $uiBase = request()->only('search', 'channel', 'folder', 'label');
     $uiChip = function (array $set) use ($uiBase) {
         return route('admin.unified_inbox.index', array_filter(array_merge($uiBase, $set), fn ($v) => $v !== null && $v !== ''));
     };
-    $uiStatus = request('status');
-    $uiUnread = request()->boolean('unread');
+    $uiFolder = $folder ?? request('folder');
+    $uiLabel = $labelFilter ?? request('label');
+    $uiFolderCounts = $folderCounts ?? [];
+    // Meta-style pills under search (folders moved out of the left rail).
+    $uiMetaFilters = ($hasFolders ?? false)
+        ? [
+            'inbox' => 'Inbox',
+            'unread' => 'Unread',
+            'follow_up' => 'Follow up',
+            'done' => 'Done',
+            'spam' => 'Spam',
+        ]
+        : [
+            'unread' => 'Unread',
+        ];
 @endphp
 
 <aside class="ui-list" aria-label="Conversations">
@@ -15,10 +28,8 @@
     <div class="ui-list-toolbar">
         <form method="GET" action="{{ route('admin.unified_inbox.index') }}" class="ui-list-search">
             <input type="hidden" name="channel" value="{{ request('channel') }}">
-            <input type="hidden" name="status" value="{{ $uiStatus }}">
-            @if ($uiUnread)<input type="hidden" name="unread" value="1">@endif
-            @if (request('folder'))<input type="hidden" name="folder" value="{{ request('folder') }}">@endif
-            @if (request('label'))<input type="hidden" name="label" value="{{ request('label') }}">@endif
+            @if ($uiFolder)<input type="hidden" name="folder" value="{{ $uiFolder }}">@endif
+            @if ($uiLabel)<input type="hidden" name="label" value="{{ $uiLabel }}">@endif
             <label class="ui-search">
                 <span class="sr-only">Search</span>
                 <input type="search" name="search" value="{{ request('search') }}" placeholder="Search conversations..." maxlength="200">
@@ -34,12 +45,33 @@
         @endif
     </div>
 
-    <div class="ui-chips" role="group" aria-label="Filters">
-        <a class="ui-chip" href="{{ $uiChip(['unread' => $uiUnread ? null : 1]) }}" @if($uiUnread) aria-pressed="true" @endif>Unread</a>
-        @foreach (['open' => 'Open', 'pending' => 'Pending', 'closed' => 'Closed'] as $value => $label)
-            <a class="ui-chip" href="{{ $uiChip(['status' => $uiStatus === $value ? null : $value]) }}" @if($uiStatus === $value) aria-pressed="true" @endif>{{ $label }}</a>
+    <div class="ui-chips ui-meta-filters" role="group" aria-label="Inbox filters">
+        @foreach ($uiMetaFilters as $value => $label)
+            @php
+                if ($value === 'inbox') {
+                    $isActive = blank($uiFolder);
+                    $href = $uiChip(['folder' => null]);
+                } elseif ($value === 'unread' && ! ($hasFolders ?? false)) {
+                    $isActive = request()->boolean('unread');
+                    $href = $uiChip(['unread' => $isActive ? null : 1]);
+                } else {
+                    $isActive = $uiFolder === $value;
+                    $href = $uiChip(['folder' => $isActive ? null : $value]);
+                }
+                $count = (int) ($uiFolderCounts[$value] ?? 0);
+            @endphp
+            <a class="ui-chip" href="{{ $href }}" @if($isActive) aria-pressed="true" @endif>
+                <span>{{ $label }}</span>
+                @if ($count > 0)<span class="ui-chip-count">{{ $count }}</span>@endif
+            </a>
         @endforeach
-        @if ($uiStatus || $uiUnread || request('search') || request('folder') || request('label'))
+        @foreach (($allLabels ?? []) as $chipLabel)
+            <a class="ui-chip ui-chip-label" href="{{ $uiChip(['label' => $uiLabel === $chipLabel ? null : $chipLabel]) }}" @if($uiLabel === $chipLabel) aria-pressed="true" @endif style="--ui-label-hue: {{ crc32($chipLabel) % 360 }}">
+                <span class="ui-label-dot" aria-hidden="true"></span>
+                <span>{{ $chipLabel }}</span>
+            </a>
+        @endforeach
+        @if ($uiFolder || $uiLabel || request('search') || request()->boolean('unread'))
             <a class="ui-chip ui-chip-clear" href="{{ route('admin.unified_inbox.index', request()->only('channel')) }}">Clear</a>
         @endif
     </div>

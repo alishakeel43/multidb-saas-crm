@@ -4,6 +4,7 @@ namespace Webkul\UnifiedInbox\Services;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 use Webkul\UnifiedInbox\Models\ChannelConnection;
 use Webkul\UnifiedInbox\Repositories\ConversationRepository;
@@ -86,8 +87,35 @@ class InboxHistorySync
         }
 
         $customerName = (string) ($customer['name'] ?? $customer['username'] ?? ucfirst($connection->channel).' User');
+        $avatarUrl = (string) ($customer['profile_pic'] ?? $customer['picture'] ?? '');
+        $token = (string) (($connection->credentials ?? [])['access_token'] ?? '');
+
+        if ($token !== '' && ($customerName === '' || str_ends_with($customerName, ' User') || $avatarUrl === '')) {
+            try {
+                $profile = $this->meta->messagingUserProfile($customerId, $token, $connection->channel);
+                if (($profile['name'] ?? '') !== '') {
+                    $customerName = $profile['name'];
+                }
+                if (($profile['profile_pic'] ?? '') !== '') {
+                    $avatarUrl = $profile['profile_pic'];
+                }
+            } catch (Throwable) {
+                // Keep conversation participant fields from the thread payload.
+            }
+        }
+
         $rows = array_reverse((array) ($thread['messages']['data'] ?? []));
         $stored = 0;
+
+        $attributes = [
+            'customer_name' => $customerName,
+            'status' => 'open',
+            'unread_count' => 0,
+        ];
+
+        if ($avatarUrl !== '' && Schema::hasColumn('unified_inbox_conversations', 'avatar_url')) {
+            $attributes['avatar_url'] = $avatarUrl;
+        }
 
         $conversation = $this->conversations->getModel()->newQuery()->firstOrCreate(
             [
@@ -95,11 +123,7 @@ class InboxHistorySync
                 'account_id' => (string) $connection->external_id,
                 'external_id' => $customerId,
             ],
-            [
-                'customer_name' => $customerName,
-                'status' => 'open',
-                'unread_count' => 0,
-            ]
+            $attributes
         );
 
         foreach ($rows as $row) {
@@ -140,6 +164,14 @@ class InboxHistorySync
 
         if ($conversation->customer_name === '' || str_ends_with($conversation->customer_name, ' User')) {
             $conversation->customer_name = $customerName;
+        }
+
+        if (
+            $avatarUrl !== ''
+            && Schema::hasColumn($conversation->getTable(), 'avatar_url')
+            && blank($conversation->avatar_url)
+        ) {
+            $conversation->avatar_url = $avatarUrl;
         }
 
         $conversation->save();
