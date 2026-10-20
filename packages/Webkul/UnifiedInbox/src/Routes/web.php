@@ -37,6 +37,7 @@ Route::middleware(['web', 'admin_locale', 'user'])
     ->group(function () {
         // Main Unified Inbox view
         Route::get('unified-inbox', [InboxController::class, 'index'])->name('index');
+        Route::get('unified-inbox/updates', [InboxController::class, 'updates'])->name('updates');
         Route::get('unified-inbox/compose/templates', [InboxController::class, 'composeTemplates'])->name('compose.templates');
         Route::get('unified-inbox/compose/contacts', [InboxController::class, 'composeContacts'])->name('compose.contacts');
         Route::post('unified-inbox/compose', [InboxController::class, 'compose'])->name('compose.store');

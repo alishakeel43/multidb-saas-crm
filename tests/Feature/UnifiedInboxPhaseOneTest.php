@@ -237,6 +237,25 @@ it('deletes a chat on every channel and shows it again with only new messages', 
         ->assertJsonCount(1, 'messages');
 })->with(['whatsapp', 'messenger', 'instagram']);
 
+it('changes the inbox update version when a message arrives or its status changes', function () {
+    $conversation = uiP1Setup();
+    $version = fn () => $this->actingAs($this->user, 'user')
+        ->getJson(route('admin.unified_inbox.updates'))
+        ->assertSuccessful()
+        ->json('version');
+
+    $before = $version();
+    expect($version())->toBe($before);
+
+    $message = Message::create(['conversation_id' => $conversation->id, 'direction' => 'outbound', 'external_id' => 'wamid.poll', 'body' => 'Ping', 'status' => 'sent', 'occurred_at' => now()]);
+    $afterCreate = $version();
+    expect($afterCreate)->not->toBe($before);
+
+    $this->travel(1)->seconds();
+    $message->update(['status' => 'read']);
+    expect($version())->not->toBe($afterCreate);
+});
+
 it('returns not found when deleting an unknown chat', function () {
     $this->actingAs($this->user, 'user')
         ->deleteJson(route('admin.unified_inbox.conversations.destroy', 999999))

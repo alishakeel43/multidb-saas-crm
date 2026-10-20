@@ -1510,17 +1510,22 @@
         }
 
         // Keep every channel current without navigating or reloading the browser page.
-        // Meta delivers webhooks server-side; this lightweight poll paints those saved rows into the open inbox.
+        // Meta delivers webhooks server-side; a cheap version check every 2s re-renders the open inbox only when something changed.
         (function () {
+            const UPDATES_URL = "{{ route('admin.unified_inbox.updates') }}";
             let refreshing = false;
+            let version = null;
+            let pending = false;
+            let lastRefresh = Date.now();
 
             async function refreshInbox() {
-                if (refreshing || document.hidden) return;
+                if (refreshing || document.hidden) return false;
 
                 const search = document.querySelector('.ui-list-search input[name="search"]');
-                if (search === document.activeElement) return;
+                if (search === document.activeElement) return false;
 
                 refreshing = true;
+                lastRefresh = Date.now();
 
                 try {
                     const response = await fetch(window.location.href, {
@@ -1528,7 +1533,7 @@
                         credentials: 'same-origin',
                     });
 
-                    if (!response.ok) return;
+                    if (!response.ok) return false;
 
                     const documentSnapshot = new DOMParser().parseFromString(await response.text(), 'text/html');
                     const nextTabs = documentSnapshot.querySelector('.ui-tabs');
@@ -1551,14 +1556,44 @@
 
                         if (hasNewMessage && nearBottom) history.scrollTop = history.scrollHeight;
                     }
+
+                    return true;
                 } catch (error) {
                     // A temporary network failure must not interrupt typing or replying.
+                    return false;
                 } finally {
                     refreshing = false;
                 }
             }
 
-            setInterval(refreshInbox, 8000);
+            let checking = false;
+
+            async function checkForUpdates() {
+                if (checking || document.hidden) return;
+                checking = true;
+
+                try {
+                    const response = await fetch(UPDATES_URL, {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                        cache: 'no-store',
+                    });
+
+                    if (response.ok) {
+                        const next = (await response.json()).version;
+                        if (version !== null && next !== version) pending = true;
+                        version = next;
+                    }
+                } catch (error) {
+                    // Fall through to the periodic full refresh.
+                }
+
+                // Timestamps are per second, so a full refresh every 30s catches two changes inside the same second.
+                if ((pending || Date.now() - lastRefresh > 30000) && await refreshInbox()) pending = false;
+                checking = false;
+            }
+
+            setInterval(checkForUpdates, 2000);
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden) refreshInbox();
             });

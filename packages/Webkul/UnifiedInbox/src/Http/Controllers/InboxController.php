@@ -251,6 +251,24 @@ class InboxController extends Controller
     }
 
     /**
+     * Cheap change marker for the open inbox: it re-renders only when this value changes.
+     * Covers new messages, delivery/read ticks, unsends, status/flag changes and deleted chats.
+     */
+    public function updates(): JsonResponse
+    {
+        $conversations = $this->conversationRepository->getModel()->newQuery()->toBase()
+            ->selectRaw('MAX(id) as id, MAX(updated_at) as updated_at')
+            ->first();
+        $messages = $this->messageRepository->getModel()->newQuery()->toBase()
+            ->selectRaw('MAX(id) as id, MAX(updated_at) as updated_at')
+            ->first();
+
+        return response()
+            ->json(['version' => md5(json_encode([$conversations, $messages]))])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /**
      * Messenger and Instagram photos are not in the thread list. Ask Graph for a missing
      * picture, and remember a refusal for 30 minutes so the inbox does not call Meta on every refresh.
      */
