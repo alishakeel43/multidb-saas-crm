@@ -77,5 +77,6 @@ Route::middleware(['web', 'admin_locale', 'user'])
             Route::post('cancel-selection', [ChannelController::class, 'cancelSelection'])->name('cancel_selection');
             Route::post('manual', [ChannelController::class, 'manualConnect'])->name('manual');
             Route::post('{id}/disconnect', [ChannelController::class, 'disconnect'])->name('disconnect');
+            Route::get('{channel}/logs', [ChannelController::class, 'logs'])->whereIn('channel', ['whatsapp', 'messenger', 'instagram'])->name('logs');
         });
     });

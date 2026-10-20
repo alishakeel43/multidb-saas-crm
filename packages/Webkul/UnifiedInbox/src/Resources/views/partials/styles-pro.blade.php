@@ -93,5 +93,9 @@
     .ui-sandbox-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
     .ui-asset-picker{border:1px solid #bfd7ff;background:#f5f9ff}
     @media (max-width:720px){.ui-sandbox-grid{grid-template-columns:1fr}}
+    .ui-channels-foot .ui-channels-logs{display:flex;justify-content:center;width:100%;margin-top:8px}
+    .ui-logs-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .ui-logs-stats span{padding:4px 10px;border:1px solid var(--ui-line,#e7eaf2);border-radius:999px;font-size:12px}
+    .ui-numhist .is-failed{color:#b42318;font-weight:600}
 </style>
 @endPushOnce

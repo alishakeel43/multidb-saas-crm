@@ -395,6 +395,44 @@ class ChannelController extends Controller
     }
 
     /**
+     * Dedicated per-channel logs page: number/account history plus recent
+     * message and delivery-status events stored in the tenant database.
+     */
+    public function logs(string $channel): View
+    {
+        $this->requireCurrentTenant();
+
+        $connections = $this->channelRepository->all();
+
+        $history = array_values(array_filter(
+            $this->numberHistory($connections),
+            fn ($row) => $row['channel'] === $channel
+        ));
+
+        $events = \Webkul\UnifiedInbox\Models\Message::query()
+            ->with('conversation:id,channel,account_id,customer_name')
+            ->whereHas('conversation', fn ($q) => $q->where('channel', $channel))
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->paginate(50);
+
+        $stats = \Webkul\UnifiedInbox\Models\Message::query()
+            ->whereHas('conversation', fn ($q) => $q->where('channel', $channel))
+            ->selectRaw('direction, status, COUNT(*) as total')
+            ->groupBy('direction', 'status')
+            ->get();
+
+        return view('unified_inbox::admin.channels.logs', [
+            'channel' => $channel,
+            'title' => trans('unified_inbox::app.channels.'.$channel.'-title'),
+            'history' => $history,
+            'events' => $events,
+            'stats' => $stats,
+            'webhookUrl' => $this->router->getCentralWebhookUrl(),
+        ]);
+    }
+
+    /**
      * Current + archived numbers/accounts with dates and conversation counts (never deleted).
      */
     protected function numberHistory($connections): array

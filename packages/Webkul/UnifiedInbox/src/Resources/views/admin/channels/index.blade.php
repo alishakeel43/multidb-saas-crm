@@ -59,6 +59,7 @@
                                 @else
                                     <button type="button" onclick="launchMetaEmbeddedSignup('{{ $key }}')" class="ui-channels-btn ui-channels-connect">Connect</button>
                                 @endif
+                                <a href="{{ route('admin.unified_inbox.channels.logs', $key) }}" class="secondary-button ui-channels-logs">@lang('unified_inbox::app.channels.open-logs')</a>
                             </div>
                         </section>
                     @endforeach
