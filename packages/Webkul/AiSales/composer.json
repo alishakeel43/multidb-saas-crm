@@ -1,0 +1,17 @@
+{
+    "name": "webkul/ai-sales",
+    "description": "Authenticated tenant-aware integration for the ZARIS AI Sales Engine",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Webkul\\AiSales\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webkul\\AiSales\\Providers\\AiSalesServiceProvider"
+            ]
+        }
+    }
+}

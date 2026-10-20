@@ -1,5 +1,7 @@
 # Changelog
 
+- Added an authenticated, tenant-aware AI Sales Engine API for creating CRM leads and human approval activities.
+
 ## Unreleased
 
 - Fix Messenger/Instagram Development-scopes Meta login failing with "Invalid Scopes: business_management" by no longer requesting `business_management`; Pages are still found through `/me/accounts`, and the Business Manager fallbacks are skipped when that permission isn't granted.

@@ -256,6 +256,41 @@ it('changes the inbox update version when a message arrives or its status change
     expect($version())->not->toBe($afterCreate);
 });
 
+it('alerts new customer messages from every channel since the last seen message', function () {
+    $updates = fn (int $after = 0) => $this->actingAs($this->user, 'user')
+        ->getJson(route('admin.unified_inbox.updates', ['after' => $after]))
+        ->assertSuccessful();
+
+    Message::create(['conversation_id' => uiP1Setup()->id, 'direction' => 'inbound', 'external_id' => 'wamid.seen', 'body' => 'Seen', 'status' => 'received', 'occurred_at' => now()]);
+
+    $baseline = $updates()->assertJsonPath('alerts', [])->json('latest_inbound_id');
+    expect($baseline)->toBeGreaterThan(0);
+
+    foreach (['whatsapp', 'messenger', 'instagram'] as $channel) {
+        $conversation = Conversation::create([
+            'channel' => $channel,
+            'account_id' => 'ACC_'.$channel,
+            'external_id' => 'cust_'.$channel,
+            'customer_name' => ucfirst($channel).' Customer',
+            'status' => 'open',
+            'last_message_at' => now(),
+        ]);
+
+        Message::create(['conversation_id' => $conversation->id, 'direction' => 'inbound', 'external_id' => 'in.'.$channel, 'body' => 'Hello from '.$channel, 'status' => 'received', 'occurred_at' => now()]);
+        Message::create(['conversation_id' => $conversation->id, 'direction' => 'outbound', 'external_id' => 'out.'.$channel, 'body' => 'Reply', 'status' => 'sent', 'occurred_at' => now()]);
+        Message::create(['conversation_id' => $conversation->id, 'direction' => 'inbound', 'external_id' => 'old.'.$channel, 'body' => 'Synced history', 'status' => 'received', 'occurred_at' => now()->subDay()]);
+    }
+
+    $response = $updates((int) $baseline);
+    $alerts = collect($response->json('alerts'));
+
+    expect($alerts->pluck('channel')->sort()->values()->all())->toBe(['instagram', 'messenger', 'whatsapp'])
+        ->and($alerts->pluck('preview')->all())->each->toStartWith('Hello from')
+        ->and($alerts->firstWhere('channel', 'instagram')['customer_name'])->toBe('Instagram Customer');
+
+    $updates((int) $response->json('latest_inbound_id'))->assertJsonPath('alerts', []);
+});
+
 it('renders an empty conversation list after the last chat of a channel is deleted', function () {
     $conversation = uiP1Setup();
 

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Webkul\Activity\Models\ActivityProxy;
 use Webkul\Activity\Repositories\ActivityRepository;
@@ -254,7 +255,7 @@ class InboxController extends Controller
      * Cheap change marker for the open inbox: it re-renders only when this value changes.
      * Covers new messages, delivery/read ticks, unsends, status/flag changes and deleted chats.
      */
-    public function updates(): JsonResponse
+    public function updates(Request $request): JsonResponse
     {
         $conversations = $this->conversationRepository->getModel()->newQuery()->toBase()
             ->selectRaw('MAX(id) as id, MAX(updated_at) as updated_at')
@@ -263,9 +264,68 @@ class InboxController extends Controller
             ->selectRaw('MAX(id) as id, MAX(updated_at) as updated_at')
             ->first();
 
+        $latestInbound = (int) $this->messageRepository->getModel()->newQuery()
+            ->where('direction', 'inbound')
+            ->max('id');
+
         return response()
-            ->json(['version' => md5(json_encode([$conversations, $messages]))])
+            ->json([
+                'version' => md5(json_encode([$conversations, $messages])),
+                'latest_inbound_id' => $latestInbound,
+                'alerts' => $this->newMessageAlerts((int) $request->query('after', 0), $latestInbound),
+            ])
             ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * Customer messages received after the browser's last seen message ID, on every channel.
+     * History sync also imports old inbound rows, so only recent messages raise an alert.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function newMessageAlerts(int $after, int $latestInbound): array
+    {
+        if ($after <= 0 || $latestInbound <= $after) {
+            return [];
+        }
+
+        $channels = config('unified-inbox.channels', []);
+
+        return $this->messageRepository->getModel()->newQuery()
+            ->with('conversation')
+            ->where('direction', 'inbound')
+            ->where('id', '>', $after)
+            ->where('occurred_at', '>=', now()->subMinutes(10))
+            ->whereHas('conversation', function ($query) {
+                if (Schema::hasColumn('unified_inbox_conversations', 'is_spam')) {
+                    $query->where(fn ($inner) => $inner->whereNull('is_spam')->orWhere('is_spam', false));
+                }
+            })
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get()
+            ->reject(fn ($message) => $message->isDeleted())
+            ->map(function ($message) use ($channels) {
+                $conversation = $message->conversation;
+                $preview = trim((string) $message->body);
+
+                return [
+                    'id' => $message->id,
+                    'conversation_id' => $conversation->id,
+                    'channel' => $conversation->channel,
+                    'channel_label' => $channels[$conversation->channel]['label'] ?? ucfirst((string) $conversation->channel),
+                    'customer_name' => $conversation->customer_name ?: $conversation->external_id,
+                    'preview' => $preview !== ''
+                        ? Str::limit($preview, 120)
+                        : trans('unified_inbox::app.inbox.alert-attachment'),
+                    'url' => route('admin.unified_inbox.index', [
+                        'channel' => $conversation->channel,
+                        'conversation_id' => $conversation->id,
+                    ]),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**

@@ -33,6 +33,11 @@
     <div class="ui-workspace ui-inbox {{ $activeConversation ? 'ui-detail' : 'ui-index' }}" style="--ui-chrome: {{ $uiChrome }}px" v-pre>
         @include('unified_inbox::partials.header')
 
+        <div class="ui-alerts" id="ui-alerts" role="status" aria-live="polite"></div>
+        @foreach (array_keys($channels) as $uiAlertChannel)
+            <template id="ui-alert-icon-{{ $uiAlertChannel }}"><span class="ui-channel ui-channel-{{ $uiAlertChannel }}" aria-hidden="true">@include('unified_inbox::partials.channel-icon', ['channel' => $uiAlertChannel])</span></template>
+        @endforeach
+
         @if (! $uiTabLinked)
         <section class="ui-connect-gate">
             @if ($uiTab)
@@ -1566,6 +1571,60 @@
                 }
             }
 
+            const ALERT_TITLE = @json(__('unified_inbox::app.inbox.alert-title', ['channel' => ':channel']));
+            const ALERT_OPEN = @json(__('unified_inbox::app.inbox.alert-open'));
+            let lastInboundId = 0;
+
+            function showAlert(alert) {
+                const container = document.getElementById('ui-alerts');
+                if (!container) return;
+
+                const item = document.createElement('a');
+                item.className = 'ui-alert ui-alert-' + alert.channel;
+                item.href = alert.url;
+
+                const icon = document.getElementById('ui-alert-icon-' + alert.channel);
+                if (icon) item.appendChild(icon.content.cloneNode(true));
+
+                const text = document.createElement('span');
+                text.className = 'ui-alert-text';
+                text.innerHTML = '<small>' + escapeHtml(ALERT_TITLE.replace(':channel', alert.channel_label)) + '</small>'
+                    + '<strong>' + escapeHtml(alert.customer_name || '') + '</strong>'
+                    + '<span>' + escapeHtml(alert.preview || '') + '</span>';
+                item.appendChild(text);
+
+                const open = document.createElement('span');
+                open.className = 'ui-alert-open';
+                open.textContent = ALERT_OPEN;
+                item.appendChild(open);
+
+                const close = document.createElement('button');
+                close.type = 'button';
+                close.className = 'ui-alert-close';
+                close.setAttribute('aria-label', 'Dismiss');
+                close.textContent = '\u00d7';
+                close.addEventListener('click', event => {
+                    event.preventDefault();
+                    item.remove();
+                });
+                item.appendChild(close);
+
+                container.prepend(item);
+                while (container.children.length > 4) container.lastElementChild.remove();
+                setTimeout(() => item.remove(), 8000);
+            }
+
+            function handleAlerts(payload) {
+                const latest = Number(payload.latest_inbound_id || 0);
+                const alerts = (payload.alerts || [])
+                    .filter(alert => !(typeof UI_CONV_ID !== 'undefined' && alert.conversation_id === UI_CONV_ID))
+                    .reverse();
+
+                alerts.forEach(showAlert);
+
+                if (latest > lastInboundId) lastInboundId = latest;
+            }
+
             let checking = false;
 
             async function checkForUpdates() {
@@ -1573,16 +1632,18 @@
                 checking = true;
 
                 try {
-                    const response = await fetch(UPDATES_URL, {
+                    const response = await fetch(UPDATES_URL + '?after=' + lastInboundId, {
                         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                         credentials: 'same-origin',
                         cache: 'no-store',
                     });
 
                     if (response.ok) {
-                        const next = (await response.json()).version;
+                        const payload = await response.json();
+                        const next = payload.version;
                         if (version !== null && next !== version) pending = true;
                         version = next;
+                        handleAlerts(payload);
                     }
                 } catch (error) {
                     // Fall through to the periodic full refresh.

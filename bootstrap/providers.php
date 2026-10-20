@@ -7,6 +7,7 @@ use Barryvdh\DomPDF\ServiceProvider;
 use Konekt\Concord\ConcordServiceProvider;
 use Prettus\Repository\Providers\RepositoryServiceProvider;
 use Webkul\Activity\Providers\ActivityServiceProvider;
+use Webkul\AiSales\Providers\AiSalesServiceProvider;
 use Webkul\Admin\Providers\AdminServiceProvider;
 use Webkul\AiKnowledge\Providers\AiKnowledgeServiceProvider;
 use Webkul\Assignment\Providers\AssignmentServiceProvider;
@@ -57,6 +58,7 @@ return [
      * Webkul Service Providers...
      */
     ActivityServiceProvider::class,
+    AiSalesServiceProvider::class,
     AiKnowledgeServiceProvider::class,
     AdminServiceProvider::class,
     AssignmentServiceProvider::class,
