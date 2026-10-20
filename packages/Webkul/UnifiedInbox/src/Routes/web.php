@@ -70,5 +70,6 @@ Route::middleware(['web', 'admin_locale', 'user'])
             Route::get('callback', [ChannelController::class, 'callback'])->name('meta.callback');
             Route::post('manual', [ChannelController::class, 'manualConnect'])->name('manual');
             Route::post('{id}/disconnect', [ChannelController::class, 'disconnect'])->name('disconnect');
+            Route::get('{channel}/logs', [ChannelController::class, 'logs'])->whereIn('channel', ['whatsapp', 'messenger', 'instagram'])->name('logs');
         });
     });

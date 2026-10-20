@@ -78,5 +78,9 @@
     .ui-numhist table{width:100%;border-collapse:collapse;font-size:13px}
     .ui-numhist th,.ui-numhist td{padding:8px 10px;border-bottom:1px solid var(--ui-line,#e7eaf2);text-align:left}
     .ui-numhist .is-current{color:#11733b;font-weight:600}
+    .ui-channels-foot .ui-channels-logs{display:flex;justify-content:center;width:100%;margin-top:8px}
+    .ui-logs-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .ui-logs-stats span{padding:4px 10px;border:1px solid var(--ui-line,#e7eaf2);border-radius:999px;font-size:12px}
+    .ui-numhist .is-failed{color:#b42318;font-weight:600}
 </style>
 @endPushOnce
