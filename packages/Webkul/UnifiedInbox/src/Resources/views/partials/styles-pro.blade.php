@@ -58,6 +58,9 @@
     .ui-flag-btn:hover{border-color:var(--ui-accent,#444cf4)}
     .ui-flag-btn.is-on{background:#e8e9fe;border-color:var(--ui-accent,#444cf4);color:var(--ui-accent,#444cf4)}
     .ui-flag-btn.is-spam.is-on{background:#fde8e8;border-color:#e5484d;color:#b42318}
+    .ui-flag-btn.is-danger{color:#b42318}
+    .ui-flag-btn.is-danger:hover{border-color:#e5484d;background:#fff1f1}
+    .ui-flag-btn:disabled{cursor:wait;opacity:.5}
     /* 24h service window */
     .ui-window{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:12px;margin-bottom:6px}
     .ui-window-open{background:#e7f7ee;color:#11733b}

@@ -58,6 +58,7 @@ class InboxController extends Controller
         $folder = in_array($request->input('folder'), ['inbox', 'unread', 'follow_up', 'done', 'spam'], true) ? $request->input('folder') : null;
         $labelFilter = trim((string) $request->input('label', ''));
         $hasFolders = Schema::hasColumn('unified_inbox_conversations', 'is_spam');
+        $canClear = Schema::hasColumn('unified_inbox_conversations', 'cleared_at');
         $activeId = $request->input('conversation_id');
 
         $connections = $this->channelRepository->all();
@@ -88,6 +89,10 @@ class InboxController extends Controller
                     });
                 }
             });
+        }
+
+        if ($canClear) {
+            $query->notCleared();
         }
 
         if ($channelFilter && in_array($channelFilter, ['whatsapp', 'messenger', 'instagram'])) {
@@ -144,6 +149,9 @@ class InboxController extends Controller
             } else {
                 $base->whereRaw('1 = 0');
             }
+            if ($canClear) {
+                $base->notCleared();
+            }
             if ($channelFilter && in_array($channelFilter, ['whatsapp', 'messenger', 'instagram'])) {
                 $base->where('channel', $channelFilter);
             }
@@ -184,7 +192,7 @@ class InboxController extends Controller
 
         $activeMessages = collect();
         if ($activeConversation) {
-            $activeMessages = $activeConversation->messages()
+            $activeMessages = $activeConversation->visibleMessages()
                 ->orderByDesc('occurred_at')
                 ->paginate(50, ['*'], 'messages_page')
                 ->withQueryString();
@@ -233,11 +241,12 @@ class InboxController extends Controller
             'historyChannels' => $this->conversationRepository->getModel()->newQuery()
                 ->whereIn('channel', $historyConnections->where('status', '!=', 'connected')->pluck('channel')->unique()->all() ?: ['__none__'])
                 ->distinct()->pluck('channel')->all(),
-            'priorThreads' => $activeConversation ? $this->priorThreads($activeConversation, $connections) : collect(),
+            'canClear' => $canClear,
+            'priorThreads' => $activeConversation ? $this->priorThreads($activeConversation, $connections, $canClear) : collect(),
             'continuation' => $activeConversation && isset($oldNumbers[$activeConversation->channel.'|'.$activeConversation->account_id])
                 ? $this->continuationFor($activeConversation)
                 : null,
-            'channelTabStats' => $this->channelTabStats($connections, $historyConnections, $hasFolders),
+            'channelTabStats' => $this->channelTabStats($connections, $historyConnections, $hasFolders, $canClear),
         ]);
     }
 
@@ -310,7 +319,7 @@ class InboxController extends Controller
      *
      * @return array<string, array{connected: bool, conversations: int, unread: int}>
      */
-    protected function channelTabStats($connections, $historyConnections, bool $hasFolders): array
+    protected function channelTabStats($connections, $historyConnections, bool $hasFolders, bool $canClear = false): array
     {
         $channels = array_keys(config('unified-inbox.channels', [
             'whatsapp' => [],
@@ -333,6 +342,10 @@ class InboxController extends Controller
 
             if ($hasFolders) {
                 $query->where(fn ($inner) => $inner->whereNull('is_spam')->orWhere('is_spam', false));
+            }
+
+            if ($canClear) {
+                $query->notCleared();
             }
 
             $counts = $query->toBase()
@@ -360,20 +373,21 @@ class InboxController extends Controller
     /**
      * Same customer (wa_id / PSID) on other numbers of this tenant, oldest number first, with recent messages.
      */
-    protected function priorThreads($conversation, $connections)
+    protected function priorThreads($conversation, $connections, bool $canClear = false)
     {
         return $this->conversationRepository->getModel()->newQuery()
             ->where('channel', $conversation->channel)
             ->where('external_id', $conversation->external_id)
             ->where('id', '!=', $conversation->id)
+            ->when($canClear, fn ($query) => $query->notCleared())
             ->orderBy('last_message_at')
             ->get()
             ->map(function ($other) use ($connections) {
                 $conn = $connections->first(fn ($c) => $c->channel === $other->channel && $c->external_id === $other->account_id);
                 $other->number_label = $conn?->numberLabel() ?? $other->account_id;
                 $other->number_active = $conn?->status === 'connected';
-                $other->recent_messages = $other->messages()->orderByDesc('occurred_at')->limit(30)->get()->reverse()->values();
-                $other->message_total = $other->messages()->count();
+                $other->recent_messages = $other->visibleMessages()->orderByDesc('occurred_at')->limit(30)->get()->reverse()->values();
+                $other->message_total = $other->visibleMessages()->count();
 
                 return $other;
             });
@@ -695,7 +709,7 @@ class InboxController extends Controller
             $conversation->update(['unread_count' => 0]);
         }
 
-        $messages = $conversation->messages()
+        $messages = $conversation->visibleMessages()
             ->orderBy('occurred_at', 'asc')
             ->get();
 
@@ -728,6 +742,30 @@ class InboxController extends Controller
         return response()->json([
             'success' => true,
             'message' => $message->fresh(),
+        ]);
+    }
+
+    /**
+     * Delete a chat from this inbox. It reappears with only new messages if the customer writes again.
+     * Meta offers no API to delete a business conversation, so the customer's copy is unchanged.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        if (! Schema::hasColumn('unified_inbox_conversations', 'cleared_at')) {
+            return response()->json(['error' => 'Run the Unified Inbox migrations to enable deleting chats.'], 422);
+        }
+
+        $conversation = $this->conversationRepository->find($id);
+
+        if (! $conversation) {
+            return response()->json(['error' => 'Conversation not found.'], 404);
+        }
+
+        $this->conversationRepository->clear($conversation, auth()->guard('user')->id());
+
+        return response()->json([
+            'success' => true,
+            'url' => route('admin.unified_inbox.index', array_filter(['channel' => $conversation->channel])),
         ]);
     }
 

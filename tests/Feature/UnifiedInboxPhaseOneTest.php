@@ -191,6 +191,58 @@ it('does not delete a message through another conversation', function () {
     expect($message->fresh()->isDeleted())->toBeFalse();
 });
 
+it('deletes a chat on every channel and shows it again with only new messages', function (string $channel) {
+    Http::fake();
+    Storage::fake('local');
+    Storage::disk('local')->put('unified-inbox/chat/file.pdf', 'pdf');
+    $conversation = uiP1Setup();
+    $conversation->update(['channel' => $channel, 'unread_count' => 2, 'last_message_at' => now()->subMinute()]);
+    $other = Conversation::create(['channel' => $channel, 'account_id' => 'PHONE_P1', 'external_id' => '15550303030', 'customer_name' => 'Still Here Sam', 'status' => 'open', 'last_message_at' => now()]);
+    $message = Message::create(['conversation_id' => $conversation->id, 'direction' => 'inbound', 'external_id' => 'mid.chat.old', 'body' => 'Old secret', 'status' => 'received', 'attachments' => [['type' => 'document', 'path' => 'unified-inbox/chat/file.pdf']], 'occurred_at' => now()->subMinute()]);
+    $kept = Message::create(['conversation_id' => $other->id, 'direction' => 'inbound', 'external_id' => 'mid.chat.other', 'body' => 'Other chat', 'status' => 'received', 'occurred_at' => now()]);
+
+    $this->actingAs($this->user, 'user')
+        ->deleteJson(route('admin.unified_inbox.conversations.destroy', $conversation->id))
+        ->assertSuccessful()->assertJson(['success' => true]);
+
+    $conversation->refresh();
+    expect($conversation->cleared_at)->not->toBeNull()
+        ->and($conversation->unread_count)->toBe(0)
+        ->and($message->fresh()->isDeleted())->toBeTrue()
+        ->and($message->fresh()->external_id)->toBe('mid.chat.old')
+        ->and($kept->fresh()->body)->toBe('Other chat')
+        ->and(Storage::disk('local')->exists('unified-inbox/chat/file.pdf'))->toBeFalse();
+
+    Http::assertNothingSent();
+
+    $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.index', ['conversation_id' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertSee('Still Here Sam')
+        ->assertDontSee('Phase One Pat')
+        ->assertDontSee('Old secret');
+
+    $this->travel(1)->minutes();
+    Message::create(['conversation_id' => $conversation->id, 'direction' => 'inbound', 'external_id' => 'mid.chat.new', 'body' => 'Hello again', 'status' => 'received', 'occurred_at' => now()]);
+    $conversation->update(['last_message_at' => now(), 'last_message_preview' => 'Hello again']);
+
+    $this->actingAs($this->user, 'user')
+        ->get(route('admin.unified_inbox.index', ['conversation_id' => $conversation->id]))
+        ->assertSee('Phase One Pat')
+        ->assertSee('Hello again')
+        ->assertDontSee('You deleted this message');
+
+    $this->actingAs($this->user, 'user')
+        ->getJson(route('admin.unified_inbox.conversations.messages', $conversation->id))
+        ->assertJsonCount(1, 'messages');
+})->with(['whatsapp', 'messenger', 'instagram']);
+
+it('returns not found when deleting an unknown chat', function () {
+    $this->actingAs($this->user, 'user')
+        ->deleteJson(route('admin.unified_inbox.conversations.destroy', 999999))
+        ->assertNotFound();
+});
+
 it('marks a message the customer unsent on Instagram as deleted instead of storing a new one', function () {
     expect($this->tenant)->not->toBeNull();
     config()->set('unified-inbox.meta.app_secret', 'test_meta_app_secret');

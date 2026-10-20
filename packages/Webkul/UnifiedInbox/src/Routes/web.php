@@ -52,6 +52,7 @@ Route::middleware(['web', 'admin_locale', 'user'])
 
         // Conversation actions
         Route::prefix('unified-inbox/conversations/{id}')->name('conversations.')->group(function () {
+            Route::delete('', [InboxController::class, 'destroy'])->name('destroy');
             Route::get('messages', [InboxController::class, 'messages'])->name('messages');
             Route::delete('messages/{messageId}', [InboxController::class, 'destroyMessage'])->whereNumber('messageId')->name('messages.destroy');
             Route::post('send', [InboxController::class, 'send'])->name('send');

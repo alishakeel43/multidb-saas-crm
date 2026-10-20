@@ -26,6 +26,27 @@ class MessageRepository extends Repository
             return $message;
         }
 
+        $this->tombstone($message, $source, $userId);
+
+        $conversation = $message->conversation;
+        $latest = $conversation?->messages()->orderByDesc('occurred_at')->orderByDesc('id')->first();
+
+        if ($latest && $latest->is($message)) {
+            $conversation->update(['last_message_preview' => MessageModel::DELETED_BODY]);
+        }
+
+        return $message;
+    }
+
+    /**
+     * Strip the body and stored attachments, keeping the row (and its external_id) for de-duplication.
+     */
+    public function tombstone($message, string $source = 'agent', ?int $userId = null): void
+    {
+        if ($message->isDeleted()) {
+            return;
+        }
+
         foreach ((array) ($message->attachments ?? []) as $attachment) {
             $path = is_array($attachment) ? (string) ($attachment['path'] ?? '') : '';
 
@@ -43,14 +64,5 @@ class MessageRepository extends Repository
                 'deleted_source' => $source,
             ], fn ($value) => $value !== null)),
         ]);
-
-        $conversation = $message->conversation;
-        $latest = $conversation?->messages()->orderByDesc('occurred_at')->orderByDesc('id')->first();
-
-        if ($latest && $latest->is($message)) {
-            $conversation->update(['last_message_preview' => MessageModel::DELETED_BODY]);
-        }
-
-        return $message;
     }
 }

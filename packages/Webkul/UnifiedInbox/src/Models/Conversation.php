@@ -2,10 +2,12 @@
 
 namespace Webkul\UnifiedInbox\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Webkul\Activity\Models\ActivityProxy;
 use Webkul\Contact\Models\OrganizationProxy;
 use Webkul\Contact\Models\PersonProxy;
@@ -36,6 +38,7 @@ class Conversation extends Model implements ConversationContract
         'is_spam',
         'labels',
         'avatar_url',
+        'cleared_at',
     ];
 
     protected function casts(): array
@@ -47,13 +50,24 @@ class Conversation extends Model implements ConversationContract
             'is_spam' => 'boolean',
             'last_message_at' => 'datetime',
             'last_incoming_at' => 'datetime',
+            'cleared_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Hide deleted chats until a message newer than the deletion arrives.
+     */
+    public function scopeNotCleared(Builder $query): Builder
+    {
+        return $query->where(fn ($inner) => $inner
+            ->whereNull($this->qualifyColumn('cleared_at'))
+            ->orWhereColumn($this->qualifyColumn('last_message_at'), '>', $this->qualifyColumn('cleared_at')));
     }
 
     /**
      * WhatsApp customer service window: 24h after the last inbound message.
      */
-    public function serviceWindowEndsAt(): ?\Carbon\Carbon
+    public function serviceWindowEndsAt(): ?Carbon
     {
         return $this->last_incoming_at?->copy()->addHours(24);
     }
@@ -68,6 +82,17 @@ class Conversation extends Model implements ConversationContract
     public function messages(): HasMany
     {
         return $this->hasMany(MessageProxy::modelClass(), 'conversation_id');
+    }
+
+    /**
+     * Messages after the last "Delete chat"; earlier ones stay as tombstones so Meta history sync skips them.
+     */
+    public function visibleMessages(): HasMany
+    {
+        return $this->messages()->when(
+            $this->cleared_at,
+            fn ($query, $clearedAt) => $query->where('occurred_at', '>', $clearedAt)
+        );
     }
 
     public function person(): BelongsTo

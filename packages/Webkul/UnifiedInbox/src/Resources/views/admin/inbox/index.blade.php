@@ -89,6 +89,12 @@
                                         ><span class="ui-status-dot" aria-hidden="true"></span>{{ $stLabel }}</button>
                                     @endforeach
                                 </div>
+                                @if ($canClear ?? false)
+                                    <button type="button" class="ui-flag-btn is-danger" onclick="uiDeleteConversation({{ $activeConversation->id }}, this)" title="Delete this chat from the inbox">
+                                        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v4.5M9.2 6.5v4.5"/></svg>
+                                        Delete chat
+                                    </button>
+                                @endif
                             </div>
                         </header>
 
@@ -1439,6 +1445,17 @@
             placeholder.className = 'ui-message-deleted-text';
             placeholder.textContent = 'You deleted this message';
             article.prepend(placeholder);
+        }
+        async function uiDeleteConversation(conversationId, button) {
+            if (!confirm('Delete this chat and all its messages from the inbox? Linked CRM records and notes are kept. Meta does not allow businesses to delete conversations, so the customer still sees it on WhatsApp, Messenger or Instagram. If they write again, the chat reappears with only the new messages.')) return;
+            button.disabled = true;
+            const { ok, data } = await uiQrRequest('DELETE', '/conversations/' + conversationId);
+            if (!ok) {
+                button.disabled = false;
+                alert(data.message || data.error || 'Could not delete the chat.');
+                return;
+            }
+            window.location.assign(data.url || UI_BASE);
         }
         async function uiDeleteQuickReply(id) {
             if (!confirm('Delete this saved reply?')) return;
