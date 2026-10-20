@@ -142,5 +142,17 @@
     .ui-alert-close{border:0;background:none;cursor:pointer;color:var(--ui-muted,#74809a);font-size:16px;line-height:1;padding:0 2px}
     .dark .ui-alert{background:#1f2937;border-color:#374151;color:#f3f4f6}
     @keyframes ui-alert-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+    /* Full-page wait state while the Facebook / Meta auth popup is open */
+    .ui-meta-auth-loader{position:fixed;inset:0;z-index:10060;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(16,28,56,.45);backdrop-filter:blur(2px)}
+    .ui-meta-auth-loader[hidden]{display:none!important}
+    .ui-meta-auth-loader-card{display:flex;flex-direction:column;align-items:center;gap:10px;width:min(360px,100%);padding:28px 24px;border-radius:14px;background:#fff;border:1px solid var(--ui-line,#e7eaf2);box-shadow:0 18px 48px rgba(16,28,56,.22);text-align:center;color:var(--ui-ink,#101c38)}
+    .ui-meta-auth-loader-card strong{font-size:16px;line-height:1.3}
+    .ui-meta-auth-loader-card p{margin:0;font-size:13px;line-height:1.45;color:var(--ui-muted,#74809a)}
+    .ui-meta-auth-spinner{width:36px;height:36px;border-radius:999px;border:3px solid #dbe3f5;border-top-color:var(--ui-accent,#444cf4);animation:ui-meta-spin .7s linear infinite}
+    body.ui-meta-auth-busy{overflow:hidden}
+    body.ui-meta-auth-busy .ui-channels-connect{pointer-events:none;opacity:.65}
+    .dark .ui-meta-auth-loader-card{background:#1f2937;border-color:#374151;color:#f3f4f6}
+    .dark .ui-meta-auth-loader-card p{color:#9ca3af}
+    @keyframes ui-meta-spin{to{transform:rotate(360deg)}}
 </style>
 @endPushOnce

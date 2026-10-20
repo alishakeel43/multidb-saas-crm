@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- Show a full-page loader on Unified Inbox Channels while the Facebook / Meta auth popup is open, and keep it until the Meta redirect response is handled (or the user cancels).
 - Fix Messenger/Instagram Development-scopes Meta login failing with "Invalid Scopes: business_management" by no longer requesting `business_management`; Pages are still found through `/me/accounts`, and the Business Manager fallbacks are skipped when that permission isn't granted.
 - Fix the Unified Inbox returning a 500 error ("Undefined variable $uiStatus") whenever a channel tab or filter has no conversations, for example after deleting the last chat on Instagram.
 - Show new Unified Inbox messages, delivery/read ticks, and chat changes within about 2 seconds instead of 8: the open inbox polls a lightweight `unified-inbox/updates` version endpoint and re-renders only when it changes, with a full refresh every 30 seconds as a fallback. Adds `updated_at` indexes on the inbox conversation and message tables.

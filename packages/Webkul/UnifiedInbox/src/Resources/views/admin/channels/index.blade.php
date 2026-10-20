@@ -102,6 +102,22 @@
         </div>
     </div>
 
+    <div
+        id="ui-meta-auth-loader"
+        class="ui-meta-auth-loader"
+        hidden
+        aria-hidden="true"
+        role="status"
+        aria-live="polite"
+        aria-busy="false"
+    >
+        <div class="ui-meta-auth-loader-card">
+            <span class="ui-meta-auth-spinner" aria-hidden="true"></span>
+            <strong>@lang('unified_inbox::app.channels.auth-waiting')</strong>
+            <p>@lang('unified_inbox::app.channels.auth-waiting-hint')</p>
+        </div>
+    </div>
+
     @pushOnce('scripts')
     <script>
         const metaAppId = "{{ config('unified-inbox.meta.app_id') }}";
@@ -115,6 +131,30 @@
         const metaAcceptTokenUrl = @js(route('admin.unified_inbox.channels.accept_token'));
         const metaCsrfToken = @js(csrf_token());
         let activeMetaSignup = null;
+
+        function showMetaAuthLoader() {
+            const el = document.getElementById('ui-meta-auth-loader');
+            if (! el) {
+                return;
+            }
+
+            el.hidden = false;
+            el.setAttribute('aria-hidden', 'false');
+            el.setAttribute('aria-busy', 'true');
+            document.body.classList.add('ui-meta-auth-busy');
+        }
+
+        function hideMetaAuthLoader() {
+            const el = document.getElementById('ui-meta-auth-loader');
+            if (! el) {
+                return;
+            }
+
+            el.hidden = true;
+            el.setAttribute('aria-hidden', 'true');
+            el.setAttribute('aria-busy', 'false');
+            document.body.classList.remove('ui-meta-auth-busy');
+        }
 
         window.fbAsyncInit = function() {
             if (metaAppId && window.FB) {
@@ -162,6 +202,7 @@
 
             if (data.event === 'CANCEL' || data.event === 'ERROR') {
                 activeMetaSignup = null;
+                hideMetaAuthLoader();
                 alert('Meta signup was cancelled or could not be completed.');
                 return;
             }
@@ -350,18 +391,23 @@
                         })
                     };
 
+                showMetaAuthLoader();
+
                 FB.login(function(response) {
                     if (!activeMetaSignup) {
+                        hideMetaAuthLoader();
                         return;
                     }
 
                     if (usingScopes && response.authResponse && response.authResponse.accessToken) {
+                        // Keep the CRM loader visible until the accept-token redirect completes.
                         submitMetaUserToken(response.authResponse.accessToken);
                         return;
                     }
 
                     if (response.authResponse && response.authResponse.code) {
                         activeMetaSignup.code = response.authResponse.code;
+                        // Keep the CRM loader visible until the tenant callback redirect completes.
                         if (activeMetaSignup.channel === 'whatsapp') {
                             finishMetaSignup();
                         } else {
@@ -372,8 +418,10 @@
                     }
 
                     activeMetaSignup = null;
+                    hideMetaAuthLoader();
                 }, loginOptions);
             } else {
+                activeMetaSignup = null;
                 alert('Meta SDK is still loading. Please try again in a few moments.');
             }
         }

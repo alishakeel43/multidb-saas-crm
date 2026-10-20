@@ -12,6 +12,8 @@ return [
         'description' => 'Connect and manage WhatsApp Business, Facebook Messenger, and Instagram Direct channels using Meta Embedded Signup v4.',
         'connect-meta-btn' => 'Connect with Meta',
         'connecting' => 'Connecting...',
+        'auth-waiting' => 'Waiting for Meta login…',
+        'auth-waiting-hint' => 'Finish signing in with Facebook. This page continues when Meta returns a response.',
         'connected' => 'Connected',
         'disconnected' => 'Disconnected',
         'manage' => 'Manage',
