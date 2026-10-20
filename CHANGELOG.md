@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- Show "Powered by Zaristech" instead of Krayin on the admin login, forgot-password, and reset-password pages, through an English translation override in `lang/vendor/admin/en/app.php` so core Admin files stay unchanged.
 - Fix a sent Unified Inbox message briefly showing twice: the background refresh could already show the stored message before the send request returned, and the composer then added its own copy. The composer now skips a message the thread already shows, and a just-sent bubble is kept until a refresh contains it.
 - Notify the navbar bell of new WhatsApp, Messenger, and Instagram customer messages on every CRM page. A notification goes to the assigned agent, or to every active user with Unified Inbox access when the chat is unassigned; each chat keeps one unread notification showing its latest message, and it is marked read when the chat is opened. The bell now refreshes every 15 seconds and when the tab becomes visible, and immediately on the inbox page when new activity arrives.
 - Show a full-page loader on Unified Inbox Channels while the Facebook / Meta auth popup is open, and keep it until the Meta redirect response is handled (or the user cancels).
